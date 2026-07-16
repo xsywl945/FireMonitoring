@@ -32,5 +32,51 @@ docs/           Architecture, plans, runbooks, and test reports
 - One integrated camera and optional UVC USB camera
 - Native Windows FFmpeg/Python inference; Docker Compose for supporting services
 
-Detailed plans live in `docs/plans/`.
+## Current MVP
 
+- Spring Boot control plane with JWT/RBAC, zones, cameras, incident workflow, Flyway, WebSocket and Redis Stream ingestion;
+- Vue 3 operator console with real/mock API modes, dual-view player, device binding, incident handling and health views;
+- Python 3.11 inference service with bounded latest-frame queues, N/M temporal evidence, 500 ms dual-camera fusion, Redis publishing, mock replay, optional Ultralytics and Qwen3-VL-Plus adapters;
+- local MySQL, Redis, MinIO and MediaMTX infrastructure;
+- repeatable Windows bootstrap/start/verify/stop scripts.
+
+## Safe local demo
+
+Docker Desktop and Clash Verge TUN should be running. The script uses system networking and never stores a proxy endpoint.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\start-demo.ps1 -SkipCamera
+```
+
+The first run creates isolated Maven/Python/Node dependencies, starts the stack, creates a default classroom, and publishes a deterministic test incident. Open `http://127.0.0.1:5173` and sign in with the development-only account shown on the login page.
+
+To include the integrated camera ingest (MediaMTX only at this milestone), omit `-SkipCamera`. Stop everything with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-demo.ps1
+```
+
+## Verification
+
+```powershell
+# API
+cd .\apps\api
+..\..\.tools\apache-maven-3.9.11\bin\mvn.cmd test
+
+# Inference
+cd ..\inference
+.\.conda\python.exe -m pytest -q
+.\.conda\python.exe -m ruff check src tests
+
+# Web
+cd ..\web
+npm run test
+npm run lint -- --quiet
+npm run build
+```
+
+Detailed plans live in `docs/plans/`; current delivery state is tracked in `docs/project/STATUS.md` and the Windows runbook is in `docs/runbooks/windows-demo.md`.
+
+## Honest milestone boundary
+
+The management frontend/backend, event contracts, safe replay, media ingest and inference decision core are implemented. Live camera decoding into Ultralytics, trained fire/smoke weights, evidence clip extraction, Alibaba SMS delivery/receipts and cloud VLM orchestration remain subsequent milestones. The Qwen adapter exists and fails safely when no API key is configured.
