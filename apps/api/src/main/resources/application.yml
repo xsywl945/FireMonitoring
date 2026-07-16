@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: fire-monitoring-api
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/fire_monitoring?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:fire_monitoring}
+    password: ${DB_PASSWORD:fire_monitoring_dev}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-development-secret-change-before-deployment-0123456789abcdef}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:3600}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:8088,http://127.0.0.1:5173,http://127.0.0.1:8088}
+  media:
+    whep-base-url: ${MEDIA_WHEP_BASE_URL:http://localhost:8889}
+    hls-base-url: ${MEDIA_HLS_BASE_URL:http://localhost:8888}
+    ticket-ttl-seconds: ${MEDIA_TICKET_TTL_SECONDS:120}
+  demo:
+    admin-username: ${DEMO_ADMIN_USERNAME:admin}
+    admin-password: ${DEMO_ADMIN_PASSWORD:FireAdmin123!}
+    admin-display-name: ${DEMO_ADMIN_DISPLAY_NAME:演示管理员}

@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:fire_monitoring;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  main:
+    banner-mode: off
+
+app:
+  jwt:
+    secret: integration-test-secret-that-is-at-least-thirty-two-bytes-long
+    expiration-seconds: 3600
+  demo:
+    admin-username: admin
+    admin-password: FireAdmin123!
+    admin-display-name: Test Admin
