@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fire-monitoring-inference"
+version = "0.1.0"
+description = "Native Windows inference worker for the Fire Monitoring research prototype"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "Flask>=3.1,<4",
+  "httpx>=0.28,<1",
+  "pydantic>=2.10,<3",
+  "redis>=5.2,<7",
+]
+
+[project.optional-dependencies]
+yolo = ["ultralytics>=8.3,<9"]
+dev = [
+  "jsonschema[format]>=4.23,<5",
+  "pytest>=8.3,<9",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+fire-inference = "fire_monitoring_inference.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fire_monitoring_inference"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+

@@ -1,0 +1,2 @@
+{"siteId":1,"zoneId":1,"cameraId":1,"viewRole":"VIEW_A","timestamp":"2026-07-16T08:00:00Z","imageWidth":1280,"imageHeight":720,"processTimeMs":12,"detections":[]}
+{"siteId":1,"zoneId":1,"cameraId":1,"viewRole":"VIEW_A","timestamp":"2026-07-16T08:00:00.2Z","imageWidth":1280,"imageHeight":720,"processTimeMs":13,"detections":[{"className":"smoke","confidence":0.72,"bboxXyxy":[200,100,420,300]}]}

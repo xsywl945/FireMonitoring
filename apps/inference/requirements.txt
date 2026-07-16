@@ -1,0 +1,10 @@
+# Install this file for the management API, replay worker and Redis publishing.
+Flask>=3.1,<4
+httpx>=0.28,<1
+pydantic>=2.10,<3
+redis>=5.2,<7
+
+# GPU inference is intentionally separate because the correct PyTorch wheel depends
+# on the Windows/CUDA runtime. After installing PyTorch, run:
+#   pip install "ultralytics>=8.3,<9"
+
