@@ -1,0 +1,56 @@
+# Editors and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Java
+**/target/
+*.class
+hs_err_pid*
+
+# Node
+**/node_modules/
+**/dist/
+**/.vite/
+*.tsbuildinfo
+
+# Python
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/.conda/
+*.py[cod]
+
+# Models, datasets, runtime media, and databases
+*.pt
+*.onnx
+*.engine
+*.plan
+data/
+datasets/
+weights/
+recordings/
+runtime/
+*.mp4
+*.avi
+*.mov
+
+# Local tools and generated state
+.tools/
+.wslconfig.local
+tmp/
+logs/
+coverage/
+

@@ -1,0 +1,109 @@
+name: fire-monitoring
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      TZ: ${APP_TIMEZONE:-Asia/Shanghai}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fire_monitoring}
+      MYSQL_USER: ${MYSQL_USER:-fire_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-root-me}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    ports:
+      - 127.0.0.1:3306:3306
+    volumes:
+      - ${FIRE_DATA_ROOT:-D:/FireMonitoringData}/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 768m
+    networks: [fire-net]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass '$${REDIS_PASSWORD}'"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-redis-me}
+    ports:
+      - 127.0.0.1:6379:6379
+    volumes:
+      - ${FIRE_DATA_ROOT:-D:/FireMonitoringData}/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a '$${REDIS_PASSWORD}' ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 256m
+    networks: [fire-net]
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-fire_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-minio-me}
+    ports:
+      - 127.0.0.1:9000:9000
+      - 127.0.0.1:9001:9001
+    volumes:
+      - ${FIRE_DATA_ROOT:-D:/FireMonitoringData}/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    networks: [fire-net]
+
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-fire_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-minio-me}
+      MINIO_BUCKET: ${MINIO_BUCKET:-fire-evidence}
+    entrypoint: >-
+      /bin/sh -c "
+      mc alias set local http://minio:9000 '$${MINIO_ROOT_USER}' '$${MINIO_ROOT_PASSWORD}' &&
+      mc mb --ignore-existing local/'$${MINIO_BUCKET}' &&
+      mc anonymous set none local/'$${MINIO_BUCKET}'
+      "
+    networks: [fire-net]
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.19.2
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:8554:8554
+      - 127.0.0.1:8888:8888
+      - 127.0.0.1:8889:8889
+      - 127.0.0.1:9996:9996
+      - 127.0.0.1:9997:9997
+      - 127.0.0.1:9998:9998
+      - 127.0.0.1:8189:8189/udp
+    volumes:
+      - ./infra/mediamtx/mediamtx.yml:/mediamtx.yml:ro
+      - ${FIRE_DATA_ROOT:-D:/FireMonitoringData}/mediamtx/recordings:/recordings
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9997/v3/config/global/get"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 256m
+    networks: [fire-net]
+
+networks:
+  fire-net:
+    name: fire-monitoring-net
+

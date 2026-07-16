@@ -1,0 +1,42 @@
+{
+  "eventId": "59c5d13d-2cd9-4b2d-9903-ef963888b12e",
+  "eventType": "INCIDENT_CONFIRMED",
+  "schemaVersion": "1.0",
+  "occurredAt": "2026-07-16T08:00:03.000Z",
+  "traceId": "99d03df7-e6aa-4662-96bd-1842f4a52fb7",
+  "source": "inference-worker-1",
+  "siteId": 1,
+  "zoneId": 1,
+  "cameraId": 1,
+  "modelVersion": "fire-yolo-dev",
+  "payload": {
+    "dedupKey": "zone-1-20260716T0800-fire",
+    "primaryType": "FIRE_AND_SMOKE",
+    "severity": "HIGH",
+    "fusionMode": "DUAL_CAMERA",
+    "fusionScore": 0.91,
+    "startedAt": "2026-07-16T08:00:00.000Z",
+    "confirmedAt": "2026-07-16T08:00:03.000Z",
+    "observations": [
+      {
+        "cameraId": 1,
+        "viewRole": "VIEW_A",
+        "className": "fire",
+        "score": 0.93,
+        "effectiveFrames": 4,
+        "durationMs": 800,
+        "snapshotObjectKey": null
+      },
+      {
+        "cameraId": 2,
+        "viewRole": "VIEW_B",
+        "className": "smoke",
+        "score": 0.86,
+        "effectiveFrames": 3,
+        "durationMs": 600,
+        "snapshotObjectKey": null
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fire-monitoring.local/contracts/events/v1/event-envelope.schema.json",
+  "title": "Fire Monitoring Event Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "occurredAt",
+    "traceId",
+    "source",
+    "payload"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "CAMERA_HEALTH_CHANGED",
+        "DETECTION_SUMMARY",
+        "INCIDENT_CANDIDATE",
+        "INCIDENT_CONFIRMED",
+        "INCIDENT_EVIDENCE_READY",
+        "VLM_ANALYSIS_COMPLETED",
+        "VLM_ANALYSIS_FAILED",
+        "TASK_RUNTIME_CHANGED",
+        "ALGORITHM_DEGRADED"
+      ]
+    },
+    "schemaVersion": { "const": "1.0" },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "traceId": { "type": "string", "format": "uuid" },
+    "source": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "siteId": { "type": ["integer", "null"], "minimum": 1 },
+    "zoneId": { "type": ["integer", "null"], "minimum": 1 },
+    "cameraId": { "type": ["integer", "null"], "minimum": 1 },
+    "modelVersion": { "type": ["string", "null"], "maxLength": 100 },
+    "payload": { "type": "object" }
+  }
+}
+
