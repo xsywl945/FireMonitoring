@@ -10,7 +10,7 @@ playbackAddress: :9996
 
 rtsp: yes
 rtspAddress: :8554
-protocols: [tcp]
+rtspTransports: [tcp]
 
 hls: yes
 hlsAddress: :8888
@@ -25,6 +25,23 @@ webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
 webrtcAdditionalHosts: [127.0.0.1, localhost]
 
+# Docker sees requests from the Windows host through its bridge address rather
+# than 127.0.0.1. These endpoints remain host-only because compose.yaml binds
+# ports 9997/9998 to 127.0.0.1.
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+        path:
+      - action: read
+        path:
+      - action: playback
+        path:
+      - action: api
+      - action: metrics
+
 pathDefaults:
   source: publisher
   overridePublisher: true
@@ -38,4 +55,3 @@ pathDefaults:
 
 paths:
   all_others:
-

@@ -96,7 +96,9 @@ services:
       - ./infra/mediamtx/mediamtx.yml:/mediamtx.yml:ro
       - ${FIRE_DATA_ROOT:-D:/FireMonitoringData}/mediamtx/recordings:/recordings
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9997/v3/config/global/get"]
+      # MediaMTX uses a distroless image without wget/curl. A successful
+      # invocation also proves that Docker can exec into the running process.
+      test: ["CMD", "/mediamtx", "--version"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -106,4 +108,3 @@ services:
 networks:
   fire-net:
     name: fire-monitoring-net
-
