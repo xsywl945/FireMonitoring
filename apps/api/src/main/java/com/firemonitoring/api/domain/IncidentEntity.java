@@ -29,6 +29,20 @@ public class IncidentEntity {
     private String observationsJson;
     @Column(name = "semantic_analysis_json", columnDefinition = "TEXT")
     private String semanticAnalysisJson;
+    @Column(name = "source_event_id", unique = true, length = 36)
+    private String sourceEventId;
+    @Column(name = "trace_id", length = 36)
+    private String traceId;
+    @Column(name = "dedup_key", length = 200)
+    private String dedupKey;
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
+    @Column(name = "event_source", length = 100)
+    private String eventSource;
+    @Column(name = "model_version", length = 100)
+    private String modelVersion;
+    @Column(name = "fusion_mode", length = 30)
+    private String fusionMode;
     @Version
     private long version;
 
@@ -42,6 +56,23 @@ public class IncidentEntity {
         this.startedAt = startedAt;
         this.fusionScore = fusionScore == null ? null : BigDecimal.valueOf(fusionScore);
         this.observationsJson = "[]";
+    }
+
+    public static IncidentEntity fromAlgorithmEvent(ZoneEntity zone, Severity severity, PrimaryType primaryType,
+                                                    Instant startedAt, Double fusionScore, String observationsJson,
+                                                    String sourceEventId, String traceId, String dedupKey,
+                                                    Instant confirmedAt, String eventSource, String modelVersion,
+                                                    String fusionMode) {
+        IncidentEntity incident = new IncidentEntity(zone, severity, primaryType, startedAt, fusionScore);
+        incident.observationsJson = observationsJson;
+        incident.sourceEventId = sourceEventId;
+        incident.traceId = traceId;
+        incident.dedupKey = dedupKey;
+        incident.confirmedAt = confirmedAt;
+        incident.eventSource = eventSource;
+        incident.modelVersion = modelVersion;
+        incident.fusionMode = fusionMode;
+        return incident;
     }
 
     public void transitionTo(IncidentStatus target, Instant at) {
@@ -61,4 +92,11 @@ public class IncidentEntity {
     public Double getFusionScore() { return fusionScore == null ? null : fusionScore.doubleValue(); }
     public String getObservationsJson() { return observationsJson; }
     public String getSemanticAnalysisJson() { return semanticAnalysisJson; }
+    public String getSourceEventId() { return sourceEventId; }
+    public String getTraceId() { return traceId; }
+    public String getDedupKey() { return dedupKey; }
+    public Instant getConfirmedAt() { return confirmedAt; }
+    public String getEventSource() { return eventSource; }
+    public String getModelVersion() { return modelVersion; }
+    public String getFusionMode() { return fusionMode; }
 }

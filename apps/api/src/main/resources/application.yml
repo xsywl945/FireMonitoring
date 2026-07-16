@@ -15,6 +15,16 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  data:
+    redis:
+      repositories:
+        enabled: false
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:3s}
   jackson:
     default-property-inclusion: non_null
 
@@ -30,6 +40,9 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+  health:
+    redis:
+      enabled: ${REDIS_EVENTS_ENABLED:false}
 
 app:
   jwt:
@@ -45,3 +58,12 @@ app:
     admin-username: ${DEMO_ADMIN_USERNAME:admin}
     admin-password: ${DEMO_ADMIN_PASSWORD:FireAdmin123!}
     admin-display-name: ${DEMO_ADMIN_DISPLAY_NAME:演示管理员}
+  redis:
+    events:
+      enabled: ${REDIS_EVENTS_ENABLED:false}
+      stream-key: ${REDIS_EVENTS_STREAM:monitoring.events}
+      consumer-group: ${REDIS_EVENTS_GROUP:spring-api}
+      consumer-name: ${REDIS_EVENTS_CONSUMER:spring-api-1}
+      batch-size: ${REDIS_EVENTS_BATCH_SIZE:20}
+      block-timeout: ${REDIS_EVENTS_BLOCK_TIMEOUT:1s}
+      poll-delay-ms: ${REDIS_EVENTS_POLL_DELAY_MS:250}

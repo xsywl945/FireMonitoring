@@ -20,3 +20,6 @@ app:
     admin-username: admin
     admin-password: FireAdmin123!
     admin-display-name: Test Admin
+  redis:
+    events:
+      enabled: false

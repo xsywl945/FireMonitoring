@@ -4,6 +4,7 @@ import com.firemonitoring.api.domain.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface IncidentRepository extends JpaRepository<IncidentEntity, Long> {
     List<IncidentEntity> findAllByOrderByStartedAtDesc();
@@ -12,4 +13,6 @@ public interface IncidentRepository extends JpaRepository<IncidentEntity, Long> 
     List<IncidentEntity> findByStatusAndSeverityOrderByStartedAtDesc(IncidentStatus status, Severity severity);
     long countByStatus(IncidentStatus status);
     long countByStartedAtGreaterThanEqual(Instant from);
+    boolean existsBySourceEventId(String sourceEventId);
+    Optional<IncidentEntity> findBySourceEventId(String sourceEventId);
 }

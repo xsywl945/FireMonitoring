@@ -12,6 +12,7 @@ Spring Boot 3 / Java 17 business-control API for the intelligent fire-monitoring
 - incident queries, detail timeline, strict state transitions, optimistic locking, and UUID idempotency keys;
 - consistent JSON errors with `X-Trace-Id`;
 - STOMP endpoint at `/ws/events` and incident updates on `/topic/incidents` (send the JWT in the STOMP `CONNECT` `Authorization` header);
+- optional password-authenticated Redis Stream consumer for algorithm `INCIDENT_CONFIRMED` events;
 - Flyway migrations for MySQL and H2-backed integration tests;
 - public liveness/readiness endpoint at `/actuator/health`.
 
@@ -56,5 +57,21 @@ Tests use an isolated in-memory H2 database in MySQL compatibility mode. They ve
 | `MEDIA_HLS_BASE_URL` | `http://localhost:8888` | MediaMTX HLS base URL |
 | `MEDIA_TICKET_TTL_SECONDS` | `120` | URL response expiration marker |
 | `DEMO_ADMIN_*` | local demo values | one-time seeded admin identity |
+| `REDIS_EVENTS_ENABLED` | `false` | enables the algorithm event consumer after restart |
+| `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | Redis connection |
+| `REDIS_PASSWORD` | empty | Redis password; set this for the Compose runtime |
+| `REDIS_DATABASE` | `0` | logical Redis database |
+| `REDIS_EVENTS_STREAM` | `monitoring.events` | input Stream key |
+| `REDIS_EVENTS_GROUP` | `spring-api` | consumer group |
+| `REDIS_EVENTS_CONSUMER` | `spring-api-1` | stable consumer name used to recover pending entries |
+| `REDIS_EVENTS_BATCH_SIZE` | `20` | maximum records read per pending/new pass |
+
+## Algorithm event ingestion
+
+Set `REDIS_EVENTS_ENABLED=true` and provide the same `REDIS_PASSWORD` configured on the Redis container. Each Stream entry must contain one field named `event`; its value is the complete JSON envelope defined by `contracts/events/v1/event-envelope.schema.json`.
+
+The service creates the `spring-api` consumer group with `MKSTREAM`, first retries pending records for its stable consumer name, then reads new records. Only `INCIDENT_CONFIRMED` is persisted. The envelope `eventId` is stored under a database unique constraint, making retries and restarts idempotent. Valid duplicates and irrelevant event types are acknowledged. Malformed permanent messages are logged without their full body and acknowledged; persistence failures remain pending for retry and do not terminate the scheduler or application.
+
+On successful database commit the service publishes the new incident to `/topic/incidents`. Redis is disabled in the `test` profile, so the standard test suite does not require a live Redis server.
 
 `sourceUri` is currently stored in MySQL so the future ingest controller can consume it. API responses and normal logs never return it unmasked. Production hardening should encrypt this column or move camera credentials to a secrets manager before any non-local deployment.
