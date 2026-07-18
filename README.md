@@ -11,6 +11,7 @@ apps/
   web/          Vue 3 operator console
 contracts/      OpenAPI and versioned event schemas
 infra/          Docker Compose and service configuration
+ml/             AutoDL dataset preparation, audit, training, and evaluation tools
 scripts/        Windows bootstrap, preflight, start, and stop scripts
 docs/           Architecture, plans, runbooks, and test reports
 ```
@@ -75,7 +76,9 @@ npm run lint -- --quiet
 npm run build
 ```
 
-Detailed plans live in `docs/plans/`; current delivery state is tracked in `docs/project/STATUS.md` and the Windows runbook is in `docs/runbooks/windows-demo.md`.
+Detailed plans live in `docs/plans/`. The step-by-step cloud training guide is
+`docs/plans/AutoDL-初步火灾识别模型训练说明书.md`; current delivery state is tracked in
+`docs/project/STATUS.md` and the Windows runbook is in `docs/runbooks/windows-demo.md`.
 
 ## Honest milestone boundary
 
