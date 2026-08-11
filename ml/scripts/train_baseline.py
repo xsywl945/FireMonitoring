@@ -64,6 +64,21 @@ def git_metadata() -> dict[str, object]:
         return {"git_commit": None, "git_dirty": None}
 
 
+def bundle_metadata() -> dict[str, object]:
+    bundle_file = Path(__file__).resolve().parents[2] / "BUNDLE-MANIFEST.txt"
+    if not bundle_file.is_file():
+        return {"bundle_manifest": None, "bundle_metadata": None}
+    metadata: dict[str, str] = {}
+    for line in bundle_file.read_text(encoding="utf-8-sig").splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            metadata[key] = value
+    return {
+        "bundle_manifest": str(bundle_file),
+        "bundle_metadata": metadata,
+    }
+
+
 def main() -> int:
     args = parse_args()
     data = args.data.expanduser().resolve()
@@ -89,6 +104,9 @@ def main() -> int:
 
     project.mkdir(parents=True, exist_ok=True)
     manifest = data.parent / "manifest.csv"
+    model_file = Path(args.model).expanduser()
+    if model_file.is_file():
+        model_file = model_file.resolve()
     config = {
         **vars(args),
         "data": str(data),
@@ -100,9 +118,15 @@ def main() -> int:
         "torch_cuda": torch.version.cuda,
         "ultralytics": ultralytics.__version__,
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+        "dataset_yaml_sha256": sha256_file(data),
         "dataset_manifest": str(manifest) if manifest.is_file() else None,
         "dataset_manifest_sha256": sha256_file(manifest) if manifest.is_file() else None,
+        "pretrained_model_file": str(model_file) if model_file.is_file() else None,
+        "pretrained_model_sha256": (
+            sha256_file(model_file) if model_file.is_file() else None
+        ),
         **git_metadata(),
+        **bundle_metadata(),
     }
     request_file = project / f"{args.name}.request.json"
     request_file.write_text(
