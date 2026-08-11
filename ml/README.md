@@ -16,6 +16,7 @@ YOLO 基线并导出评估结果。首轮模型统一使用两个小写类别：
 - `prepare_fire_smoke_v1.py`：合并 D-Fire 与 IFireSmoke，并修正相反的类别编号。
 - `audit_yolo_dataset.py`：检查坏图、坏标签、类别统计和数据泄漏。
 - `preview_yolo_dataset.py`：生成带框的抽样预览图，人工确认类别没有映射反。
+- `build_leakage_safe_primary_split.py`：隔离与验证/测试近似的训练图，生成主训练划分。
 - `train_baseline.py`：用固定、可复现的参数训练 YOLO11s 基线。
 - `validate_model.py`：分别在合并、D-Fire、IFireSmoke 测试集上评估。
 

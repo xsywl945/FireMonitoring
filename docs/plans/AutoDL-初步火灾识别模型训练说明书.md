@@ -364,13 +364,30 @@ python ml/scripts/audit_yolo_dataset.py \
 - `exact_cross_split_duplicate_groups` 为空。
 
 感知哈希警告表示训练/验证/测试间可能有近重复图像。打开 JSON 查看路径；若同一原视频相邻帧分别出现在
-训练和测试，应从训练侧移除并重新生成新版本数据。不要通过修改测试集来“提高成绩”。
+训练和测试，应从训练侧移除并重新生成新版本数据。不要通过修改测试集来“提高成绩”。当前D-Fire和
+IFireSmoke官方划分均存在连续帧近重复，因此主训练必须继续生成隔离划分：
+
+```bash
+python ml/scripts/build_leakage_safe_primary_split.py \
+  --manifest /root/autodl-tmp/fire-monitoring/datasets/processed/fire_smoke_v1/manifest.csv \
+  --output /root/autodl-tmp/fire-monitoring/datasets/processed/primary_fire_smoke_v1 \
+  --phash-threshold 4 \
+  --link
+
+python ml/scripts/audit_yolo_dataset.py \
+  --data /root/autodl-tmp/fire-monitoring/datasets/processed/primary_fire_smoke_v1/primary_fire_smoke_v1.yaml \
+  --output /root/autodl-tmp/fire-monitoring/audits/primary_fire_smoke_v1.json \
+  --phash-threshold 4
+```
+
+主划分保留IFireSmoke测试集不变；从IFireSmoke验证集移除与测试集近似的图，再从D-Fire/IFireSmoke
+训练图中移除与保留验证/测试图近似的样本。D-Fire官方验证/测试仅作带泄漏提示的参考，不用于早停或主结论。
 
 ### 6.8 人工看标注——这一步不可省略
 
 ```bash
 python ml/scripts/preview_yolo_dataset.py \
-  --data /root/autodl-tmp/fire-monitoring/datasets/processed/fire_smoke_v1/fire_smoke_v1.yaml \
+  --data /root/autodl-tmp/fire-monitoring/datasets/processed/primary_fire_smoke_v1/primary_fire_smoke_v1.yaml \
   --split train \
   --count 32 \
   --output /root/autodl-tmp/fire-monitoring/audits/train-preview.jpg
@@ -391,7 +408,7 @@ python ml/scripts/preview_yolo_dataset.py \
 cd /root/autodl-tmp/fire-monitoring/FireMonitoring
 
 python ml/scripts/train_baseline.py \
-  --data /root/autodl-tmp/fire-monitoring/datasets/processed/fire_smoke_v1/fire_smoke_v1.yaml \
+  --data /root/autodl-tmp/fire-monitoring/datasets/processed/primary_fire_smoke_v1/primary_fire_smoke_v1.yaml \
   --model yolo11s.pt \
   --project /root/autodl-tmp/fire-monitoring/runs \
   --name yolo11s_smoke_test \
@@ -431,7 +448,7 @@ tmux new -s fire-yolo
 cd /root/autodl-tmp/fire-monitoring/FireMonitoring
 
 python ml/scripts/train_baseline.py \
-  --data /root/autodl-tmp/fire-monitoring/datasets/processed/fire_smoke_v1/fire_smoke_v1.yaml \
+  --data /root/autodl-tmp/fire-monitoring/datasets/processed/primary_fire_smoke_v1/primary_fire_smoke_v1.yaml \
   --model yolo11s.pt \
   --project /root/autodl-tmp/fire-monitoring/runs \
   --name yolo11s_dfire_ifire_v1 \
