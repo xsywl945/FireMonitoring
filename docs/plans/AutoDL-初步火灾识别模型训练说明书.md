@@ -418,10 +418,12 @@ python ml/scripts/train_baseline.py \
   --fraction 0.10
 ```
 
-脚本固定了 AMP、种子 42、确定性模式、磁盘缓存、余弦学习率、轻度几何增强、`mosaic=0.5`、
+脚本固定了 AMP、种子 42、确定性模式、内存缓存、余弦学习率、轻度几何增强、`mosaic=0.5`、
 最后 10 epoch 关闭 Mosaic，并让 `batch=0.70` 自动使用约 70% 显存。
 [Ultralytics 训练文档](https://docs.ultralytics.com/modes/train/)明确支持浮点 batch 作为显存比例、
-`cache=disk`、AMP、`fraction` 和断点恢复。
+`cache=ram`（可用 `--cache disk|none` 覆盖）、AMP、`fraction` 和断点恢复。当前
+AutoDL 实例只有 50 GB 数据盘，而完整解码缓存估算约 27 GB（预留 50% 后约
+41 GB），因此默认使用 120 GB 系统内存，避免缓存占满数据盘。
 
 小跑通过条件：
 

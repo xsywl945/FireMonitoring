@@ -31,6 +31,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--device", default="0")
     parser.add_argument("--fraction", type=float, default=1.0)
+    parser.add_argument(
+        "--cache",
+        choices=("ram", "disk", "none"),
+        default="ram",
+        help="Dataset cache location. AutoDL defaults to RAM to protect the 50 GB data disk.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 
@@ -135,6 +141,7 @@ def main() -> int:
 
     batch: int | float
     batch = int(args.batch) if args.batch >= 1 and args.batch.is_integer() else args.batch
+    cache: str | bool = False if args.cache == "none" else args.cache
     model = YOLO(args.model)
     results = model.train(
         data=str(data),
@@ -147,7 +154,7 @@ def main() -> int:
         project=str(project),
         name=args.name,
         exist_ok=False,
-        cache="disk",
+        cache=cache,
         amp=True,
         optimizer="auto",
         cos_lr=True,
