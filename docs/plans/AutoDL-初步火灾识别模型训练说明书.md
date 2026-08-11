@@ -318,7 +318,7 @@ python ml/scripts/prepare_fire_smoke_v1.py \
 2. 核对数据 YAML 的源类别顺序；
 3. 将 D-Fire 的类别交换，最终统一为 `0=fire, 1=smoke`；
 4. 核对推荐数据版本的总图像数和无目标图像数，单独记录缺失/空源标签，防止下载不完整被误当成负样本；
-5. 对当前D-Fire包已知的18个零面积框做删除、8个轻微越界框做边界裁剪，并把原值和修复值写入审计文件；
+5. 对当前D-Fire包已知的18个零面积框做删除、379个越界框做边界裁剪，并把原值和修复值写入审计文件；
 6. 按 `test > val > train` 优先级去除跨集合完全相同的图像，不覆盖原数据。
 
 `--link` 会优先创建硬链接，节省本地盘；如果文件系统不支持，会自动退回复制。输出目录必须是新的空目录，
@@ -343,8 +343,9 @@ fire_smoke_v1/
 打开 `prepare_summary.json`，还应确认：D-Fire 为 21,527 张、9,838 张无目标图像；IFireSmoke 为
 5,000 张、0 张无目标图像。`missing_source_label_files` 与 `empty_source_label_files` 会分别记录“没有源标签文件”
 和“源标签为空”的数量；脚本按无目标图像总数做完整性校验，数量异常会直接停止。
-`source_label_repairs.json` 必须恰好记录当前推荐D-Fire版本的26处受控修复：18个
-`drop_degenerate_box` 和8个 `clip_box_to_image`。修复数超过30时脚本会停止，不能把未知版本的问题静默吞掉。
+`source_label_repairs.json` 必须恰好记录当前推荐D-Fire版本的397处受控修复：18个
+`drop_degenerate_box` 和379个 `clip_box_to_image`。越界中位数约0.33%、95分位约3.06%、最大约9.41%；
+修复数超过450或单框越界超过10%时脚本会停止，不能把未知版本的问题静默吞掉。
 
 ### 6.7 自动审计数据
 

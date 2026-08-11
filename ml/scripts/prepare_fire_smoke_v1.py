@@ -241,15 +241,25 @@ def map_label(
                 }
             )
             continue
-        if not (0 <= x <= 1 and 0 <= y <= 1 and width <= 1 and height <= 1):
+        left = x - width / 2
+        top = y - height / 2
+        right = x + width / 2
+        bottom = y + height / 2
+        needs_clip = not (
+            0 <= x <= 1
+            and 0 <= y <= 1
+            and width <= 1
+            and height <= 1
+            and left >= 0
+            and top >= 0
+            and right <= 1
+            and bottom <= 1
+        )
+        if needs_clip:
             if not allow_repairs:
                 raise ValueError(
                     f"{label_path}:{line_number}: coordinates outside normalized YOLO range"
                 )
-            left = x - width / 2
-            top = y - height / 2
-            right = x + width / 2
-            bottom = y + height / 2
             excess = max(0.0, -left, -top, right - 1, bottom - 1)
             if excess > 0.1:
                 raise ValueError(
@@ -551,7 +561,7 @@ def main() -> int:
                 expected_total_images=21_527,
                 expected_background_images=9_838,
                 allow_known_label_repairs=True,
-                max_label_repairs=30,
+                max_label_repairs=450,
             ),
             SourceSpec(
                 name="ifiresmoke",
