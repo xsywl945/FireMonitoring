@@ -17,6 +17,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import shutil
 import sys
 from collections import Counter, defaultdict
@@ -39,6 +40,8 @@ class SourceSpec:
     class_map: dict[int, int]
     expected_total_images: int
     expected_background_images: int
+    allow_known_label_repairs: bool
+    max_label_repairs: int
 
 
 @dataclass(frozen=True)
@@ -133,7 +136,14 @@ def find_labels_dir(split_dir: Path) -> Path | None:
 
 
 def read_declared_names(root: Path) -> tuple[str, ...] | None:
-    yaml_files = sorted([*root.glob("*.yaml"), *root.glob("*.yml")])
+    yaml_files = sorted(
+        [
+            *root.glob("*.yaml"),
+            *root.glob("*.yml"),
+            *root.parent.glob("*.yaml"),
+            *root.parent.glob("*.yml"),
+        ]
+    )
     for yaml_file in yaml_files:
         try:
             document = yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
@@ -178,11 +188,17 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def map_label(label_path: Path | None, class_map: dict[int, int]) -> tuple[str, tuple[int, int]]:
+def map_label(
+    label_path: Path | None,
+    class_map: dict[int, int],
+    *,
+    allow_repairs: bool,
+) -> tuple[str, tuple[int, int], list[dict[str, object]]]:
     if label_path is None or not label_path.exists():
-        return "", (0, 0)
+        return "", (0, 0), []
     mapped_lines: list[str] = []
     counts = Counter[int]()
+    repairs: list[dict[str, object]] = []
     for line_number, raw_line in enumerate(
         label_path.read_text(encoding="utf-8-sig").splitlines(), start=1
     ):
@@ -203,11 +219,70 @@ def map_label(label_path: Path | None, class_map: dict[int, int]) -> tuple[str, 
             raise ValueError(
                 f"{label_path}:{line_number}: unexpected source class {source_class}"
             )
-        if not (0 <= x <= 1 and 0 <= y <= 1 and 0 < width <= 1 and 0 < height <= 1):
+        values = (x, y, width, height)
+        if not all(math.isfinite(value) for value in values):
             raise ValueError(
-                f"{label_path}:{line_number}: coordinates outside normalized YOLO range"
+                f"{label_path}:{line_number}: non-finite coordinates"
             )
         target_class = class_map[source_class]
+        original = {"x": x, "y": y, "width": width, "height": height}
+        if width <= 0 or height <= 0:
+            if not allow_repairs:
+                raise ValueError(
+                    f"{label_path}:{line_number}: non-positive box dimensions"
+                )
+            repairs.append(
+                {
+                    "line_number": line_number,
+                    "action": "drop_degenerate_box",
+                    "source_class": source_class,
+                    "target_class": target_class,
+                    "original": original,
+                }
+            )
+            continue
+        if not (0 <= x <= 1 and 0 <= y <= 1 and width <= 1 and height <= 1):
+            if not allow_repairs:
+                raise ValueError(
+                    f"{label_path}:{line_number}: coordinates outside normalized YOLO range"
+                )
+            left = x - width / 2
+            top = y - height / 2
+            right = x + width / 2
+            bottom = y + height / 2
+            excess = max(0.0, -left, -top, right - 1, bottom - 1)
+            if excess > 0.1:
+                raise ValueError(
+                    f"{label_path}:{line_number}: box exceeds image by {excess:.6f}, "
+                    "above the controlled repair limit"
+                )
+            left = max(0.0, left)
+            top = max(0.0, top)
+            right = min(1.0, right)
+            bottom = min(1.0, bottom)
+            if right <= left or bottom <= top:
+                raise ValueError(
+                    f"{label_path}:{line_number}: box has no area inside the image"
+                )
+            x = (left + right) / 2
+            y = (top + bottom) / 2
+            width = right - left
+            height = bottom - top
+            repairs.append(
+                {
+                    "line_number": line_number,
+                    "action": "clip_box_to_image",
+                    "source_class": source_class,
+                    "target_class": target_class,
+                    "original": original,
+                    "repaired": {
+                        "x": x,
+                        "y": y,
+                        "width": width,
+                        "height": height,
+                    },
+                }
+            )
         counts[target_class] += 1
         mapped_lines.append(
             " ".join([str(target_class), *[f"{value:.8f}" for value in (x, y, width, height)]])
@@ -215,11 +290,14 @@ def map_label(label_path: Path | None, class_map: dict[int, int]) -> tuple[str, 
     mapped = "\n".join(mapped_lines)
     if mapped:
         mapped += "\n"
-    return mapped, (counts[0], counts[1])
+    return mapped, (counts[0], counts[1]), repairs
 
 
-def collect_examples(spec: SourceSpec) -> tuple[list[Example], dict[str, object]]:
+def collect_examples(
+    spec: SourceSpec,
+) -> tuple[list[Example], dict[str, object], list[dict[str, object]]]:
     examples: list[Example] = []
+    repairs: list[dict[str, object]] = []
     split_images: dict[str, int] = {}
     missing_label_files = 0
     empty_label_files = 0
@@ -242,7 +320,20 @@ def collect_examples(spec: SourceSpec) -> tuple[list[Example], dict[str, object]
                 missing_label_files += 1
             elif not label_path.read_text(encoding="utf-8-sig").strip():
                 empty_label_files += 1
-            mapped_label, object_counts = map_label(label_path, spec.class_map)
+            mapped_label, object_counts, label_repairs = map_label(
+                label_path,
+                spec.class_map,
+                allow_repairs=spec.allow_known_label_repairs,
+            )
+            for repair in label_repairs:
+                repair.update(
+                    {
+                        "source": spec.name,
+                        "split": target_split,
+                        "label": str(label_path),
+                    }
+                )
+            repairs.extend(label_repairs)
             examples.append(
                 Example(
                     source=spec.name,
@@ -266,15 +357,22 @@ def collect_examples(spec: SourceSpec) -> tuple[list[Example], dict[str, object]
             f"{spec.name} contains {background_images:,} images without objects, expected "
             f"{spec.expected_background_images:,}; missing labels may be hiding positive samples"
         )
+    if len(repairs) > spec.max_label_repairs:
+        raise ValueError(
+            f"{spec.name} required {len(repairs)} label repairs, above the controlled "
+            f"limit of {spec.max_label_repairs}; inspect the data version"
+        )
+    repair_actions = Counter(str(repair["action"]) for repair in repairs)
     integrity = {
         "split_images": split_images,
         "total_images": len(examples),
         "background_images": background_images,
         "missing_source_label_files": missing_label_files,
         "empty_source_label_files": empty_label_files,
+        "label_repairs": dict(repair_actions),
     }
     print(f"Verified {spec.name} source integrity: {integrity}")
-    return examples, integrity
+    return examples, integrity, repairs
 
 
 def choose_combined_examples(
@@ -452,6 +550,8 @@ def main() -> int:
                 class_map={0: 1, 1: 0},
                 expected_total_images=21_527,
                 expected_background_images=9_838,
+                allow_known_label_repairs=True,
+                max_label_repairs=30,
             ),
             SourceSpec(
                 name="ifiresmoke",
@@ -465,16 +565,20 @@ def main() -> int:
                 class_map={0: 0, 1: 1},
                 expected_total_images=5_000,
                 expected_background_images=0,
+                allow_known_label_repairs=False,
+                max_label_repairs=0,
             ),
         ]
         all_examples: list[Example] = []
         by_source: dict[str, list[Example]] = {}
         source_integrity: dict[str, dict[str, object]] = {}
+        source_label_repairs: list[dict[str, object]] = []
         for spec in specs:
             verify_declared_names(spec)
-            collected, integrity = collect_examples(spec)
+            collected, integrity, repairs = collect_examples(spec)
             by_source[spec.name] = collected
             source_integrity[spec.name] = integrity
+            source_label_repairs.extend(repairs)
             all_examples.extend(collected)
         combined, duplicates, conflicts = choose_combined_examples(all_examples)
         if conflicts:
@@ -530,6 +634,10 @@ def main() -> int:
         (output / "exact_duplicates_removed.json").write_text(
             json.dumps(duplicates, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        (output / "source_label_repairs.json").write_text(
+            json.dumps(source_label_repairs, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
         summary = {
             "class_names": {"0": "fire", "1": "smoke"},
             "source_roots": {spec.name: str(spec.root) for spec in specs},
@@ -544,6 +652,7 @@ def main() -> int:
             },
             "source_test_images": eval_counts,
             "exact_duplicate_groups_removed": len(duplicates),
+            "source_label_repair_count": len(source_label_repairs),
             "link_mode_requested": bool(args.link),
         }
         (output / "prepare_summary.json").write_text(
