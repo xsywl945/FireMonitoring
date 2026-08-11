@@ -177,12 +177,18 @@ Kaggle/Hugging Face 失败，可以在本地通过 TUN 下载后，经 AutoDL �
 
 ```bash
 mkdir -p /root/autodl-tmp/fire-monitoring/{datasets/raw,datasets/processed,runs,audits,artifacts}
-mkdir -p /root/autodl-fs/fire-monitoring-backup
 cd /root/autodl-tmp/fire-monitoring
+
+if [ -d /root/autodl-fs ]; then
+  mkdir -p /root/autodl-fs/fire-monitoring-backup
+else
+  echo "WARNING: 尚未挂载 AutoDL 文件存储"
+fi
 ```
 
-若实例没有 `/root/autodl-fs`，先在 AutoDL 控制台初始化同地区“文件存储”，然后重启实例；也可暂时把
-备份下载到 Windows，但不能只留在即将释放的实例中。
+不要在 `/root/autodl-fs` 不存在时直接创建这个根目录，否则普通系统盘目录会被误认为持久化文件存储。
+若实例没有该目录，先在 AutoDL 控制台初始化同地区“文件存储”，然后重启实例；也可暂时把备份下载到
+Windows，但不能只留在即将释放的实例中。
 
 ### 6.2 上传本项目训练工具包
 
@@ -191,6 +197,25 @@ cd /root/autodl-tmp/fire-monitoring
 ```text
 /root/autodl-tmp/fire-monitoring/FireMonitoring/ml/
 ```
+
+本项目可在 Windows 本地生成最小上传包：
+
+```powershell
+cd C:\Users\xsywl\Desktop\FireMonitoring
+powershell -File scripts/New-AutoDLTrainingBundle.ps1
+```
+
+上传 `tmp/autodl-upload/` 中最新的 ZIP 后，在 AutoDL 执行：
+
+```bash
+cd /root/autodl-tmp/fire-monitoring
+unzip -q /上传路径/FireMonitoring-AutoDL-*.zip -d .
+cd FireMonitoring
+bash ml/autodl/bootstrap.sh
+```
+
+脚本会完成第 6.1 节目录创建、第 6.3 节依赖安装与 GPU 检查，并把检查结果写入
+`/root/autodl-tmp/fire-monitoring/artifacts/`。如果已运行脚本，可以跳过下面重复的安装命令。
 
 若项目已有远程 Git 仓库，也可以：
 

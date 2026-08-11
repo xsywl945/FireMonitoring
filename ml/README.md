@@ -19,5 +19,12 @@ YOLO 基线并导出评估结果。首轮模型统一使用两个小写类别：
 - `train_baseline.py`：用固定、可复现的参数训练 YOLO11s 基线。
 - `validate_model.py`：分别在合并、D-Fire、IFireSmoke 测试集上评估。
 
+AutoDL 初始化：
+
+- 在 Windows 执行 `powershell -File scripts/New-AutoDLTrainingBundle.ps1` 生成上传包；
+- 上传并解压后，在实例执行 `bash ml/autodl/bootstrap.sh`，它会安装固定依赖、
+  验证 CUDA，并保存环境和磁盘信息；
+- 初始化脚本不包含、读取或保存 SSH/Kaggle 密码。
+
 数据集、权重和训练输出均不提交 Git；仓库根目录的 `.gitignore` 已忽略
 `datasets/`、`*.pt`、`*.onnx` 等大文件。
