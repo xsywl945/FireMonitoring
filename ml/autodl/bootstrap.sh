@@ -5,6 +5,16 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 WORK_ROOT="${FIRE_WORK_ROOT:-/root/autodl-tmp/fire-monitoring}"
 
+if command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="$(command -v python)"
+elif [[ -x /root/miniconda3/bin/python ]]; then
+  PYTHON_BIN=/root/miniconda3/bin/python
+  export PATH="/root/miniconda3/bin:${PATH}"
+else
+  echo "ERROR: could not find the AutoDL Python interpreter." >&2
+  exit 2
+fi
+
 if [[ ! -d /root/autodl-tmp ]]; then
   echo "ERROR: /root/autodl-tmp does not exist; confirm this is an AutoDL instance." >&2
   exit 2
@@ -19,16 +29,17 @@ mkdir -p \
 
 echo "Repository: ${REPO_ROOT}"
 echo "Work root:  ${WORK_ROOT}"
+echo "Python:     ${PYTHON_BIN}"
 
-python -m pip install --disable-pip-version-check \
+"${PYTHON_BIN}" -m pip install --disable-pip-version-check \
   -r "${REPO_ROOT}/ml/requirements-autodl.txt"
 
-python "${REPO_ROOT}/ml/scripts/check_environment.py" \
+"${PYTHON_BIN}" "${REPO_ROOT}/ml/scripts/check_environment.py" \
   --require-cuda \
   --workdir /root/autodl-tmp \
   | tee "${WORK_ROOT}/artifacts/environment-check.txt"
 
-python -m pip freeze > "${WORK_ROOT}/artifacts/environment-freeze.txt"
+"${PYTHON_BIN}" -m pip freeze > "${WORK_ROOT}/artifacts/environment-freeze.txt"
 nvidia-smi > "${WORK_ROOT}/artifacts/nvidia-smi.txt"
 df -h / /root/autodl-tmp > "${WORK_ROOT}/artifacts/disk-usage.txt"
 
