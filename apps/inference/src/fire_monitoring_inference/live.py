@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+from collections import deque
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -171,6 +172,7 @@ class LiveCameraRunner:
         period = 1 / self.config.target_fps if self.config.target_fps > 0 else 0
         next_due = 0.0
         last_status = time.monotonic()
+        recent_frames: deque[FramePacket] = deque(maxlen=3)
         self.pipeline.runtime.start()
         try:
             while self.config.max_frames == 0 or processed < self.config.max_frames:
@@ -198,6 +200,7 @@ class LiveCameraRunner:
                 )
                 processed += 1
                 next_due = now + period
+                recent_frames.append(packet)
 
                 annotated = None
                 if self.frame_buffer is not None:
@@ -214,21 +217,28 @@ class LiveCameraRunner:
                 ]
                 if self.enrichment is not None:
                     for confirmed_event in confirmed_events:
-                        image = (
-                            packet.image.copy() if hasattr(packet.image, "copy") else packet.image
+                        context_frames = tuple(
+                            FramePacket(
+                                camera_id=item.camera_id,
+                                captured_at=item.captured_at,
+                                monotonic_ns=item.monotonic_ns,
+                                image=(
+                                    item.image.copy()
+                                    if hasattr(item.image, "copy")
+                                    else item.image
+                                ),
+                                width=item.width,
+                                height=item.height,
+                            )
+                            for item in recent_frames
                         )
+                        current = context_frames[-1]
                         self.enrichment.submit(
                             IncidentEnrichmentJob(
                                 confirmed=confirmed_event,
-                                frame=FramePacket(
-                                    camera_id=packet.camera_id,
-                                    captured_at=packet.captured_at,
-                                    monotonic_ns=packet.monotonic_ns,
-                                    image=image,
-                                    width=packet.width,
-                                    height=packet.height,
-                                ),
+                                frame=current,
                                 detections=list(detections),
+                                context_frames=context_frames,
                             )
                         )
 

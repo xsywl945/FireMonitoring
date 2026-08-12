@@ -26,3 +26,23 @@ def test_mock_replay_emits_detection_candidate_and_confirmed_events() -> None:
     assert confirmed.payload["fusionMode"] == "DUAL_CAMERA"
     assert 0 <= confirmed.payload["fusionScore"] <= 1
     assert publisher.events == events
+
+
+def test_pipeline_can_defer_confirmed_event_for_vlm_gate() -> None:
+    publisher = MemoryEventPublisher()
+    pipeline = InferencePipeline(
+        publisher=publisher,
+        source="test-worker",
+        model_version="mock-test",
+        temporal_config=TemporalConfig(n=3, m=5, candidate_n=1, cooldown_ms=1000),
+        defer_confirmed=True,
+    )
+
+    events = MockReplayRunner(detector=MockDetector(), pipeline=pipeline).run(
+        built_in_demo_frames()
+    )
+
+    assert any(event.event_type == EventType.INCIDENT_CONFIRMED for event in events)
+    assert all(event.event_type != EventType.INCIDENT_CONFIRMED for event in publisher.events)
+    assert pipeline.runtime.snapshot()["incidentsConfirmed"] == 0
+    assert pipeline.runtime.snapshot()["eventsPublished"] == len(publisher.events)

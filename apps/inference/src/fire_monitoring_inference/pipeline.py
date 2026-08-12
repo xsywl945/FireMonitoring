@@ -31,6 +31,7 @@ class InferencePipeline:
         temporal_config: TemporalConfig | None = None,
         fusion: DualCameraFusion | None = None,
         runtime: RuntimeState | None = None,
+        defer_confirmed: bool = False,
     ) -> None:
         self.publisher = publisher
         self.source = source
@@ -38,6 +39,7 @@ class InferencePipeline:
         self.temporal_config = temporal_config or TemporalConfig()
         self.fusion = fusion or DualCameraFusion()
         self.runtime = runtime or RuntimeState(model_version=model_version)
+        self.defer_confirmed = defer_confirmed
         self._trackers: dict[tuple[int, int, str], TemporalStateMachine] = {}
         self._latest: dict[tuple[int, int, str], TemporalEvidence] = {}
         self._zone_status: dict[int, FusionStatus] = defaultdict(lambda: FusionStatus.NONE)
@@ -199,8 +201,14 @@ class InferencePipeline:
             )
         self._zone_status[zone_id] = decision.status
 
+        published_events = 0
         for event in events:
+            if self.defer_confirmed and event.event_type == EventType.INCIDENT_CONFIRMED:
+                continue
             self.publisher.publish(event)
-        confirmed = any(event.event_type == EventType.INCIDENT_CONFIRMED for event in events)
-        self.runtime.record_frame(timestamp, len(events), confirmed)
+            published_events += 1
+        confirmed = not self.defer_confirmed and any(
+            event.event_type == EventType.INCIDENT_CONFIRMED for event in events
+        )
+        self.runtime.record_frame(timestamp, published_events, confirmed)
         return events

@@ -13,12 +13,14 @@ from .contracts import (
     EvidenceFrame,
     IncidentEvidenceReadyPayload,
     StrictModel,
+    VlmAnalysisPayload,
     utc_now,
 )
 from .evidence import EvidenceStore
 from .frames import FramePacket
 from .live_frames import encode_jpeg
 from .publisher import EventPublisher
+from .runtime import RuntimeState
 from .vision.base import VisionReasoner
 
 log = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ class IncidentEnrichmentJob:
     confirmed: EventEnvelope
     frame: FramePacket
     detections: list[Detection]
+    context_frames: tuple[FramePacket, ...] = ()
 
 
 class IncidentEnrichmentWorker:
@@ -42,11 +45,19 @@ class IncidentEnrichmentWorker:
         reasoner: VisionReasoner,
         cv2_module: object,
         capacity: int = 4,
+        gate_confirmed: bool = False,
+        gate_min_confidence: float = 0.7,
+        gate_fail_open: bool = False,
+        runtime: RuntimeState | None = None,
     ) -> None:
         self.publisher = publisher
         self.evidence_store = evidence_store
         self.reasoner = reasoner
         self._cv2 = cv2_module
+        self.gate_confirmed = gate_confirmed
+        self.gate_min_confidence = gate_min_confidence
+        self.gate_fail_open = gate_fail_open
+        self.runtime = runtime
         self._jobs: queue.Queue[IncidentEnrichmentJob | None] = queue.Queue(maxsize=capacity)
         self._thread = threading.Thread(target=self._run, name="incident-enrichment", daemon=True)
 
@@ -69,7 +80,41 @@ class IncidentEnrichmentWorker:
         self._thread.join(timeout=timeout)
 
     def process(self, job: IncidentEnrichmentJob) -> list[EventEnvelope]:
-        jpeg = encode_jpeg(self._cv2, job.frame.image)
+        frames = job.context_frames[-3:] if job.context_frames else (job.frame,)
+        encoded_frames = [encode_jpeg(self._cv2, frame.image) for frame in frames]
+        jpeg = encoded_frames[-1]
+        image_urls = [
+            "data:image/jpeg;base64," + base64.b64encode(item).decode("ascii")
+            for item in encoded_frames
+        ]
+        judgement = self.reasoner.analyze(incident_id=None, image_data_urls=image_urls)
+
+        gated_events: list[EventEnvelope] = []
+        if self.gate_confirmed:
+            if self._accepted_by_gate(judgement):
+                self.publisher.publish(job.confirmed)
+                gated_events.append(job.confirmed)
+            elif judgement.status != "SUCCEEDED" and self.gate_fail_open:
+                log.error(
+                    "VLM gate unavailable; fail-open alert emitted: traceId=%s error=%s",
+                    job.confirmed.trace_id,
+                    judgement.error_code,
+                )
+                self.publisher.publish(job.confirmed)
+                gated_events.append(job.confirmed)
+            else:
+                log.warning(
+                    "VLM gate held candidate: traceId=%s status=%s visibleFire=%s "
+                    "visibleSmoke=%s confidence=%s error=%s",
+                    job.confirmed.trace_id,
+                    judgement.status,
+                    judgement.has_visible_fire,
+                    judgement.has_visible_smoke,
+                    judgement.confidence,
+                    judgement.error_code,
+                )
+                return []
+
         object_key: str | None = None
         try:
             object_key = self.evidence_store.put_jpeg(
@@ -103,8 +148,6 @@ class IncidentEnrichmentWorker:
         )
         self.publisher.publish(evidence_event)
 
-        image_url = "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii")
-        judgement = self.reasoner.analyze(incident_id=None, image_data_urls=[image_url])
         vlm_type = (
             EventType.VLM_ANALYSIS_COMPLETED
             if judgement.status == "SUCCEEDED"
@@ -112,7 +155,19 @@ class IncidentEnrichmentWorker:
         )
         vlm_event = self._related_event(job.confirmed, event_type=vlm_type, payload=judgement)
         self.publisher.publish(vlm_event)
-        return [evidence_event, vlm_event]
+        events = [*gated_events, evidence_event, vlm_event]
+        if self.runtime is not None:
+            self.runtime.record_events(len(events), confirmed=bool(gated_events))
+        return events
+
+    def _accepted_by_gate(self, judgement: VlmAnalysisPayload) -> bool:
+        confidence = judgement.confidence
+        return bool(
+            judgement.status == "SUCCEEDED"
+            and (judgement.has_visible_fire or judgement.has_visible_smoke)
+            and confidence is not None
+            and confidence >= self.gate_min_confidence
+        )
 
     def _run(self) -> None:
         while True:

@@ -94,4 +94,4 @@ Detailed plans live in `docs/plans/`. The step-by-step cloud training guide is
 
 ## Honest milestone boundary
 
-The single-camera chain is integrated: DirectShow camera → local YOLO overlays → 3/5 temporal confirmation → Redis → Spring incident → private MinIO evidence JPEG → optional Qwen 3.7 Plus analysis → WebSocket/browser. SMS and dual-camera fusion are intentionally disabled. This is a research prototype and must not replace certified fire alarm equipment or become the only life-safety notification path.
+The single-camera chain is integrated: DirectShow camera → local YOLO overlays → 3/5 local candidate → three-frame Qwen 3.7 Plus verification gate → confirmed Redis/Spring incident → private MinIO evidence JPEG → WebSocket/browser. The current strict gate holds candidates when cloud verification fails or does not confirm visible physical fire/smoke. SMS and dual-camera fusion are intentionally disabled. This is a research prototype and must not replace certified fire alarm equipment or become the only life-safety notification path.

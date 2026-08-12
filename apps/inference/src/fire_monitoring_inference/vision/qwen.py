@@ -10,7 +10,7 @@ from pydantic import Field, ValidationError
 
 from ..contracts import StrictModel, VlmAnalysisPayload
 
-PROMPT_VERSION = "fire-risk-v2"
+PROMPT_VERSION = "fire-risk-v3"
 
 
 class VlmJudgement(StrictModel):
@@ -34,12 +34,19 @@ class VlmJudgement(StrictModel):
     uncertainties: list[Annotated[str, Field(max_length=200)]] = Field(max_length=10)
 
 
-SYSTEM_PROMPT = """You are an auxiliary fire-scene risk assessor for a research prototype.
-Analyze only visible evidence. Never claim that emergency services were contacted, power was cut,
-or an evacuation happened. Return exactly one JSON object matching the requested schema. When the
-source cannot be seen, use sourceNature=unknown and record the uncertainty."""
+SYSTEM_PROMPT = """You are the visual verification gate for a classroom and laboratory fire
+monitoring research prototype. Analyze only the supplied chronological camera frames. Treat fire
+or smoke shown on a monitor, phone, poster, reflection, or printed image as NOT physically present.
+Distinguish smoke from steam, fog, dust, glare, sunlight, lamps and bright red/orange objects. Set
+hasVisibleFire or hasVisibleSmoke true only for a real physical phenomenon visible in the monitored
+scene. Never claim that emergency services were contacted, power was cut, or an evacuation
+happened. Return exactly one JSON object matching the requested schema. When evidence is
+insufficient, set both visibility fields false, use sourceNature=unknown, lower confidence, and
+explain uncertainty."""
 
-USER_PROMPT = """Assess these classroom/laboratory camera evidence frames. Return fields:
+USER_PROMPT = """Assess these chronological classroom/laboratory camera evidence frames jointly.
+Use temporal consistency across frames to reject screen content, reflections and transient
+artifacts. Return JSON fields:
 schemaVersion='1.0', hasVisibleFire, hasVisibleSmoke, sourceNature
 (electrical|open_flame|chemical|cooking|unknown), sceneType
 (classroom|laboratory|corridor|other), burningObjects, peopleAtRisk, riskLevel
@@ -72,7 +79,9 @@ class QwenVisionReasoner:
             return self._failure(incident_id, "VLM_UNSAFE_IMAGE_URL", started)
 
         content: list[dict[str, Any]] = [{"type": "text", "text": USER_PROMPT}]
-        content.extend({"type": "image_url", "image_url": {"url": url}} for url in image_data_urls)
+        for index, url in enumerate(image_data_urls, start=1):
+            content.append({"type": "text", "text": f"Chronological evidence frame {index}."})
+            content.append({"type": "image_url", "image_url": {"url": url}})
         request = {
             "model": self.model,
             "temperature": 0,

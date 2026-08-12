@@ -32,11 +32,11 @@
               </div>
             </div>
             <el-empty v-else description="该事件暂无可显示的关键帧" />
-            <div class="fusion-explanation"><span class="explanation-icon"><el-icon><Connection /></el-icon></span><div><strong>为什么触发本次预警？</strong><p>本地 YOLO 候选检测通过单摄 3 / 5 帧时序确认规则，系统证据分为 {{ (incident.fusionScore || 0).toFixed(2) }}。云端语义研判不会阻塞基础预警。</p></div></div>
+            <div class="fusion-explanation"><span class="explanation-icon"><el-icon><Connection /></el-icon></span><div><strong>为什么触发本次预警？</strong><p>本地 YOLO 候选通过单摄 3 / 5 帧时序规则，证据分为 {{ (incident.fusionScore || 0).toFixed(2) }}；随后最近 3 个时序帧通过千问复核，系统才发布本次正式预警。</p></div></div>
           </article>
 
           <article class="panel semantic-panel">
-            <header class="panel-header"><div><h2>多模态语义研判</h2><p>千问基于单摄关键帧生成的辅助判断</p></div><span v-if="incident.semanticAnalysis?.model" class="model-chip">{{ incident.semanticAnalysis.model }}</span></header>
+            <header class="panel-header"><div><h2>多模态语义研判</h2><p>千问基于最近 3 个时序帧生成的报警前置复核</p></div><span v-if="incident.semanticAnalysis?.model" class="model-chip">{{ incident.semanticAnalysis.model }}</span></header>
             <template v-if="incident.semanticAnalysis?.state === 'COMPLETED'">
               <div class="semantic-summary"><el-icon><MagicStick /></el-icon><p>{{ incident.semanticAnalysis.summary }}</p></div>
               <div class="semantic-grid">
@@ -46,8 +46,8 @@
               <div v-if="incident.semanticAnalysis.recommendations?.length" class="recommendation-list"><strong>建议操作</strong><ol><li v-for="item in incident.semanticAnalysis.recommendations" :key="item">{{ item }}</li></ol></div>
               <p v-if="incident.semanticAnalysis.uncertainty" class="uncertainty-note"><el-icon><InfoFilled /></el-icon><span><b>不确定性说明：</b>{{ incident.semanticAnalysis.uncertainty }}</span></p>
             </template>
-            <div v-else-if="incident.semanticAnalysis?.state === 'PENDING'" class="analysis-pending"><div class="signal-loader"><span /><span /><span /></div><strong>云端语义研判进行中</strong><p>基础预警不受云端分析进度影响</p></div>
-            <div v-else class="analysis-pending"><el-icon><Warning /></el-icon><strong>云端研判暂不可用</strong><p>本次预警仍由视觉检测与时序融合证据支撑</p></div>
+            <div v-else-if="incident.semanticAnalysis?.state === 'PENDING'" class="analysis-pending"><div class="signal-loader"><span /><span /><span /></div><strong>云端语义研判进行中</strong><p>研判通过前不会发布正式预警</p></div>
+            <div v-else class="analysis-pending"><el-icon><Warning /></el-icon><strong>云端研判结果暂不可用</strong><p>严格门控模式不会在研判失败时发布新的正式预警</p></div>
             <footer class="ai-disclaimer">AI 研判仅作为辅助信息，不能替代现场人员和专业消防判断。</footer>
           </article>
         </div>

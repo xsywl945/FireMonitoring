@@ -47,6 +47,13 @@ class RuntimeState:
             self._state["lastFrameAt"] = timestamp
             self._state["updatedAt"] = utc_now()
 
+    def record_events(self, published: int, *, confirmed: bool = False) -> None:
+        with self._lock:
+            self._state["eventsPublished"] += published
+            if confirmed:
+                self._state["incidentsConfirmed"] += 1
+            self._state["updatedAt"] = utc_now()
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             return {

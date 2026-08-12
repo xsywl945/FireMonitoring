@@ -2,7 +2,7 @@
 
 ## 当前集成范围
 
-当前可运行链路为：笔记本前置摄像头 → RTX 5060 上的 YOLO11s → 单摄 3/5 帧时序确认 → Redis → Spring Boot 事件 → 私有 MinIO 关键帧 → 可选 Qwen 3.7 Plus 语义研判 → WebSocket 与 Vue 控制台。
+当前可运行链路为：笔记本前置摄像头 → RTX 5060 上的 YOLO11s → 单摄 3/5 帧本地候选 → 最近 3 帧 Qwen 3.7 Plus 复核 → 复核通过后发布正式事件 → Redis → Spring Boot → 私有 MinIO 关键帧 → WebSocket 与 Vue 控制台。
 
 短信和第二路摄像头未启用。本系统是研究原型，不能替代认证火灾报警器，也不能作为唯一生命安全通知链路。
 
@@ -34,6 +34,9 @@ DASHSCOPE_API_KEY=替换为轮换后的新密钥
 ```dotenv
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen3.7-plus
+INFERENCE_VLM_GATE_ENABLED=true
+INFERENCE_VLM_GATE_MIN_CONFIDENCE=0.70
+INFERENCE_VLM_GATE_FAIL_OPEN=false
 SMS_DEMO_ARMED=false
 ```
 
@@ -56,15 +59,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\start-demo
 - 前置摄像头画面和 YOLO 检测框；
 - 推理状态 `RUNNING`、模型版本、单帧耗时和处理帧数；
 - 当前火焰/烟雾候选；
-- 只有满足 3/5 帧规则后才生成的预警事件。
+- YOLO 候选框，以及只有通过 3/5 帧规则和千问复核后才生成的正式预警事件。
 
 实时模式下 Python 直接拥有摄像头，脚本不会同时启动 FFmpeg，避免设备争用。不要为了测试制造明火或烟雾；优先使用安全的视频/图片回放或正常场景观察。
 
 ## 千问调用策略
 
-采用百炼 OpenAI 兼容 `chat/completions` 接口。事件确认后只调用一次：关键帧以内存 Base64 `data:image/jpeg` 发送，`enable_thinking=false`，并要求严格 JSON Schema。未配置密钥、超时、HTTP 错误或结构校验失败时只把语义研判标为失败，不影响 YOLO 基础预警。
+采用百炼 OpenAI 兼容 `chat/completions` 接口。YOLO 通过 3/5 帧规则后只调用一次：最近 3 个时序帧以内存 Base64 `data:image/jpeg` 发送，`enable_thinking=false`，要求 JSON Object 输出，并在本地做严格 Pydantic 校验。
+
+当前为严格门控：只有 `hasVisibleFire` 或 `hasVisibleSmoke` 为真，且大模型置信度不低于 `0.70` 时才发布正式预警。未配置密钥会阻止实时推理服务就绪；API 超时、HTTP 错误、结构校验失败、低置信度或判断为屏幕内容/反光/蒸汽等情况只保留本地候选，不进入事故和站内通知链。若未来需要在断网时优先保证召回，可显式把 `INFERENCE_VLM_GATE_FAIL_OPEN` 改为 `true`，但这不符合当前“必须经过大模型研判”的要求。
 
 系统不会启用模型内置网页搜索、代码解释器或其他工具，也不会逐帧调用 API。
+
+该门控会引入云端延迟和断网漏报风险，只适用于科研演示，不能作为唯一生命安全链路或替代认证火灾报警器。
 
 ## 健康检查
 

@@ -118,6 +118,7 @@ def _pipeline(
     runtime: RuntimeState,
     *,
     model_version: str,
+    defer_confirmed: bool = False,
 ) -> InferencePipeline:
     temporal = TemporalConfig(
         n=config.temporal_n,
@@ -134,6 +135,7 @@ def _pipeline(
         temporal_config=temporal,
         fusion=DualCameraFusion(FusionConfig(sync_window_ms=config.fusion_window_ms)),
         runtime=runtime,
+        defer_confirmed=defer_confirmed,
     )
 
 
@@ -165,6 +167,10 @@ def _serve_camera(
             camera_id=args.camera_id,
             requested_fps=args.target_fps,
         )
+        if config.vlm_gate_enabled and not args.enrich:
+            raise RuntimeError("VLM gate requires --enrich")
+        if config.vlm_gate_enabled and config.dashscope_api_key is None:
+            raise RuntimeError("VLM gate requires DASHSCOPE_API_KEY")
         if args.enrich:
             if config.minio_access_key is None or config.minio_secret_key is None:
                 raise RuntimeError("MinIO credentials are required for incident enrichment")
@@ -189,6 +195,10 @@ def _serve_camera(
                 evidence_store=evidence_store,
                 reasoner=reasoner,
                 cv2_module=source.cv2_module,
+                gate_confirmed=config.vlm_gate_enabled,
+                gate_min_confidence=config.vlm_gate_min_confidence,
+                gate_fail_open=config.vlm_gate_fail_open,
+                runtime=runtime,
             )
             enrichment.start()
         logging.getLogger(__name__).info(
@@ -205,6 +215,7 @@ def _serve_camera(
                 publisher,
                 runtime,
                 model_version=config.model_version,
+                defer_confirmed=config.vlm_gate_enabled,
             ),
             config=LiveCameraConfig(
                 site_id=args.site_id,

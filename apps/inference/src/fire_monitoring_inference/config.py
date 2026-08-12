@@ -32,6 +32,9 @@ class ServiceConfig(BaseModel):
     dashscope_api_key: SecretStr | None = None
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     dashscope_model: str = "qwen3.7-plus"
+    vlm_gate_enabled: bool = False
+    vlm_gate_min_confidence: float = Field(default=0.7, ge=0, le=1)
+    vlm_gate_fail_open: bool = False
     minio_endpoint: str = "127.0.0.1:9000"
     minio_access_key: SecretStr | None = None
     minio_secret_key: SecretStr | None = None
@@ -71,6 +74,9 @@ class ServiceConfig(BaseModel):
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
             ),
             dashscope_model=_env("DASHSCOPE_MODEL", "qwen3.7-plus"),
+            vlm_gate_enabled=_env("INFERENCE_VLM_GATE_ENABLED", False),
+            vlm_gate_min_confidence=_env("INFERENCE_VLM_GATE_MIN_CONFIDENCE", 0.7),
+            vlm_gate_fail_open=_env("INFERENCE_VLM_GATE_FAIL_OPEN", False),
             minio_endpoint=_env("INFERENCE_MINIO_ENDPOINT", "127.0.0.1:9000"),
             minio_access_key=SecretStr(minio_access_key) if minio_access_key else None,
             minio_secret_key=SecretStr(minio_secret_key) if minio_secret_key else None,
