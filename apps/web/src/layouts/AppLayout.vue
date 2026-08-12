@@ -16,8 +16,8 @@
 
       <div class="sidebar-status">
         <div class="sidebar-status-head"><span>系统状态</span><strong><i /> 正常运行</strong></div>
-        <div class="sidebar-stat-row"><span>摄像头</span><b>2 / 2 在线</b></div>
-        <div class="sidebar-stat-row"><span>推理模式</span><b>双视角融合</b></div>
+        <div class="sidebar-stat-row"><span>摄像头</span><b>{{ onlineCameras }} / {{ totalCameras }} 在线</b></div>
+        <div class="sidebar-stat-row"><span>推理模式</span><b>单摄时序</b></div>
         <div class="sidebar-stat-row"><span>本地时间</span><b>{{ clock }}</b></div>
       </div>
     </aside>
@@ -34,7 +34,7 @@
         </div>
         <div class="topbar-actions">
           <RouterLink class="alert-button" to="/incidents" aria-label="待确认预警">
-            <el-icon><Bell /></el-icon><span class="alert-count">1</span>
+            <el-icon><Bell /></el-icon><span v-if="newIncidentCount" class="alert-count">{{ newIncidentCount }}</span>
           </RouterLink>
           <el-dropdown trigger="click" @command="handleCommand">
             <button class="profile-button">
@@ -57,22 +57,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter, RouterLink, RouterView } from 'vue-router'
 import { ArrowDown, Bell, DataAnalysis, Monitor, Operation, Setting, VideoCamera } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { cameraApi, incidentApi } from '@/api'
 
 const router = useRouter()
 const auth = useAuthStore()
 const mobileNavOpen = ref(false)
 const clock = ref('')
-const navigation = [
+const onlineCameras = ref(0)
+const totalCameras = ref(0)
+const newIncidentCount = ref(0)
+const navigation = computed(() => [
   { path: '/dashboard', label: '运行总览', icon: DataAnalysis },
   { path: '/monitor', label: '实时监控', icon: Monitor },
-  { path: '/incidents', label: '预警事件', icon: Operation, badge: '1' },
+  { path: '/incidents', label: '预警事件', icon: Operation, badge: newIncidentCount.value ? String(newIncidentCount.value) : undefined },
   { path: '/devices', label: '区域与设备', icon: VideoCamera },
   { path: '/health', label: '系统健康', icon: Setting },
-]
+])
 
 const initials = computed(() => auth.user?.displayName.slice(-2) || '管理员')
 const updateClock = () => {
@@ -81,6 +85,12 @@ const updateClock = () => {
 updateClock()
 const timer = window.setInterval(updateClock, 1000)
 onBeforeUnmount(() => window.clearInterval(timer))
+onMounted(async () => {
+  const [cameras, incidents] = await Promise.all([cameraApi.list(), incidentApi.list({ status: 'NEW' })])
+  totalCameras.value = cameras.length
+  onlineCameras.value = cameras.filter((camera) => camera.status === 'ONLINE').length
+  newIncidentCount.value = incidents.length
+})
 
 function handleCommand(command: string) {
   if (command === 'logout') {

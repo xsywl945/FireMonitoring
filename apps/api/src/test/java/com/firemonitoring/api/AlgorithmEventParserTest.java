@@ -47,6 +47,23 @@ class AlgorithmEventParserTest {
         assertThatThrownBy(() -> parser.parseConfirmed(missingZone)).isInstanceOf(EventParseException.class);
     }
 
+    @Test
+    void parsesEvidenceAndVlmPayloads() {
+        UUID traceId = UUID.randomUUID();
+        ParsedIncidentEvidenceEvent evidence = parser.parseEvidence(evidenceEvent(traceId));
+        ParsedVlmAnalysisEvent vlm = parser.parseVlm(vlmEvent(traceId));
+
+        assertThat(evidence.payload().evidence()).singleElement().satisfies(frame -> {
+            assertThat(frame.viewRole()).isEqualTo("SINGLE");
+            assertThat(frame.snapshotObjectKey()).startsWith("incidents/");
+            assertThat(frame.detections()).singleElement()
+                    .extracting(EvidenceDetection::className).isEqualTo("fire");
+        });
+        assertThat(vlm.payload().status()).isEqualTo("SUCCEEDED");
+        assertThat(vlm.payload().model()).isEqualTo("qwen3.7-plus");
+        assertThat(vlm.payload().riskLevel()).isEqualTo("HIGH");
+    }
+
     static String confirmedEvent(UUID eventId, long zoneId) {
         return """
                 {
@@ -75,5 +92,36 @@ class AlgorithmEventParserTest {
                   }
                 }
                 """.formatted(eventId, UUID.randomUUID(), zoneId, zoneId);
+    }
+
+    static String evidenceEvent(UUID traceId) {
+        return """
+                {
+                  "eventId":"%s","eventType":"INCIDENT_EVIDENCE_READY","schemaVersion":"1.0",
+                  "occurredAt":"2026-08-12T06:00:03Z","traceId":"%s","source":"inference-worker-1",
+                  "siteId":1,"zoneId":1,"cameraId":1,"modelVersion":"fire-yolo-dev",
+                  "payload":{"evidence":[{
+                    "cameraId":1,"viewRole":"SINGLE","capturedAt":"2026-08-12T06:00:03Z",
+                    "imageWidth":1280,"imageHeight":720,"temporalScore":0.84,
+                    "snapshotObjectKey":"incidents/%s/frame.jpg",
+                    "detections":[{"className":"fire","confidence":0.9,"bboxXyxy":[10,20,100,120]}]
+                  }]}
+                }
+                """.formatted(UUID.randomUUID(), traceId, traceId);
+    }
+
+    static String vlmEvent(UUID traceId) {
+        return """
+                {
+                  "eventId":"%s","eventType":"VLM_ANALYSIS_COMPLETED","schemaVersion":"1.0",
+                  "occurredAt":"2026-08-12T06:00:04Z","traceId":"%s","source":"inference-worker-1",
+                  "siteId":1,"zoneId":1,"cameraId":1,"modelVersion":"fire-yolo-dev",
+                  "payload":{"status":"SUCCEEDED","provider":"dashscope","model":"qwen3.7-plus",
+                    "promptVersion":"fire-risk-v2","hasVisibleFire":true,"hasVisibleSmoke":false,
+                    "sourceNature":"open_flame","sceneType":"classroom","riskLevel":"HIGH",
+                    "reasoningSummary":"Visible flame.","recommendedActions":["Verify the scene"],
+                    "confidence":0.86,"uncertainties":[],"latencyMs":1200}
+                }
+                """.formatted(UUID.randomUUID(), traceId);
     }
 }

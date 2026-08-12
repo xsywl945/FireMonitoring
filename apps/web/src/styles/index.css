@@ -33,6 +33,8 @@
   --el-border-radius-base: 8px;
 }
 
+.evidence-frame > img { width: 100%; height: 100%; display: block; object-fit: contain; }
+
 * { box-sizing: border-box; }
 html, body, #app { margin: 0; min-height: 100%; }
 body { min-width: 320px; background: var(--bg-main); }
@@ -223,7 +225,7 @@ button { color: inherit; }
 .stream-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-content: start; }
 .stream-card { overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: #0d202d; box-shadow: 0 15px 40px rgba(0, 0, 0, .14); }
 .stream-stage { position: relative; aspect-ratio: 16/10; overflow: hidden; background: #07131a; }
-.stream-stage video { width: 100%; height: 100%; display: block; object-fit: cover; }
+.stream-stage video, .stream-stage .inference-feed { width: 100%; height: 100%; display: block; object-fit: cover; }
 .mock-feed { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(165deg, #29424c, #1b343f 46%, #102833); }
 .mock-room { position: absolute; inset: 0; perspective: 500px; background: linear-gradient(165deg, transparent 0 52%, rgba(5, 15, 21, .44) 53%), linear-gradient(90deg, rgba(207, 222, 217, .03), transparent 40%); }
 .mock-window { position: absolute; left: 8%; top: 15%; width: 22%; height: 34%; border: 5px solid #152e39; background: linear-gradient(#5c747a, #344e55); box-shadow: 0 0 40px rgba(190, 220, 220, .08); }
@@ -250,6 +252,7 @@ button { color: inherit; }
 .detection-panel { min-height: 100%; padding: 17px; border: 1px solid var(--line); border-radius: 11px; background: linear-gradient(155deg, #102838, #0b1e2b); }
 .detection-panel > header { display: flex; justify-content: space-between; align-items: flex-start; }.detection-panel h2 { margin: 2px 0 0; font-size: 16px; }.engine-state { color: #58d2ad; font-size: 7px; }
 .risk-orb { position: relative; width: 116px; height: 116px; display: grid; place-items: center; margin: 24px auto; border-radius: 50%; background: conic-gradient(#ff5353 0 94%, #203c4c 94%); box-shadow: 0 0 30px rgba(255, 74, 74, .1); }.risk-orb::before { content: ''; position: absolute; width: 104px; height: 104px; border-radius: 50%; background: #102634; }.risk-orb > div { position: relative; z-index: 1; display: flex; flex-direction: column; text-align: center; }.risk-orb strong { color: #ff7272; font-size: 34px; line-height: 1; }.risk-orb span { margin-top: 5px; color: #688493; font-size: 8px; }
+.risk-orb.risk-normal strong { color: #38cca1; }
 .evidence-stack > div { display: grid; grid-template-columns: 1fr auto; gap: 5px; margin-bottom: 13px; color: #6e8997; font-size: 8px; }.evidence-stack span b { margin-right: 5px; color: #afc4cd; }.evidence-stack strong { color: #c5d8e1; font-size: 9px; }.evidence-stack > div > i { grid-column: 1/-1; height: 3px; overflow: hidden; border-radius: 3px; background: #1c3948; }.evidence-stack em { display: block; height: 100%; background: linear-gradient(90deg, #ff6840, #ff9f50); }.evidence-stack .fusion-row { min-height: 27px; align-items: center; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; }.fusion-row strong { color: #57d5ae; }
 .detection-message { display: flex; gap: 9px; margin-top: 17px; padding: 11px; border: 1px solid rgba(255, 84, 64, .17); border-radius: 7px; background: rgba(255, 71, 52, .06); }.detection-message > .el-icon { flex: 0 0 auto; color: #ff684e; }.detection-message strong { color: #f5b0a2; font-size: 9px; }.detection-message p { margin: 5px 0 0; color: #775f60; font-size: 8px; line-height: 1.6; }
 .legend-row { display: flex; justify-content: center; gap: 13px; margin-top: 14px; color: #607c89; font-size: 7px; }.legend-row i { display: inline-block; width: 7px; height: 7px; margin-right: 3px; border: 1px solid; }.legend-row .fire { border-color: #ff604b; }.legend-row .smoke { border-color: #50bff3; }.legend-row .normal { border-color: #4ad4a7; }

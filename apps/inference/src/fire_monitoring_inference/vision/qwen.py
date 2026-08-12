@@ -10,7 +10,7 @@ from pydantic import Field, ValidationError
 
 from ..contracts import StrictModel, VlmAnalysisPayload
 
-PROMPT_VERSION = "fire-risk-v1"
+PROMPT_VERSION = "fire-risk-v2"
 
 
 class VlmJudgement(StrictModel):
@@ -39,7 +39,7 @@ Analyze only visible evidence. Never claim that emergency services were contacte
 or an evacuation happened. Return exactly one JSON object matching the requested schema. When the
 source cannot be seen, use sourceNature=unknown and record the uncertainty."""
 
-USER_PROMPT = """Assess these synchronized classroom/laboratory camera frames. Return fields:
+USER_PROMPT = """Assess these classroom/laboratory camera evidence frames. Return fields:
 schemaVersion='1.0', hasVisibleFire, hasVisibleSmoke, sourceNature
 (electrical|open_flame|chemical|cooking|unknown), sceneType
 (classroom|laboratory|corridor|other), burningObjects, peopleAtRisk, riskLevel
@@ -54,7 +54,7 @@ class QwenVisionReasoner:
         *,
         api_key: str | None,
         base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model: str = "qwen3-vl-plus",
+        model: str = "qwen3.7-plus",
         client: httpx.Client | Any | None = None,
     ) -> None:
         self.api_key = api_key
@@ -62,7 +62,7 @@ class QwenVisionReasoner:
         self.model = model
         self._client = client or httpx.Client(timeout=httpx.Timeout(25.0, connect=3.0))
 
-    def analyze(self, *, incident_id: int, image_data_urls: list[str]) -> VlmAnalysisPayload:
+    def analyze(self, *, incident_id: int | None, image_data_urls: list[str]) -> VlmAnalysisPayload:
         started = time.perf_counter()
         if not self.api_key:
             return self._failure(incident_id, "VLM_NOT_CONFIGURED", started)
@@ -76,7 +76,15 @@ class QwenVisionReasoner:
         request = {
             "model": self.model,
             "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "enable_thinking": False,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "fire_scene_judgement",
+                    "strict": True,
+                    "schema": VlmJudgement.model_json_schema(by_alias=True),
+                },
+            },
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": content},
@@ -129,7 +137,9 @@ class QwenVisionReasoner:
             raise ValueError("model content is not an object")
         return value
 
-    def _failure(self, incident_id: int, error_code: str, started: float) -> VlmAnalysisPayload:
+    def _failure(
+        self, incident_id: int | None, error_code: str, started: float
+    ) -> VlmAnalysisPayload:
         return VlmAnalysisPayload(
             incidentId=incident_id,
             status="FAILED",

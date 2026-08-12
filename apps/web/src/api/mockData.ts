@@ -55,10 +55,14 @@ export const mockIncidentDetails: IncidentDetail[] = [
     observations: [
       {
         id: 'obs-a-01',
+        cameraId: 1,
         viewRole: 'VIEW_A',
         cameraName: '笔记本前置摄像头',
         capturedAt: isoAgo(3),
         temporalScore: 0.92,
+        imageWidth: 640,
+        imageHeight: 480,
+        snapshotAvailable: false,
         detections: [
           { className: 'fire', confidence: 0.96, bboxXyxy: [176, 240, 348, 431] },
           { className: 'smoke', confidence: 0.87, bboxXyxy: [142, 98, 401, 302] },
@@ -66,10 +70,14 @@ export const mockIncidentDetails: IncidentDetail[] = [
       },
       {
         id: 'obs-b-01',
+        cameraId: 2,
         viewRole: 'VIEW_B',
         cameraName: 'USB 侧视摄像头',
         capturedAt: isoAgo(3),
         temporalScore: 0.89,
+        imageWidth: 640,
+        imageHeight: 480,
+        snapshotAvailable: false,
         detections: [{ className: 'fire', confidence: 0.91, bboxXyxy: [221, 214, 389, 438] }],
       },
     ],
@@ -80,13 +88,13 @@ export const mockIncidentDetails: IncidentDetail[] = [
       sceneRisk: '附近存在纸张、窗帘等可燃物，火势具有向上和侧向蔓延风险。',
       recommendations: ['立即切断对应区域电源', '通知现场人员疏散并联系校内消防值班人员', '仅在确保人身安全时使用适用灭火器'],
       uncertainty: '画面不能确认设备内部是否仍在持续短路。',
-      model: 'qwen3-vl-plus',
+      model: 'qwen3.7-plus',
     },
     timeline: [
       { id: 'tl-1', action: '候选检测', actor: 'YOLO 检测服务', occurredAt: isoAgo(3.4), note: 'VIEW_A 连续 4/5 帧检测到火焰' },
       { id: 'tl-2', action: '双视角确认', actor: '决策融合服务', occurredAt: isoAgo(3.1), note: '500ms 窗口内双路证据一致，融合分 0.94' },
       { id: 'tl-3', action: '事件创建', actor: '系统', occurredAt: isoAgo(3), note: '已触发站内预警，短信进入发送队列' },
-      { id: 'tl-4', action: '语义研判完成', actor: 'qwen3-vl-plus', occurredAt: isoAgo(2.6) },
+      { id: 'tl-4', action: '语义研判完成', actor: 'qwen3.7-plus', occurredAt: isoAgo(2.6) },
     ],
   },
   {
@@ -102,10 +110,14 @@ export const mockIncidentDetails: IncidentDetail[] = [
     observations: [
       {
         id: 'obs-a-02',
+        cameraId: 3,
         viewRole: 'VIEW_A',
         cameraName: '实验室网络摄像头',
         capturedAt: isoAgo(46),
         temporalScore: 0.86,
+        imageWidth: 640,
+        imageHeight: 480,
+        snapshotAvailable: false,
         detections: [{ className: 'smoke', confidence: 0.88, bboxXyxy: [110, 86, 372, 324] }],
       },
     ],
@@ -181,6 +193,6 @@ export const mockServices: ServiceHealth[] = [
   { key: 'media', name: '视频媒体网关', description: 'WebRTC / HLS 双通道', status: 'HEALTHY', latencyMs: 37, updatedAt: isoAgo(0) },
   { key: 'redis', name: '实时事件总线', description: 'Redis Streams 消费正常', status: 'HEALTHY', latencyMs: 4, updatedAt: isoAgo(0) },
   { key: 'storage', name: '证据对象存储', description: 'MinIO · 可用空间 163 GB', status: 'HEALTHY', latencyMs: 12, updatedAt: isoAgo(0) },
-  { key: 'cloud', name: '云端语义研判', description: 'qwen3-vl-plus · 北京地域', status: 'DEGRADED', latencyMs: 1240, updatedAt: isoAgo(1) },
-  { key: 'sms', name: '短信通知', description: '阿里云短信 · 演示白名单', status: 'HEALTHY', latencyMs: 386, updatedAt: isoAgo(3) },
+  { key: 'cloud', name: '云端语义研判', description: 'qwen3.7-plus · 未配置密钥', status: 'DEGRADED', updatedAt: isoAgo(1) },
+  { key: 'sms', name: '短信通知', description: '当前阶段未启用', status: 'UNKNOWN', updatedAt: isoAgo(3) },
 ]

@@ -4,7 +4,7 @@ export type IncidentStatus = 'NEW' | 'ACKNOWLEDGED' | 'HANDLING' | 'RESOLVED' | 
 export type CameraStatus = 'ONLINE' | 'OFFLINE' | 'DEGRADED' | 'UNKNOWN'
 export type SceneType = 'CLASSROOM' | 'LABORATORY' | 'CORRIDOR' | 'OTHER'
 export type SourceType = 'INTEGRATED' | 'USB' | 'NETWORK_RTSP' | 'DEMO_FILE'
-export type ViewRole = 'VIEW_A' | 'VIEW_B'
+export type ViewRole = 'VIEW_A' | 'VIEW_B' | 'SINGLE'
 export type IncidentAction = 'ACKNOWLEDGE' | 'START_HANDLING' | 'RESOLVE' | 'MARK_FALSE_ALARM'
 export type PrimaryType = 'FIRE' | 'SMOKE' | 'FIRE_AND_SMOKE'
 
@@ -100,10 +100,13 @@ export interface IncidentSummary {
 
 export interface IncidentObservation {
   id: string
+  cameraId: number
   viewRole: ViewRole
   capturedAt: string
   cameraName: string
-  frameUrl?: string
+  imageWidth: number
+  imageHeight: number
+  snapshotAvailable: boolean
   detections: Detection[]
   temporalScore: number
 }
@@ -116,6 +119,8 @@ export interface SemanticAnalysis {
   recommendations?: string[]
   uncertainty?: string
   model?: string
+  confidence?: number
+  errorCode?: string
 }
 
 export interface TimelineEntry {
@@ -157,4 +162,24 @@ export interface ServiceHealth {
   status: 'HEALTHY' | 'DEGRADED' | 'OFFLINE' | 'UNKNOWN'
   latencyMs?: number
   updatedAt: string
+}
+
+export interface InferenceRuntime {
+  status: 'IDLE' | 'RUNNING' | 'STOPPED' | 'FAILED'
+  modelVersion: string
+  framesProcessed: number
+  eventsPublished: number
+  incidentsConfirmed: number
+  lastFrameAt: string | null
+  lastError: string | null
+}
+
+export interface InferenceLiveStatus {
+  ready: boolean
+  capturedAt?: string
+  imageWidth?: number
+  imageHeight?: number
+  processTimeMs?: number
+  framesProcessed?: number
+  detections: Detection[]
 }

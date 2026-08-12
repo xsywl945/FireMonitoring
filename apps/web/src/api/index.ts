@@ -11,6 +11,8 @@ import type {
   IncidentDetail,
   IncidentQuery,
   IncidentSummary,
+  InferenceLiveStatus,
+  InferenceRuntime,
   ServiceHealth,
   StreamTicket,
   TrendPoint,
@@ -201,6 +203,20 @@ export const incidentApi = {
       })
     ).data
   },
+  async evidence(incidentId: number, index: number): Promise<Blob> {
+    return (await http.get<Blob>(`/incidents/${incidentId}/evidence/${index}`, { responseType: 'blob' })).data
+  },
+}
+
+async function inferenceGet<T>(path: string): Promise<T> {
+  const response = await fetch(`/inference/api/v1${path}`, { cache: 'no-store' })
+  if (!response.ok) throw new Error(`推理服务请求失败 (${response.status})`)
+  return response.json() as Promise<T>
+}
+
+export const inferenceApi = {
+  runtime: () => inferenceGet<InferenceRuntime>('/runtime'),
+  liveStatus: () => inferenceGet<InferenceLiveStatus>('/live/status'),
 }
 
 export const healthApi = {

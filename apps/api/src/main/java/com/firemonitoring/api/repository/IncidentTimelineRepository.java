@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface IncidentTimelineRepository extends JpaRepository<IncidentTimelineEntity, Long> {
     List<IncidentTimelineEntity> findByIncidentIdOrderByOccurredAtAsc(Long incidentId);
+    boolean existsByIncidentIdAndEventTypeAndNote(Long incidentId, String eventType, String note);
 }

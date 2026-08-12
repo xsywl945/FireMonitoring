@@ -9,8 +9,10 @@ from fire_monitoring_inference.contracts import (
     DetectionSummaryPayload,
     EventEnvelope,
     EventType,
+    EvidenceFrame,
     FusionObservation,
     IncidentConfirmedPayload,
+    IncidentEvidenceReadyPayload,
     VlmAnalysisPayload,
 )
 
@@ -71,6 +73,27 @@ def test_incident_and_vlm_payloads_match_shared_json_schemas() -> None:
     validate(
         CONTRACTS / "payloads" / "incident-confirmed.schema.json",
         incident.model_dump(by_alias=True, mode="json", exclude_none=True),
+    )
+
+    evidence = IncidentEvidenceReadyPayload(
+        evidence=[
+            EvidenceFrame(
+                cameraId=1,
+                viewRole="SINGLE",
+                capturedAt=timestamp,
+                imageWidth=1280,
+                imageHeight=720,
+                detections=[
+                    Detection(className="fire", confidence=0.83, bboxXyxy=[100, 120, 300, 400])
+                ],
+                temporalScore=0.83,
+                snapshotObjectKey="incidents/trace/frame.jpg",
+            )
+        ]
+    )
+    validate(
+        CONTRACTS / "payloads" / "incident-evidence-ready.schema.json",
+        evidence.model_dump(by_alias=True, mode="json", exclude_none=True),
     )
 
     fallback = VlmAnalysisPayload(

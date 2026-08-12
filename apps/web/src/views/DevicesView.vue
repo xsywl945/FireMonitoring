@@ -1,6 +1,6 @@
 <template>
   <div class="devices-page">
-    <PageHeader eyebrow="CONFIGURATION" title="区域与设备" description="管理监控区域、视频源和双视角绑定关系">
+    <PageHeader eyebrow="CONFIGURATION" title="区域与设备" description="管理监控区域与视频源；当前阶段使用一路摄像头">
       <template #actions>
         <el-button plain :icon="Plus" @click="zoneDialog = true">新建区域</el-button>
         <el-button type="primary" :icon="VideoCamera" @click="cameraDialog = true">添加摄像头</el-button>
@@ -10,12 +10,12 @@
     <div class="device-summary-strip">
       <div><span>监控区域</span><strong>{{ zones.length }}</strong><small>全部已布防</small></div>
       <div><span>摄像头</span><strong>{{ cameras.length }}</strong><small>{{ onlineCount }} 路在线</small></div>
-      <div><span>双视角区域</span><strong>{{ pairedZones }}</strong><small>500 ms 软同步</small></div>
+      <div><span>双视角预留</span><strong>{{ pairedZones }}</strong><small>当前未启用</small></div>
       <div><span>未绑定设备</span><strong>{{ unboundCameras }}</strong><small>等待分配视角</small></div>
     </div>
 
     <section class="panel zone-panel">
-      <header class="panel-header"><div><h2>监控区域</h2><p>每个区域最多绑定 VIEW_A 与 VIEW_B 两路摄像头</p></div></header>
+      <header class="panel-header"><div><h2>监控区域</h2><p>当前使用 VIEW_A；VIEW_B 为后续双摄扩展预留</p></div></header>
       <div class="zone-card-grid">
         <article v-for="zone in zones" :key="zone.id" class="zone-card">
           <header>
@@ -70,7 +70,7 @@
       <template #footer><el-button @click="zoneDialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="createZone">创建区域</el-button></template>
     </el-dialog>
 
-    <el-dialog v-model="bindingDialog" title="调整双视角绑定" width="min(560px, 92vw)">
+    <el-dialog v-model="bindingDialog" title="调整摄像头绑定" width="min(560px, 92vw)">
       <p class="dialog-description">{{ bindingZone?.name }} · 每个视角只能绑定一路设备</p>
       <div class="binding-editor">
         <label>VIEW_A <small>主视角 · 权重 0.55</small></label>
@@ -155,7 +155,7 @@ async function saveBindings() {
       ...(bindingForm.viewA ? [{ cameraId: bindingForm.viewA, viewRole: 'VIEW_A' as const, weight: 0.55 }] : []),
       ...(bindingForm.viewB ? [{ cameraId: bindingForm.viewB, viewRole: 'VIEW_B' as const, weight: 0.45 }] : []),
     ])
-    bindingDialog.value = false; await load(); ElMessage.success('双视角绑定已更新')
+    bindingDialog.value = false; await load(); ElMessage.success('摄像头绑定已更新')
   } finally { saving.value = false }
 }
 onMounted(load)

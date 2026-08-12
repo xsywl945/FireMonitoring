@@ -1,6 +1,6 @@
 # Fire Monitoring
 
-面向教室和实验室的双视角智能火灾监控研究原型。系统由实时媒体、YOLO推理、单摄时序证据、双摄决策融合、多模态语义研判、预警和人工处置闭环组成。
+面向教室和实验室的智能火灾监控研究原型。当前里程碑采用单摄像头，由实时视频、YOLO 推理、单摄时序证据、千问多模态语义研判、站内预警和人工处置组成；双摄融合为后续扩展。
 
 ## Repository layout
 
@@ -36,8 +36,8 @@ docs/           Architecture, plans, runbooks, and test reports
 ## Current MVP
 
 - Spring Boot control plane with JWT/RBAC, zones, cameras, incident workflow, Flyway, WebSocket and Redis Stream ingestion;
-- Vue 3 operator console with real/mock API modes, dual-view player, device binding, incident handling and health views;
-- Python 3.11 inference service with bounded latest-frame queues, N/M temporal evidence, 500 ms dual-camera fusion, Redis publishing, mock replay, optional Ultralytics and Qwen3-VL-Plus adapters;
+- Vue 3 operator console with real/mock API modes, local annotated stream, device binding, incident handling and health views;
+- Python 3.11 inference service with bounded latest-frame queues, N/M temporal evidence, Redis publishing, Ultralytics live inference and Qwen 3.7 Plus structured-output integration;
 - local MySQL, Redis, MinIO and MediaMTX infrastructure;
 - repeatable Windows bootstrap/start/verify/stop scripts.
 
@@ -46,12 +46,13 @@ docs/           Architecture, plans, runbooks, and test reports
 Docker Desktop and Clash Verge TUN should be running. The script uses system networking and never stores a proxy endpoint.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\start-demo.ps1 -SkipCamera
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup-local-yolo.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\start-demo.ps1 -LiveInference
 ```
 
-The first run creates isolated Maven/Python/Node dependencies, starts the stack, creates a default classroom, and publishes a deterministic test incident. Open `http://127.0.0.1:5173` and sign in with the development-only account shown on the login page.
+The first run prepares isolated dependencies, starts the stack, creates/binds the integrated camera, and loads the archived `best.pt` on the RTX 5060. Open `http://127.0.0.1:5173` and sign in with the development-only account shown on the login page. Python owns the camera in live mode, so FFmpeg ingest is intentionally not started at the same time.
 
-To include the integrated camera ingest (MediaMTX only at this milestone), omit `-SkipCamera`. Stop everything with:
+To enable Qwen analysis, put `DASHSCOPE_API_KEY` only in the ignored local `.env`. It is called once after temporal confirmation, never for every frame. Stop everything with:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-demo.ps1
@@ -93,4 +94,4 @@ Detailed plans live in `docs/plans/`. The step-by-step cloud training guide is
 
 ## Honest milestone boundary
 
-The management frontend/backend, event contracts, safe replay, media ingest and inference decision core are implemented. DirectShow decoding from one local camera into the trained fire/smoke model and the existing temporal pipeline is implemented as an isolated test command. Web video overlays, the MediaMTX-to-YOLO live worker, evidence clip extraction, Alibaba SMS delivery/receipts and cloud VLM orchestration remain subsequent milestones. The Qwen adapter exists and fails safely when no API key is configured.
+The single-camera chain is integrated: DirectShow camera → local YOLO overlays → 3/5 temporal confirmation → Redis → Spring incident → private MinIO evidence JPEG → optional Qwen 3.7 Plus analysis → WebSocket/browser. SMS and dual-camera fusion are intentionally disabled. This is a research prototype and must not replace certified fire alarm equipment or become the only life-safety notification path.

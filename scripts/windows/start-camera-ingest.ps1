@@ -25,11 +25,12 @@ if (Test-Path -LiteralPath $pidFile) {
 
 $logFile = Join-Path $LogRoot "camera-$StreamKey.log"
 $targetUrl = "rtsp://127.0.0.1:8554/raw/$StreamKey"
+if ($DeviceName.Contains('"')) { throw 'Camera device name cannot contain a quote character.' }
 $arguments = @(
     '-hide_banner', '-loglevel', 'warning',
     '-f', 'dshow', '-rtbufsize', '256M',
     '-video_size', "${Width}x${Height}", '-framerate', "$FrameRate",
-    '-i', "video=$DeviceName",
+    '-i', "video=`"$DeviceName`"",
     '-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
     '-pix_fmt', 'yuv420p', '-g', "$FrameRate",
     '-f', 'rtsp', '-rtsp_transport', 'tcp', $targetUrl
@@ -40,4 +41,3 @@ Set-Content -LiteralPath $pidFile -Value $process.Id -Encoding ascii
 Write-Host "Started '$DeviceName' as raw/$StreamKey (PID $($process.Id))." -ForegroundColor Green
 Write-Host "WebRTC: http://127.0.0.1:8889/raw/$StreamKey"
 Write-Host "HLS:    http://127.0.0.1:8888/raw/$StreamKey"
-

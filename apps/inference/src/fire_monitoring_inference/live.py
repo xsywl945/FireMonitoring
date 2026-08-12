@@ -8,7 +8,9 @@ from typing import Any, Protocol
 
 from .contracts import Detection, EventType, utc_now
 from .detectors.base import Detector
+from .enrichment import IncidentEnrichmentJob, IncidentEnrichmentWorker
 from .frames import FramePacket
+from .live_frames import LiveFrameBuffer, draw_detections
 from .pipeline import InferencePipeline
 
 
@@ -152,12 +154,16 @@ class LiveCameraRunner:
         pipeline: InferencePipeline,
         config: LiveCameraConfig,
         cv2_module: Any | None = None,
+        frame_buffer: LiveFrameBuffer | None = None,
+        enrichment: IncidentEnrichmentWorker | None = None,
     ) -> None:
         self.source = source
         self.detector = detector
         self.pipeline = pipeline
         self.config = config
         self._cv2 = cv2_module
+        self.frame_buffer = frame_buffer
+        self.enrichment = enrichment
 
     def run(self) -> LiveRunSummary:
         processed = 0
@@ -193,7 +199,41 @@ class LiveCameraRunner:
                 processed += 1
                 next_due = now + period
 
+                annotated = None
+                if self.frame_buffer is not None:
+                    annotated = self.frame_buffer.publish(
+                        image=packet.image,
+                        detections=detections,
+                        captured_at=packet.captured_at,
+                        process_time_ms=process_time_ms,
+                        frames_processed=processed,
+                    )
+
+                confirmed_events = [
+                    event for event in events if event.event_type == EventType.INCIDENT_CONFIRMED
+                ]
+                if self.enrichment is not None:
+                    for confirmed_event in confirmed_events:
+                        image = (
+                            packet.image.copy() if hasattr(packet.image, "copy") else packet.image
+                        )
+                        self.enrichment.submit(
+                            IncidentEnrichmentJob(
+                                confirmed=confirmed_event,
+                                frame=FramePacket(
+                                    camera_id=packet.camera_id,
+                                    captured_at=packet.captured_at,
+                                    monotonic_ns=packet.monotonic_ns,
+                                    image=image,
+                                    width=packet.width,
+                                    height=packet.height,
+                                ),
+                                detections=list(detections),
+                            )
+                        )
+
                 if self.config.preview and self._show_preview(
+                    annotated,
                     packet.image,
                     detections,
                     processed=processed,
@@ -235,6 +275,7 @@ class LiveCameraRunner:
 
     def _show_preview(
         self,
+        annotated: Any | None,
         image: Any,
         detections: list[Detection],
         *,
@@ -243,31 +284,11 @@ class LiveCameraRunner:
     ) -> bool:
         if self._cv2 is None:
             raise RuntimeError("preview requires an OpenCV module")
-        for detection in detections:
-            x1, y1, x2, y2 = (int(value) for value in detection.bbox_xyxy)
-            color = (0, 0, 255) if detection.class_name == "fire" else (0, 165, 255)
-            self._cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
-            label = f"{detection.class_name} {detection.confidence:.2f}"
-            self._cv2.putText(
-                image,
-                label,
-                (max(0, x1), max(20, y1 - 8)),
-                self._cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                color,
-                2,
-                self._cv2.LINE_AA,
-            )
         status = f"frames={processed} inference={process_time_ms:.1f}ms | Q/Esc: quit"
-        self._cv2.putText(
-            image,
-            status,
-            (12, 28),
-            self._cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
-            (0, 255, 0),
-            2,
-            self._cv2.LINE_AA,
+        rendered = (
+            annotated
+            if annotated is not None
+            else draw_detections(self._cv2, image, detections, status=status)
         )
-        self._cv2.imshow("Fire Monitoring - single camera research preview", image)
+        self._cv2.imshow("Fire Monitoring - single camera research preview", rendered)
         return self._cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q"), 27)

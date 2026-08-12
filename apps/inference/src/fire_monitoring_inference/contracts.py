@@ -87,8 +87,23 @@ class IncidentCandidatePayload(StrictModel):
     observed_at: datetime = Field(alias="observedAt")
 
 
+class EvidenceFrame(StrictModel):
+    camera_id: int = Field(alias="cameraId", ge=1)
+    view_role: Literal["VIEW_A", "VIEW_B", "SINGLE"] = Field(alias="viewRole")
+    captured_at: datetime = Field(alias="capturedAt")
+    image_width: int = Field(alias="imageWidth", ge=1)
+    image_height: int = Field(alias="imageHeight", ge=1)
+    detections: list[Detection] = Field(max_length=100)
+    temporal_score: float = Field(alias="temporalScore", ge=0, le=1)
+    snapshot_object_key: str | None = Field(default=None, alias="snapshotObjectKey")
+
+
+class IncidentEvidenceReadyPayload(StrictModel):
+    evidence: list[EvidenceFrame] = Field(min_length=1, max_length=2)
+
+
 class VlmAnalysisPayload(StrictModel):
-    incident_id: int = Field(alias="incidentId", ge=1)
+    incident_id: int | None = Field(default=None, alias="incidentId", ge=1)
     status: Literal["SUCCEEDED", "FAILED", "DEMO_FALLBACK"]
     provider: str
     model: str

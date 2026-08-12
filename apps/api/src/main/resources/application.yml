@@ -54,6 +54,12 @@ app:
     whep-base-url: ${MEDIA_WHEP_BASE_URL:http://localhost:8889}
     hls-base-url: ${MEDIA_HLS_BASE_URL:http://localhost:8888}
     ticket-ttl-seconds: ${MEDIA_TICKET_TTL_SECONDS:120}
+  evidence:
+    endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+    access-key: ${MINIO_ROOT_USER:fire_minio}
+    secret-key: ${MINIO_ROOT_PASSWORD:change-minio-me}
+    bucket: ${MINIO_BUCKET:fire-evidence}
+    max-bytes: ${EVIDENCE_MAX_BYTES:5242880}
   demo:
     admin-username: ${DEMO_ADMIN_USERNAME:admin}
     admin-password: ${DEMO_ADMIN_PASSWORD:FireAdmin123!}

@@ -18,24 +18,25 @@
       <section class="detail-layout">
         <div class="detail-main-column">
           <article class="panel evidence-panel">
-            <header class="panel-header"><div><h2>双视角证据</h2><p>事件确认时刻的关键帧与模型检测结果</p></div><span class="sync-chip">同步偏差 32 ms</span></header>
+            <header class="panel-header"><div><h2>单摄关键证据</h2><p>通过时序规则后归档的关键帧与模型检测结果</p></div><span class="sync-chip">3 / 5 帧确认</span></header>
             <div v-if="incident.observations.length" class="evidence-grid">
-              <div v-for="observation in incident.observations" :key="observation.id" class="evidence-card">
+              <div v-for="(observation, observationIndex) in incident.observations" :key="observation.id" class="evidence-card">
                 <div class="evidence-frame">
-                  <div class="evidence-mock-room"><span class="room-window" /><span class="room-board" /><span class="room-desk desk-a" /><span class="room-desk desk-b" /></div>
-                  <div v-for="(detection, index) in observation.detections" :key="index" class="detection-box" :class="detection.className" :style="detectionStyle(detection.bboxXyxy)"><b>{{ detection.className === 'fire' ? '火焰' : '烟雾' }} {{ Math.round(detection.confidence * 100) }}%</b></div>
+                  <img v-if="evidenceUrls[observationIndex]" :src="evidenceUrls[observationIndex]" alt="事件关键帧" />
+                  <div v-else class="evidence-mock-room"><span class="room-window" /><span class="room-board" /><span class="room-desk desk-a" /><span class="room-desk desk-b" /></div>
+                  <div v-for="(detection, index) in observation.detections" :key="index" class="detection-box" :class="detection.className" :style="detectionStyle(detection.bboxXyxy, observation.imageWidth, observation.imageHeight)"><b>{{ detection.className === 'fire' ? '火焰' : '烟雾' }} {{ Math.round(detection.confidence * 100) }}%</b></div>
                   <span class="evidence-role">{{ observation.viewRole }}</span>
                   <span class="evidence-time">{{ formatTime(observation.capturedAt) }}</span>
                 </div>
-                <footer><div><strong>{{ observation.cameraName }}</strong><span>{{ observation.detections.length }} 个目标 · 时序分 {{ observation.temporalScore.toFixed(2) }}</span></div><el-button link type="primary">查看原图</el-button></footer>
+                <footer><div><strong>{{ observation.cameraName }}</strong><span>{{ observation.detections.length }} 个目标 · 时序分 {{ observation.temporalScore.toFixed(2) }}</span></div><el-button v-if="evidenceUrls[observationIndex]" link type="primary" @click="viewOriginal(observationIndex)">查看原图</el-button></footer>
               </div>
             </div>
             <el-empty v-else description="该事件暂无可显示的关键帧" />
-            <div class="fusion-explanation"><span class="explanation-icon"><el-icon><Connection /></el-icon></span><div><strong>为什么触发本次预警？</strong><p>VIEW_A 与 VIEW_B 在 500 ms 融合窗口内给出一致的火焰证据，且单摄时序规则连续 4 / 5 帧通过。系统融合分 {{ (incident.fusionScore || 0).toFixed(2) }}，超过严重预警阈值 0.90。</p></div></div>
+            <div class="fusion-explanation"><span class="explanation-icon"><el-icon><Connection /></el-icon></span><div><strong>为什么触发本次预警？</strong><p>本地 YOLO 候选检测通过单摄 3 / 5 帧时序确认规则，系统证据分为 {{ (incident.fusionScore || 0).toFixed(2) }}。云端语义研判不会阻塞基础预警。</p></div></div>
           </article>
 
           <article class="panel semantic-panel">
-            <header class="panel-header"><div><h2>多模态语义研判</h2><p>云端模型基于双视角关键帧生成的辅助判断</p></div><span v-if="incident.semanticAnalysis?.model" class="model-chip">{{ incident.semanticAnalysis.model }}</span></header>
+            <header class="panel-header"><div><h2>多模态语义研判</h2><p>千问基于单摄关键帧生成的辅助判断</p></div><span v-if="incident.semanticAnalysis?.model" class="model-chip">{{ incident.semanticAnalysis.model }}</span></header>
             <template v-if="incident.semanticAnalysis?.state === 'COMPLETED'">
               <div class="semantic-summary"><el-icon><MagicStick /></el-icon><p>{{ incident.semanticAnalysis.summary }}</p></div>
               <div class="semantic-grid">
@@ -62,9 +63,9 @@
           </article>
           <article class="panel notification-panel">
             <header class="panel-header"><div><h2>通知状态</h2><p>事件触发后的外部通知链路</p></div></header>
-            <div class="notification-row"><span class="notice-icon sms">短</span><div><strong>阿里云短信</strong><span>演示白名单 · 已送达</span></div><el-icon class="success-icon"><CircleCheckFilled /></el-icon></div>
-            <div class="notification-row"><span class="notice-icon app">站</span><div><strong>站内预警</strong><span>1 名值班员已收到</span></div><el-icon class="success-icon"><CircleCheckFilled /></el-icon></div>
-            <div class="notification-audit">最近更新 {{ formatTime(incident.startedAt) }} · 通知冷却窗口生效中</div>
+            <div class="notification-row"><span class="notice-icon sms">短</span><div><strong>短信通知</strong><span>当前阶段未启用</span></div></div>
+            <div class="notification-row"><span class="notice-icon app">站</span><div><strong>站内预警</strong><span>已通过实时事件通道发布</span></div><el-icon class="success-icon"><CircleCheckFilled /></el-icon></div>
+            <div class="notification-audit">最近更新 {{ formatTime(incident.startedAt) }} · 本阶段仅启用站内预警</div>
           </article>
         </aside>
       </section>
@@ -83,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, CircleCheck, CircleCheckFilled, Clock, Connection, InfoFilled, Location, MagicStick, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -100,6 +101,7 @@ const incident = ref<IncidentDetail>()
 const actionDialog = ref(false)
 const selectedAction = ref<IncidentAction>('ACKNOWLEDGE')
 const actionForm = reactive<{ note: string; falseAlarmReason?: 'STEAM' | 'DUST' | 'LIGHT' | 'SCREEN_CONTENT' | 'OTHER' }>({ note: '' })
+const evidenceUrls = ref<Record<number, string>>({})
 const actionTitle = computed(() => ({ ACKNOWLEDGE: '确认预警事件', START_HANDLING: '开始现场处置', RESOLVE: '解决并归档事件', MARK_FALSE_ALARM: '标记为误报' }[selectedAction.value]))
 const availableActions = computed(() => {
   if (!incident.value) return []
@@ -111,7 +113,14 @@ const availableActions = computed(() => {
 
 async function load() {
   loading.value = true
-  try { incident.value = await incidentApi.get(Number(route.params.id)) } catch { incident.value = undefined } finally { loading.value = false }
+  try {
+    cleanupEvidence()
+    incident.value = await incidentApi.get(Number(route.params.id))
+    await Promise.all(incident.value.observations.map(async (observation, index) => {
+      if (!observation.snapshotAvailable) return
+      try { evidenceUrls.value[index] = URL.createObjectURL(await incidentApi.evidence(incident.value!.id, index)) } catch { /* evidence remains optional */ }
+    }))
+  } catch { incident.value = undefined } finally { loading.value = false }
 }
 function openAction(action: IncidentAction) { selectedAction.value = action; actionForm.note = ''; actionForm.falseAlarmReason = undefined; actionDialog.value = true }
 async function submitAction() {
@@ -121,6 +130,9 @@ async function submitAction() {
 }
 function formatDate(date: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(date)) }
 function formatTime(date: string) { return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(date)) }
-function detectionStyle(box: [number, number, number, number]) { return { left: `${(box[0] / 640) * 100}%`, top: `${(box[1] / 480) * 100}%`, width: `${((box[2] - box[0]) / 640) * 100}%`, height: `${((box[3] - box[1]) / 480) * 100}%` } }
+function detectionStyle(box: [number, number, number, number], width: number, height: number) { return { left: `${(box[0] / width) * 100}%`, top: `${(box[1] / height) * 100}%`, width: `${((box[2] - box[0]) / width) * 100}%`, height: `${((box[3] - box[1]) / height) * 100}%` } }
+function viewOriginal(index: number) { if (evidenceUrls.value[index]) window.open(evidenceUrls.value[index], '_blank', 'noopener,noreferrer') }
+function cleanupEvidence() { Object.values(evidenceUrls.value).forEach(URL.revokeObjectURL); evidenceUrls.value = {} }
 onMounted(load)
+onBeforeUnmount(cleanupEvidence)
 </script>

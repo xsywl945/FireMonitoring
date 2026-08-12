@@ -32,7 +32,15 @@ public class AlgorithmEventIngestionService {
     @Transactional
     public IngestionResult ingest(String json) {
         AlgorithmEventEnvelope envelope = parser.parseEnvelope(json);
-        if (envelope.eventType() != AlgorithmEventType.INCIDENT_CONFIRMED) return IngestionResult.IGNORED;
+        return switch (envelope.eventType()) {
+            case INCIDENT_CONFIRMED -> ingestConfirmed(json);
+            case INCIDENT_EVIDENCE_READY -> ingestEvidence(json);
+            case VLM_ANALYSIS_COMPLETED, VLM_ANALYSIS_FAILED -> ingestVlm(json);
+            default -> IngestionResult.IGNORED;
+        };
+    }
+
+    private IngestionResult ingestConfirmed(String json) {
         ParsedIncidentConfirmedEvent event = parser.parseConfirmed(json);
         String eventId = event.envelope().eventId().toString();
         if (incidents.existsBySourceEventId(eventId)) return IngestionResult.DUPLICATE;
@@ -55,6 +63,64 @@ public class AlgorithmEventIngestionService {
         IncidentDetail detail = incidentService.get(incident.getId());
         publishAfterCommit(detail);
         return IngestionResult.CREATED;
+    }
+
+    private IngestionResult ingestEvidence(String json) {
+        ParsedIncidentEvidenceEvent event = parser.parseEvidence(json);
+        IncidentEntity incident = findByTrace(event.envelope());
+        String note = eventNote(event.envelope());
+        if (timeline.existsByIncidentIdAndEventTypeAndNote(
+                incident.getId(), "INCIDENT_EVIDENCE_READY", note)) {
+            return IngestionResult.DUPLICATE;
+        }
+        incident.replaceObservationsJson(event.evidenceJson());
+        incidents.saveAndFlush(incident);
+        timeline.saveAndFlush(new IncidentTimelineEntity(
+                incident,
+                "INCIDENT_EVIDENCE_READY",
+                note,
+                null,
+                actor(event.envelope()),
+                event.envelope().occurredAt()));
+        publishAfterCommit(incidentService.get(incident.getId()));
+        return IngestionResult.CREATED;
+    }
+
+    private IngestionResult ingestVlm(String json) {
+        ParsedVlmAnalysisEvent event = parser.parseVlm(json);
+        IncidentEntity incident = findByTrace(event.envelope());
+        String eventType = event.envelope().eventType().name();
+        String note = eventNote(event.envelope());
+        if (timeline.existsByIncidentIdAndEventTypeAndNote(
+                incident.getId(), eventType, note)) {
+            return IngestionResult.DUPLICATE;
+        }
+        incident.replaceSemanticAnalysisJson(event.analysisJson());
+        incidents.saveAndFlush(incident);
+        timeline.saveAndFlush(new IncidentTimelineEntity(
+                incident,
+                eventType,
+                note,
+                null,
+                actor(event.envelope()),
+                event.envelope().occurredAt()));
+        publishAfterCommit(incidentService.get(incident.getId()));
+        return IngestionResult.CREATED;
+    }
+
+    private IncidentEntity findByTrace(AlgorithmEventEnvelope envelope) {
+        return incidents.findByTraceId(envelope.traceId().toString())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Algorithm event references missing trace: " + envelope.traceId()));
+    }
+
+    private static String eventNote(AlgorithmEventEnvelope envelope) {
+        return "eventId=" + envelope.eventId();
+    }
+
+    private static String actor(AlgorithmEventEnvelope envelope) {
+        return envelope.source().length() <= 50
+                ? envelope.source() : envelope.source().substring(0, 50);
     }
 
     private void publishAfterCommit(IncidentDetail detail) {

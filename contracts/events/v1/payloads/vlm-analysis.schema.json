@@ -4,9 +4,9 @@
   "title": "VLM Analysis Payload v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["incidentId", "status", "provider", "model", "promptVersion"],
+  "required": ["status", "provider", "model", "promptVersion"],
   "properties": {
-    "incidentId": { "type": "integer", "minimum": 1 },
+    "incidentId": { "type": ["integer", "null"], "minimum": 1 },
     "status": { "type": "string", "enum": ["SUCCEEDED", "FAILED", "DEMO_FALLBACK"] },
     "provider": { "type": "string" },
     "model": { "type": "string" },
@@ -41,4 +41,3 @@
     "latencyMs": { "type": ["number", "null"], "minimum": 0 }
   }
 }
-

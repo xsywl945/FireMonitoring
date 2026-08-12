@@ -81,6 +81,14 @@ public class IncidentEntity {
         if (target == IncidentStatus.RESOLVED || target == IncidentStatus.FALSE_ALARM) resolvedAt = at;
     }
 
+    public void replaceObservationsJson(String observationsJson) {
+        this.observationsJson = observationsJson;
+    }
+
+    public void replaceSemanticAnalysisJson(String semanticAnalysisJson) {
+        this.semanticAnalysisJson = semanticAnalysisJson;
+    }
+
     public Long getId() { return id; }
     public ZoneEntity getZone() { return zone; }
     public IncidentStatus getStatus() { return status; }

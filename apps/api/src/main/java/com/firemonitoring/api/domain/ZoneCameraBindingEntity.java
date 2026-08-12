@@ -24,4 +24,8 @@ public class ZoneCameraBindingEntity {
         this.viewRole = viewRole;
         this.weight = BigDecimal.valueOf(weight);
     }
+
+    public ZoneEntity getZone() { return zone; }
+    public CameraEntity getCamera() { return camera; }
+    public ViewRole getViewRole() { return viewRole; }
 }

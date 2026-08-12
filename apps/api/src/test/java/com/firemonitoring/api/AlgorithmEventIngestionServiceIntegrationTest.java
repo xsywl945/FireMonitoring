@@ -4,6 +4,7 @@ import com.firemonitoring.api.domain.*;
 import com.firemonitoring.api.events.*;
 import com.firemonitoring.api.repository.*;
 import com.firemonitoring.api.service.ResourceNotFoundException;
+import com.firemonitoring.api.service.IncidentService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +25,7 @@ class AlgorithmEventIngestionServiceIntegrationTest {
     @Autowired ZoneRepository zones;
     @Autowired IncidentRepository incidents;
     @Autowired IncidentTimelineRepository timeline;
+    @Autowired IncidentService incidentService;
     @MockitoSpyBean SimpMessagingTemplate messaging;
 
     @BeforeEach
@@ -75,5 +77,39 @@ class AlgorithmEventIngestionServiceIntegrationTest {
         assertThatThrownBy(() -> ingestion.ingest(event)).isInstanceOf(ResourceNotFoundException.class);
         assertThat(incidents.existsBySourceEventId(eventId.toString())).isFalse();
         verifyNoInteractions(messaging);
+    }
+
+    @Test
+    void attachesEvidenceAndSemanticAnalysisByTraceId() {
+        ZoneEntity zone = zones.save(new ZoneEntity(
+                "富化事件区域-" + UUID.randomUUID(), SceneType.CLASSROOM));
+        UUID eventId = UUID.randomUUID();
+        assertThat(ingestion.ingest(AlgorithmEventParserTest.confirmedEvent(eventId, zone.getId())))
+                .isEqualTo(IngestionResult.CREATED);
+        IncidentEntity incident = incidents.findBySourceEventId(eventId.toString()).orElseThrow();
+        UUID traceId = UUID.fromString(incident.getTraceId());
+
+        assertThat(ingestion.ingest(AlgorithmEventParserTest.evidenceEvent(traceId)))
+                .isEqualTo(IngestionResult.CREATED);
+        assertThat(ingestion.ingest(AlgorithmEventParserTest.vlmEvent(traceId)))
+                .isEqualTo(IngestionResult.CREATED);
+
+        IncidentEntity enriched = incidents.findById(incident.getId()).orElseThrow();
+        assertThat(enriched.getObservationsJson()).contains("snapshotObjectKey", "detections");
+        assertThat(enriched.getSemanticAnalysisJson()).contains("qwen3.7-plus", "Visible flame");
+        var detail = incidentService.get(incident.getId());
+        assertThat(detail.observations()).singleElement().satisfies(observation -> {
+            assertThat(observation.snapshotAvailable()).isTrue();
+            assertThat(observation.imageWidth()).isEqualTo(1280);
+            assertThat(observation.detections()).hasSize(1);
+        });
+        assertThat(detail.semanticAnalysis().get("state").asText()).isEqualTo("COMPLETED");
+        assertThat(detail.semanticAnalysis().get("summary").asText()).isEqualTo("Visible flame.");
+        assertThat(timeline.findByIncidentIdOrderByOccurredAtAsc(incident.getId()))
+                .extracting(IncidentTimelineEntity::getEventType)
+                .containsExactly(
+                        "INCIDENT_CONFIRMED",
+                        "INCIDENT_EVIDENCE_READY",
+                        "VLM_ANALYSIS_COMPLETED");
     }
 }

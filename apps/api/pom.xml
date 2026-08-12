@@ -80,6 +80,18 @@
             <version>${jjwt.version}</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>9.0.3</version>
+        </dependency>
+        <!-- MinIO 9 publishes the JVM implementation through Gradle metadata;
+             Maven consumers must request the concrete OkHttp JVM artifact. -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-jvm</artifactId>
+            <version>5.3.2</version>
+        </dependency>
 
         <dependency>
             <groupId>com.h2database</groupId>

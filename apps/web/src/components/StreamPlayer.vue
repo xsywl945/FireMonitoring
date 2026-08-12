@@ -1,7 +1,14 @@
 <template>
   <article class="stream-card" :class="{ 'stream-offline': camera.status === 'OFFLINE' }">
     <div class="stream-stage">
-      <video ref="videoEl" muted autoplay playsinline />
+      <img
+        v-if="mode === 'inference'"
+        class="inference-feed"
+        :src="inferenceStreamUrl"
+        alt="本地摄像头实时检测画面"
+        @error="handleInferenceError"
+      />
+      <video v-else ref="videoEl" muted autoplay playsinline />
       <div v-if="mode === 'mock'" class="mock-feed" aria-label="模拟视频流占位画面">
         <div class="mock-room">
           <div class="mock-window" />
@@ -32,8 +39,8 @@
         </span>
       </div>
       <div class="stream-telemetry">
-        <span>{{ mode === 'webrtc' ? 'WebRTC' : mode === 'hls' ? 'HLS' : 'LOCAL DEMO' }}</span>
-        <span>1280 × 720</span>
+        <span>{{ mode === 'inference' ? 'LOCAL YOLO' : mode === 'webrtc' ? 'WebRTC' : mode === 'hls' ? 'HLS' : 'LOCAL DEMO' }}</span>
+        <span>{{ mode === 'inference' ? '检测框已叠加' : '实时视频' }}</span>
         <span>推理 5 FPS</span>
       </div>
     </div>
@@ -56,10 +63,11 @@ import { cameraStatusLabels, sourceLabels } from '@/config/labels'
 import type { Camera } from '@/types/domain'
 
 const props = defineProps<{ camera: Camera }>()
-type PlaybackMode = 'loading' | 'mock' | 'webrtc' | 'hls' | 'offline' | 'error'
+type PlaybackMode = 'loading' | 'mock' | 'inference' | 'webrtc' | 'hls' | 'offline' | 'error'
 const videoEl = ref<HTMLVideoElement>()
 const mode = ref<PlaybackMode>('loading')
 const errorMessage = ref('')
+const inferenceStreamUrl = '/inference/api/v1/live/stream.mjpg'
 let peer: RTCPeerConnection | undefined
 let hls: Hls | undefined
 
@@ -119,6 +127,10 @@ async function connect() {
     mode.value = 'mock'
     return
   }
+  if (import.meta.env.VITE_SINGLE_CAMERA_INFERENCE === 'true') {
+    mode.value = 'inference'
+    return
+  }
   mode.value = 'loading'
   try {
     const ticket = await cameraApi.streamTicket(props.camera.id)
@@ -131,6 +143,11 @@ async function connect() {
     mode.value = 'error'
     errorMessage.value = error instanceof Error ? error.message : '视频连接失败'
   }
+}
+
+function handleInferenceError() {
+  mode.value = 'error'
+  errorMessage.value = '本地推理画面尚未就绪，请确认推理服务和摄像头已启动'
 }
 
 function cleanup() {

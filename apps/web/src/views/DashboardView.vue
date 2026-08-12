@@ -10,7 +10,7 @@
     <section class="metric-grid" aria-label="核心指标">
       <article class="metric-card metric-camera">
         <div class="metric-icon"><el-icon><VideoCamera /></el-icon></div>
-        <div class="metric-copy"><span>在线摄像头</span><strong>{{ summary.onlineCameras }}<small> / {{ summary.totalCameras }}</small></strong><p><i class="positive" /> 双视角链路正常</p></div>
+        <div class="metric-copy"><span>在线摄像头</span><strong>{{ summary.onlineCameras }}<small> / {{ summary.totalCameras }}</small></strong><p><i class="positive" /> 当前采用单摄监控</p></div>
         <div class="metric-progress"><span :style="{ width: `${cameraRate}%` }" /></div>
       </article>
       <article class="metric-card metric-alert">
@@ -32,7 +32,7 @@
       <article class="panel trend-panel">
         <header class="panel-header">
           <div><h2>检测趋势</h2><p>最近 7 小时模型候选检测数量</p></div>
-          <span class="model-chip">YOLO · 双视角</span>
+          <span class="model-chip">YOLO11s · 单摄时序</span>
         </header>
         <TrendChart :data="trend" />
       </article>
@@ -46,7 +46,7 @@
           <div class="featured-top"><SeverityBadge :severity="activeIncident.severity" /><span>#{{ activeIncident.id }}</span></div>
           <h3>{{ activeIncident.zoneName }}</h3>
           <p><el-icon><Clock /></el-icon> {{ formatRelative(activeIncident.startedAt) }} · {{ primaryTypeLabels[activeIncident.primaryType] }}</p>
-          <div class="fusion-meter"><span>双视角融合置信度</span><strong>94%</strong><div><i style="width:94%" /></div></div>
+          <div class="fusion-meter"><span>预警状态</span><strong>{{ primaryTypeLabels[activeIncident.primaryType] }}</strong><div><i style="width:100%" /></div></div>
           <RouterLink class="incident-link" :to="`/incidents/${activeIncident.id}`">进入处置台 <el-icon><ArrowRight /></el-icon></RouterLink>
         </div>
         <el-empty v-else description="当前无活动事件" />

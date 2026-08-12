@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify
 
 from .config import ServiceConfig
+from .live_frames import LiveFrameBuffer
 from .publisher import EventPublisher
 from .runtime import RuntimeState
 
@@ -12,6 +13,7 @@ def create_app(
     config: ServiceConfig | None = None,
     runtime: RuntimeState | None = None,
     publisher: EventPublisher | None = None,
+    live_frames: LiveFrameBuffer | None = None,
 ) -> Flask:
     settings = config or ServiceConfig.from_env()
     state = runtime or RuntimeState(model_version=settings.model_version)
@@ -43,5 +45,22 @@ def create_app(
     @app.get("/api/v1/config")
     def get_config() -> tuple[object, int]:
         return jsonify(settings.public_dict()), 200
+
+    @app.get("/api/v1/live/status")
+    def live_status() -> tuple[object, int]:
+        if live_frames is None:
+            return jsonify({"ready": False, "detections": []}), 200
+        return jsonify(live_frames.status()), 200
+
+    @app.get("/api/v1/live/stream.mjpg")
+    def live_stream() -> Response:
+        if live_frames is None:
+            return Response(status=503)
+        response = Response(
+            live_frames.mjpeg(),
+            mimetype="multipart/x-mixed-replace; boundary=frame",
+        )
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        return response
 
     return app

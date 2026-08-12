@@ -1,54 +1,87 @@
-# Windows 本地演示运行手册
+# Windows 单摄完整系统运行手册
+
+## 当前集成范围
+
+当前可运行链路为：笔记本前置摄像头 → RTX 5060 上的 YOLO11s → 单摄 3/5 帧时序确认 → Redis → Spring Boot 事件 → 私有 MinIO 关键帧 → 可选 Qwen 3.7 Plus 语义研判 → WebSocket 与 Vue 控制台。
+
+短信和第二路摄像头未启用。本系统是研究原型，不能替代认证火灾报警器，也不能作为唯一生命安全通知链路。
 
 ## 前置条件
 
 - Docker Desktop 已启动；
-- Clash Verge TUN 可用；项目不设置固定代理；
+- Clash Verge TUN 可用；项目不写死代理地址；
+- 摄像头没有被会议软件占用；
 - Java 17、Node.js、Conda、FFmpeg 和 Git 可用；
-- D 盘建议至少保留 20 GB 空间。
+- 模型存在于 `data/training-archive/2026-08-12-yolo11s-primary-v2/models/deployment/best.pt`。
 
-## 首次启动
+## 首次准备
+
+在 PowerShell 中运行：
 
 ```powershell
 cd C:\Users\xsywl\Desktop\FireMonitoring
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\start-demo.ps1 -SkipCamera
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\setup-local-yolo.ps1
 ```
 
-首次启动会在仓库忽略目录中准备 `.tools`、`apps/inference/.conda` 和 `apps/web/node_modules`。`.env` 由 `.env.example` 复制且不提交 Git；真实云密钥只写入 `.env`。
+如需启用千问，只在被 Git 忽略的 `.env` 中填写以下一行。不要把密钥放进源码、命令历史、截图或报告；已经发到聊天里的密钥应先轮换。
 
-默认使用确定性安全回放验证完整事件链。添加 `-LiveInference` 会启动空闲的实时服务边界，但在 M2 接入 YOLO 摄像头循环前不会产生检测事件。
+```dotenv
+DASHSCOPE_API_KEY=替换为轮换后的新密钥
+```
 
-## 摄像头与流媒体
+其余配置保持：
 
-列出 DirectShow 摄像头：
+```dotenv
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DASHSCOPE_MODEL=qwen3.7-plus
+SMS_DEMO_ARMED=false
+```
+
+## 启动完整单摄系统
+
+首次启动不要使用 `-SkipBuild`：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\list-cameras.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\start-demo.ps1 -LiveInference
 ```
 
-使用集成摄像头启动完整演示时，不传 `-SkipCamera`。RTSP 发布地址为 `rtsp://127.0.0.1:8554/raw/integrated`，浏览器播放由 API 生成 WHEP/HLS 地址。
+后续代码未变化时可加快启动：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\start-demo.ps1 -LiveInference -SkipBuild
+```
+
+打开 `http://127.0.0.1:5173`，使用登录页显示的本机开发账号。进入“实时监控”后应看到：
+
+- 前置摄像头画面和 YOLO 检测框；
+- 推理状态 `RUNNING`、模型版本、单帧耗时和处理帧数；
+- 当前火焰/烟雾候选；
+- 只有满足 3/5 帧规则后才生成的预警事件。
+
+实时模式下 Python 直接拥有摄像头，脚本不会同时启动 FFmpeg，避免设备争用。不要为了测试制造明火或烟雾；优先使用安全的视频/图片回放或正常场景观察。
+
+## 千问调用策略
+
+采用百炼 OpenAI 兼容 `chat/completions` 接口。事件确认后只调用一次：关键帧以内存 Base64 `data:image/jpeg` 发送，`enable_thinking=false`，并要求严格 JSON Schema。未配置密钥、超时、HTTP 错误或结构校验失败时只把语义研判标为失败，不影响 YOLO 基础预警。
+
+系统不会启用模型内置网页搜索、代码解释器或其他工具，也不会逐帧调用 API。
 
 ## 健康检查
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\verify-demo.ps1
-docker compose ps -a
+Invoke-RestMethod http://127.0.0.1:8091/api/v1/runtime
+Invoke-RestMethod http://127.0.0.1:8091/api/v1/live/status
+docker compose ps
 ```
 
-日志位于 `runtime/logs/`，PID 位于 `runtime/pids/`。这些目录不提交 Git。
+正常时 `runtime.status` 为 `RUNNING`，`live/status.ready` 为 `true`。日志位于 `runtime/logs/`，重点查看 `inference.err.log`、`api.err.log` 和 `web.err.log`。
 
 ## 停止与恢复
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-demo.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\stop-demo.ps1
 ```
 
-异常中断后可再次运行停止脚本清理本项目进程。数据保留在 `D:\FireMonitoringData`；`docker compose down` 不删除持久数据。
+停止脚本会关闭本项目进程和容器，但不删除持久数据。MySQL、Redis 和 MinIO 数据仍保留在 `D:\FireMonitoringData`。
 
-## 故障定位顺序
-
-1. 执行 `preflight.ps1`；
-2. 检查 `docker compose ps -a`；
-3. 检查 `runtime/logs/api.err.log`、`inference.err.log` 和 `web.err.log`；
-4. 验证 8080、8091、5173、6379、8554 端口是否被其他进程占用；
-5. 仅在下载失败时检查 Clash TUN/DNS，不向仓库写代理端口。
+若摄像头打不开，依次关闭相机/会议软件、运行停止脚本、确认 `runtime/pids/` 中没有残留进程，再重新启动。若下载或云 API 失败，再检查 Clash TUN、DNS 和 TLS；不要往仓库写本机代理端口。

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 import threading
 from collections.abc import Sequence
@@ -15,6 +16,7 @@ from .contracts import EventEnvelope
 from .detectors.mock import MockDetector
 from .fusion import DualCameraFusion, FusionConfig
 from .live import CameraError, LiveCameraConfig, LiveCameraRunner, OpenCVCameraSource
+from .live_frames import LiveFrameBuffer
 from .pipeline import InferencePipeline
 from .publisher import (
     EventPublisher,
@@ -37,6 +39,21 @@ def _parser() -> argparse.ArgumentParser:
     serve.add_argument("--redis", action="store_true", help="require Redis readiness")
     serve.add_argument("--replay", type=Path, help="run a JSONL replay in a worker thread")
     serve.add_argument("--pace", type=float, default=0)
+    serve.add_argument("--camera-model", type=Path, help="run one local camera with this model")
+    serve.add_argument("--camera-index", type=int, default=0)
+    serve.add_argument("--device", default="0")
+    serve.add_argument("--imgsz", type=int, default=640)
+    serve.add_argument("--confidence", type=float, default=0.25)
+    serve.add_argument("--target-fps", type=float, default=5.0)
+    serve.add_argument("--site-id", type=int, default=1)
+    serve.add_argument("--zone-id", type=int, default=1)
+    serve.add_argument("--camera-id", type=int, default=1)
+    serve.add_argument(
+        "--enrich",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="store confirmed evidence and run configured cloud semantics",
+    )
 
     replay = subparsers.add_parser("replay", help="emit deterministic mock inference events")
     replay.add_argument("--input", type=Path, help="JSONL input; omit for the built-in demo")
@@ -120,7 +137,98 @@ def _pipeline(
     )
 
 
+def _serve_camera(
+    *,
+    args: argparse.Namespace,
+    config: ServiceConfig,
+    publisher: EventPublisher,
+    runtime: RuntimeState,
+    live_frames: LiveFrameBuffer,
+) -> None:
+    enrichment = None
+    try:
+        from .detectors.ultralytics_adapter import UltralyticsDetector
+        from .enrichment import IncidentEnrichmentWorker
+        from .evidence import MinioEvidenceStore
+        from .vision.qwen import QwenVisionReasoner
+
+        detector = UltralyticsDetector(
+            str(args.camera_model),
+            model_version=config.model_version,
+            imgsz=args.imgsz,
+            confidence=args.confidence,
+            device=args.device,
+            half=args.device.lower() != "cpu",
+        )
+        source = OpenCVCameraSource(
+            camera_index=args.camera_index,
+            camera_id=args.camera_id,
+            requested_fps=args.target_fps,
+        )
+        if args.enrich:
+            if config.minio_access_key is None or config.minio_secret_key is None:
+                raise RuntimeError("MinIO credentials are required for incident enrichment")
+            evidence_store = MinioEvidenceStore(
+                endpoint=config.minio_endpoint,
+                access_key=config.minio_access_key.get_secret_value(),
+                secret_key=config.minio_secret_key.get_secret_value(),
+                bucket=config.minio_bucket,
+                secure=config.minio_secure,
+            )
+            reasoner = QwenVisionReasoner(
+                api_key=(
+                    config.dashscope_api_key.get_secret_value()
+                    if config.dashscope_api_key is not None
+                    else None
+                ),
+                base_url=config.dashscope_base_url,
+                model=config.dashscope_model,
+            )
+            enrichment = IncidentEnrichmentWorker(
+                publisher=publisher,
+                evidence_store=evidence_store,
+                reasoner=reasoner,
+                cv2_module=source.cv2_module,
+            )
+            enrichment.start()
+        logging.getLogger(__name__).info(
+            "live camera ready: index=%s backend=%s device=%s",
+            args.camera_index,
+            source.backend_name,
+            args.device,
+        )
+        LiveCameraRunner(
+            source=source,
+            detector=detector,
+            pipeline=_pipeline(
+                config,
+                publisher,
+                runtime,
+                model_version=config.model_version,
+            ),
+            config=LiveCameraConfig(
+                site_id=args.site_id,
+                zone_id=args.zone_id,
+                camera_id=args.camera_id,
+                target_fps=args.target_fps,
+            ),
+            cv2_module=source.cv2_module,
+            frame_buffer=live_frames,
+            enrichment=enrichment,
+        ).run()
+    except Exception:
+        runtime.fail("LIVE_CAMERA_START_FAILED")
+        logging.getLogger(__name__).exception("live camera worker stopped")
+    finally:
+        if enrichment is not None:
+            enrichment.stop()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     args = _parser().parse_args(argv)
     config = ServiceConfig.from_env()
 
@@ -230,6 +338,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "serve":
         publisher = _publisher("redis" if args.redis else "memory", config)
         runtime = RuntimeState(model_version=config.model_version)
+        live_frames = None
         if args.replay:
             frames = load_jsonl(args.replay)
             worker = threading.Thread(
@@ -239,7 +348,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                 daemon=True,
             )
             worker.start()
-        app = create_app(config=config, runtime=runtime, publisher=publisher)
+        if args.camera_model:
+            if not args.camera_model.is_file():
+                print(f"model file does not exist: {args.camera_model}", file=sys.stderr)
+                return 2
+            try:
+                import cv2
+
+            except ImportError as exc:
+                print(f"live camera dependencies are unavailable: {exc}", file=sys.stderr)
+                return 1
+            live_frames = LiveFrameBuffer(cv2)
+            camera_worker = threading.Thread(
+                target=_serve_camera,
+                kwargs={
+                    "args": args,
+                    "config": config,
+                    "publisher": publisher,
+                    "runtime": runtime,
+                    "live_frames": live_frames,
+                },
+                name="live-camera-worker",
+                daemon=True,
+            )
+            camera_worker.start()
+        app = create_app(
+            config=config,
+            runtime=runtime,
+            publisher=publisher,
+            live_frames=live_frames,
+        )
         app.run(
             host=args.host or config.host,
             port=args.port or config.port,

@@ -3,6 +3,7 @@ package com.firemonitoring.api.service;
 import com.firemonitoring.api.domain.*;
 import com.firemonitoring.api.dto.*;
 import com.firemonitoring.api.repository.CameraRepository;
+import com.firemonitoring.api.repository.ZoneCameraBindingRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,22 +15,24 @@ import java.util.List;
 @Service
 public class CameraService {
     private final CameraRepository cameras;
+    private final ZoneCameraBindingRepository bindings;
     private final String whepBaseUrl;
     private final String hlsBaseUrl;
     private final long ticketTtlSeconds;
 
-    public CameraService(CameraRepository cameras,
+    public CameraService(CameraRepository cameras, ZoneCameraBindingRepository bindings,
                          @Value("${app.media.whep-base-url}") String whepBaseUrl,
                          @Value("${app.media.hls-base-url}") String hlsBaseUrl,
                          @Value("${app.media.ticket-ttl-seconds}") long ticketTtlSeconds) {
         this.cameras = cameras;
+        this.bindings = bindings;
         this.whepBaseUrl = stripSlash(whepBaseUrl);
         this.hlsBaseUrl = stripSlash(hlsBaseUrl);
         this.ticketTtlSeconds = ticketTtlSeconds;
     }
 
     @Transactional(readOnly = true)
-    public List<CameraResponse> list() { return cameras.findAll().stream().map(CameraService::map).toList(); }
+    public List<CameraResponse> list() { return cameras.findAll().stream().map(this::map).toList(); }
 
     @Transactional
     public CameraResponse create(CameraUpsert request) {
@@ -67,17 +70,20 @@ public class CameraService {
         CameraEntity camera = get(id);
         Instant expiresAt = Instant.now().plusSeconds(ticketTtlSeconds);
         return new StreamTicket(expiresAt,
-                URI.create(whepBaseUrl + "/" + camera.getStreamKey() + "/whep"),
-                URI.create(hlsBaseUrl + "/" + camera.getStreamKey() + "/index.m3u8"));
+                URI.create(whepBaseUrl + "/raw/" + camera.getStreamKey() + "/whep"),
+                URI.create(hlsBaseUrl + "/raw/" + camera.getStreamKey() + "/index.m3u8"));
     }
 
     private CameraEntity get(Long id) {
         return cameras.findById(id).orElseThrow(() -> new ResourceNotFoundException("Camera not found: " + id));
     }
 
-    private static CameraResponse map(CameraEntity camera) {
+    private CameraResponse map(CameraEntity camera) {
+        var binding = bindings.findByCameraId(camera.getId());
         return new CameraResponse(camera.getId(), camera.getName(), camera.getSourceType(), camera.getStreamKey(),
-                mask(camera.getSourceUri()), camera.getStatus(), camera.getLastSeenAt());
+                mask(camera.getSourceUri()), camera.getStatus(), camera.getLastSeenAt(),
+                binding.map(item -> item.getZone().getId()).orElse(null),
+                binding.map(ZoneCameraBindingEntity::getViewRole).orElse(null));
     }
 
     private static String mask(String source) {

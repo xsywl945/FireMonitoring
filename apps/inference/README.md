@@ -20,7 +20,7 @@ src/fire_monitoring_inference/
   replay.py                 确定性 JSONL 回放
   publisher.py              内存、标准输出、Redis Streams 发布器
   detectors/                Mock 与可选 Ultralytics 适配器
-  vision/                   Qwen3-VL-Plus 严格结构化适配器
+  vision/                   Qwen 3.7 Plus 严格结构化适配器
 tests/                      时序、融合、Schema、回放与安全测试
 ```
 
@@ -86,9 +86,9 @@ python -m pip install "ultralytics>=8.3,<9"
 训练权重的类别必须映射为小写 `fire`/`smoke`。适配器会丢弃未知类别，避免把 COCO 类别误发
 为火灾事件。首轮参数以 `imgsz=640`、FP16、每路 5 FPS、batch 不超过 2 为基线。
 
-## Qwen3-VL-Plus
+## Qwen 3.7 Plus
 
-密钥只从本机环境变量 `DASHSCOPE_API_KEY` 注入。适配器仅接受内存中的 `data:image/...`
+密钥只从本机环境变量 `DASHSCOPE_API_KEY` 注入，默认模型为 `qwen3.7-plus`。适配器仅接受内存中的 `data:image/...`
 URL，每个事件最多 3 张图，禁止远程 URL；输出必须通过禁止额外字段的 Pydantic 模型。超时、
 HTTP 错误、JSON 错误或 Schema 错误都会返回 `FAILED` 和稳定错误码，绝不取消基础报警，
 也不会伪造云端分析结果。

@@ -7,11 +7,11 @@
         <span>燧巡 · 智能火灾监控</span>
       </div>
       <div class="login-story">
-        <p class="page-eyebrow">DUAL-VIEW FIRE INTELLIGENCE</p>
+        <p class="page-eyebrow">FIRE MONITORING INTELLIGENCE</p>
         <h1>看见早期风险，<br /><em>让预警更有依据。</em></h1>
-        <p>融合双视角视觉定位、时序证据与云端多模态研判，为教室和实验室提供可解释的实时火灾预警。</p>
+        <p>融合本地视觉定位、单摄时序证据与云端多模态研判，为教室和实验室提供可解释的实时火灾预警。</p>
         <div class="login-capabilities">
-          <span><i /> 双视角决策融合</span>
+          <span><i /> 单摄时序确认</span>
           <span><i /> YOLO 实时检测</span>
           <span><i /> 语义风险研判</span>
         </div>

@@ -31,7 +31,12 @@ class ServiceConfig(BaseModel):
     fusion_window_ms: int = Field(default=500, ge=0, le=10_000)
     dashscope_api_key: SecretStr | None = None
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    dashscope_model: str = "qwen3-vl-plus"
+    dashscope_model: str = "qwen3.7-plus"
+    minio_endpoint: str = "127.0.0.1:9000"
+    minio_access_key: SecretStr | None = None
+    minio_secret_key: SecretStr | None = None
+    minio_bucket: str = "fire-evidence"
+    minio_secure: bool = False
 
     @model_validator(mode="after")
     def validate_temporal_thresholds(self) -> ServiceConfig:
@@ -44,6 +49,8 @@ class ServiceConfig(BaseModel):
     @classmethod
     def from_env(cls) -> ServiceConfig:
         key = os.getenv("DASHSCOPE_API_KEY")
+        minio_access_key = os.getenv("MINIO_ROOT_USER")
+        minio_secret_key = os.getenv("MINIO_ROOT_PASSWORD")
         return cls(
             host=_env("INFERENCE_HOST", "127.0.0.1"),
             port=_env("INFERENCE_PORT", 8091),
@@ -63,11 +70,26 @@ class ServiceConfig(BaseModel):
                 "DASHSCOPE_BASE_URL",
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
             ),
-            dashscope_model=_env("DASHSCOPE_MODEL", "qwen3-vl-plus"),
+            dashscope_model=_env("DASHSCOPE_MODEL", "qwen3.7-plus"),
+            minio_endpoint=_env("INFERENCE_MINIO_ENDPOINT", "127.0.0.1:9000"),
+            minio_access_key=SecretStr(minio_access_key) if minio_access_key else None,
+            minio_secret_key=SecretStr(minio_secret_key) if minio_secret_key else None,
+            minio_bucket=_env("MINIO_BUCKET", "fire-evidence"),
+            minio_secure=_env("INFERENCE_MINIO_SECURE", False),
         )
 
     def public_dict(self) -> dict[str, Any]:
-        data = self.model_dump(exclude={"dashscope_api_key", "redis_url"})
+        data = self.model_dump(
+            exclude={
+                "dashscope_api_key",
+                "redis_url",
+                "minio_access_key",
+                "minio_secret_key",
+            }
+        )
         data["redis_configured"] = bool(self.redis_url)
         data["dashscope_configured"] = self.dashscope_api_key is not None
+        data["minio_configured"] = (
+            self.minio_access_key is not None and self.minio_secret_key is not None
+        )
         return data
