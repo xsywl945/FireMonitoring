@@ -57,6 +57,23 @@ class AlgorithmEventIngestionServiceIntegrationTest {
     }
 
     @Test
+    void deduplicatesRepeatedConfirmationWithSameTraceAndDifferentEventId() {
+        ZoneEntity zone = zones.save(new ZoneEntity(
+                "算法事件去重区域-" + UUID.randomUUID(), SceneType.LABORATORY));
+        UUID traceId = UUID.randomUUID();
+        long before = incidents.count();
+
+        assertThat(ingestion.ingest(AlgorithmEventParserTest.confirmedEvent(
+                UUID.randomUUID(), traceId, zone.getId()))).isEqualTo(IngestionResult.CREATED);
+        assertThat(ingestion.ingest(AlgorithmEventParserTest.confirmedEvent(
+                UUID.randomUUID(), traceId, zone.getId()))).isEqualTo(IngestionResult.DUPLICATE);
+
+        assertThat(incidents.count()).isEqualTo(before + 1);
+        assertThat(incidents.findFirstByTraceIdOrderByIdAsc(traceId.toString())).isPresent();
+        verify(messaging, times(1)).convertAndSend(eq("/topic/incidents"), any(Object.class));
+    }
+
+    @Test
     void ignoresOtherEventTypesWithoutTouchingDatabase() {
         long before = incidents.count();
         String event = """

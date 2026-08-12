@@ -65,6 +65,10 @@ class AlgorithmEventParserTest {
     }
 
     static String confirmedEvent(UUID eventId, long zoneId) {
+        return confirmedEvent(eventId, UUID.randomUUID(), zoneId);
+    }
+
+    static String confirmedEvent(UUID eventId, UUID traceId, long zoneId) {
         return """
                 {
                   "eventId":"%s",
@@ -91,7 +95,7 @@ class AlgorithmEventParserTest {
                     ]
                   }
                 }
-                """.formatted(eventId, UUID.randomUUID(), zoneId, zoneId);
+                """.formatted(eventId, traceId, zoneId, zoneId);
     }
 
     static String evidenceEvent(UUID traceId) {

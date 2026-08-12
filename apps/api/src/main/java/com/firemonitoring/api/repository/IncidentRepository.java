@@ -15,5 +15,5 @@ public interface IncidentRepository extends JpaRepository<IncidentEntity, Long> 
     long countByStartedAtGreaterThanEqual(Instant from);
     boolean existsBySourceEventId(String sourceEventId);
     Optional<IncidentEntity> findBySourceEventId(String sourceEventId);
-    Optional<IncidentEntity> findByTraceId(String traceId);
+    Optional<IncidentEntity> findFirstByTraceIdOrderByIdAsc(String traceId);
 }

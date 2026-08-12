@@ -44,6 +44,9 @@ public class AlgorithmEventIngestionService {
         ParsedIncidentConfirmedEvent event = parser.parseConfirmed(json);
         String eventId = event.envelope().eventId().toString();
         if (incidents.existsBySourceEventId(eventId)) return IngestionResult.DUPLICATE;
+        if (incidents.findFirstByTraceIdOrderByIdAsc(event.envelope().traceId().toString()).isPresent()) {
+            return IngestionResult.DUPLICATE;
+        }
 
         ZoneEntity zone = zones.findById(event.envelope().zoneId())
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -109,7 +112,7 @@ public class AlgorithmEventIngestionService {
     }
 
     private IncidentEntity findByTrace(AlgorithmEventEnvelope envelope) {
-        return incidents.findByTraceId(envelope.traceId().toString())
+        return incidents.findFirstByTraceIdOrderByIdAsc(envelope.traceId().toString())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Algorithm event references missing trace: " + envelope.traceId()));
     }

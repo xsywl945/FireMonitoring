@@ -77,14 +77,11 @@ class QwenVisionReasoner:
             "model": self.model,
             "temperature": 0,
             "enable_thinking": False,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "fire_scene_judgement",
-                    "strict": True,
-                    "schema": VlmJudgement.model_json_schema(by_alias=True),
-                },
-            },
+            # DashScope's OpenAI-compatible multimodal endpoint reliably supports
+            # JSON Object mode for qwen3.7-plus. Keep the stricter contract on our
+            # side with Pydantic so an incomplete or unsafe response still fails
+            # closed instead of entering the incident pipeline.
+            "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": content},
