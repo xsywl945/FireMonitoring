@@ -14,6 +14,7 @@ from .config import ServiceConfig
 from .contracts import EventEnvelope
 from .detectors.mock import MockDetector
 from .fusion import DualCameraFusion, FusionConfig
+from .live import CameraError, LiveCameraConfig, LiveCameraRunner, OpenCVCameraSource
 from .pipeline import InferencePipeline
 from .publisher import (
     EventPublisher,
@@ -42,6 +43,30 @@ def _parser() -> argparse.ArgumentParser:
     replay.add_argument("--publisher", choices=("stdout", "redis", "memory"), default="stdout")
     replay.add_argument("--pace", type=float, default=0, help="0=fast; 1=recorded timing")
 
+    camera = subparsers.add_parser(
+        "camera", help="run YOLO on one local camera through the temporal event pipeline"
+    )
+    camera.add_argument("--model", type=Path, required=True, help="path to a YOLO .pt model")
+    camera.add_argument("--model-version", default="yolo11s-fire-smoke-primary-v2")
+    camera.add_argument("--camera-index", type=int, default=0)
+    camera.add_argument("--device", default="0", help="Ultralytics device, normally 0 or cpu")
+    camera.add_argument("--imgsz", type=int, default=640)
+    camera.add_argument("--confidence", type=float, default=0.25)
+    camera.add_argument("--half", action=argparse.BooleanOptionalAction, default=True)
+    camera.add_argument("--width", type=int, default=1280)
+    camera.add_argument("--height", type=int, default=720)
+    camera.add_argument("--target-fps", type=float, default=5.0)
+    camera.add_argument("--max-frames", type=int, default=0, help="0 runs until Q/Esc/Ctrl+C")
+    camera.add_argument("--site-id", type=int, default=1)
+    camera.add_argument("--zone-id", type=int, default=1)
+    camera.add_argument("--camera-id", type=int, default=1)
+    camera.add_argument("--publisher", choices=("memory", "stdout", "redis"), default="memory")
+    camera.add_argument("--preview", action=argparse.BooleanOptionalAction, default=False)
+
+    doctor = subparsers.add_parser("doctor", help="verify CUDA and the local YOLO model")
+    doctor.add_argument("--model", type=Path, required=True)
+    doctor.add_argument("--device-index", type=int, default=0)
+
     example = subparsers.add_parser("write-example", help="write the built-in replay JSONL")
     example.add_argument("path", type=Path)
 
@@ -61,6 +86,22 @@ def _publisher(name: str, config: ServiceConfig) -> EventPublisher:
 def _runner(
     config: ServiceConfig, publisher: EventPublisher, runtime: RuntimeState
 ) -> MockReplayRunner:
+    pipeline = _pipeline(
+        config,
+        publisher,
+        runtime,
+        model_version=config.model_version,
+    )
+    return MockReplayRunner(detector=MockDetector(), pipeline=pipeline)
+
+
+def _pipeline(
+    config: ServiceConfig,
+    publisher: EventPublisher,
+    runtime: RuntimeState,
+    *,
+    model_version: str,
+) -> InferencePipeline:
     temporal = TemporalConfig(
         n=config.temporal_n,
         m=config.temporal_m,
@@ -69,15 +110,14 @@ def _runner(
         clear_frames=config.clear_frames,
         cooldown_ms=config.cooldown_ms,
     )
-    pipeline = InferencePipeline(
+    return InferencePipeline(
         publisher=publisher,
         source=config.source,
-        model_version=config.model_version,
+        model_version=model_version,
         temporal_config=temporal,
         fusion=DualCameraFusion(FusionConfig(sync_window_ms=config.fusion_window_ms)),
         runtime=runtime,
     )
-    return MockReplayRunner(detector=MockDetector(), pipeline=pipeline)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -99,6 +139,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(args.path)
         return 0
 
+    if args.command == "doctor":
+        from .diagnostics import local_yolo_diagnostics
+
+        try:
+            result = local_yolo_diagnostics(args.model, device_index=args.device_index)
+        except RuntimeError as exc:
+            print(f"diagnostics failed: {exc}", file=sys.stderr)
+            return 1
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
     if args.command == "replay":
         publisher = _publisher(args.publisher, config)
         runtime = RuntimeState(model_version=config.model_version)
@@ -107,6 +158,73 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.publisher != "stdout":
             confirmed = sum(event.event_type == "INCIDENT_CONFIRMED" for event in events)
             print(json.dumps({"events": len(events), "confirmedIncidents": confirmed}))
+        return 0
+
+    if args.command == "camera":
+        if not args.model.is_file():
+            print(f"model file does not exist: {args.model}", file=sys.stderr)
+            return 2
+        if args.device.lower() == "cpu" and args.half:
+            print("FP16 is disabled automatically for CPU inference.", file=sys.stderr)
+        publisher = _publisher(args.publisher, config)
+        if not publisher.health():
+            print("selected event publisher is not ready", file=sys.stderr)
+            return 1
+        runtime = RuntimeState(model_version=args.model_version)
+        try:
+            if not 0 <= args.confidence <= 1:
+                raise ValueError("confidence must be between 0 and 1")
+            if min(args.imgsz, args.width, args.height) < 1:
+                raise ValueError("imgsz, width, and height must be positive")
+            live_config = LiveCameraConfig(
+                site_id=args.site_id,
+                zone_id=args.zone_id,
+                camera_id=args.camera_id,
+                target_fps=args.target_fps,
+                max_frames=args.max_frames,
+                preview=args.preview,
+            )
+            from .detectors.ultralytics_adapter import UltralyticsDetector
+
+            detector = UltralyticsDetector(
+                str(args.model),
+                model_version=args.model_version,
+                imgsz=args.imgsz,
+                confidence=args.confidence,
+                device=args.device,
+                half=args.half and args.device.lower() != "cpu",
+            )
+            pipeline = _pipeline(
+                config,
+                publisher,
+                runtime,
+                model_version=args.model_version,
+            )
+            source = OpenCVCameraSource(
+                camera_index=args.camera_index,
+                camera_id=args.camera_id,
+                width=args.width,
+                height=args.height,
+                requested_fps=args.target_fps,
+            )
+            print(
+                f"camera={args.camera_index} backend={source.backend_name} "
+                f"model={args.model.name} device={args.device}",
+                file=sys.stderr,
+            )
+            runner = LiveCameraRunner(
+                source=source,
+                detector=detector,
+                pipeline=pipeline,
+                config=live_config,
+                cv2_module=source.cv2_module if args.preview else None,
+            )
+            summary = runner.run()
+        except (CameraError, RuntimeError, ValueError) as exc:
+            print(f"camera inference failed: {exc}", file=sys.stderr)
+            return 1
+        stream = sys.stderr if args.publisher == "stdout" else sys.stdout
+        print(json.dumps(summary.to_dict(), ensure_ascii=False), file=stream)
         return 0
 
     if args.command == "serve":

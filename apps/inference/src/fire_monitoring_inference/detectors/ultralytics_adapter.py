@@ -40,7 +40,7 @@ class UltralyticsDetector:
             imgsz=self.imgsz,
             conf=self.confidence,
             device=self.device,
-            half=self.half,
+            quantize=16 if self.half else None,
             verbose=False,
         )
         batches: list[list[Detection]] = []

@@ -76,10 +76,21 @@ npm run lint -- --quiet
 npm run build
 ```
 
+## Single-camera YOLO check
+
+The trained `best.pt` can be tested directly with the integrated Windows camera without Docker, Redis, SMS, or a cloud VLM call:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\setup-local-yolo.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\test-single-camera.ps1
+```
+
+Press `Q` or `Esc` in the preview window to stop. See `docs/runbooks/single-camera-yolo.md` for parameters, output meanings, and troubleshooting.
+
 Detailed plans live in `docs/plans/`. The step-by-step cloud training guide is
 `docs/plans/AutoDL-初步火灾识别模型训练说明书.md`; current delivery state is tracked in
 `docs/project/STATUS.md` and the Windows runbook is in `docs/runbooks/windows-demo.md`.
 
 ## Honest milestone boundary
 
-The management frontend/backend, event contracts, safe replay, media ingest and inference decision core are implemented. Live camera decoding into Ultralytics, trained fire/smoke weights, evidence clip extraction, Alibaba SMS delivery/receipts and cloud VLM orchestration remain subsequent milestones. The Qwen adapter exists and fails safely when no API key is configured.
+The management frontend/backend, event contracts, safe replay, media ingest and inference decision core are implemented. DirectShow decoding from one local camera into the trained fire/smoke model and the existing temporal pipeline is implemented as an isolated test command. Web video overlays, the MediaMTX-to-YOLO live worker, evidence clip extraction, Alibaba SMS delivery/receipts and cloud VLM orchestration remain subsequent milestones. The Qwen adapter exists and fails safely when no API key is configured.
