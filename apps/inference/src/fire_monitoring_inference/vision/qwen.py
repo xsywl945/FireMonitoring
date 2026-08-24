@@ -34,6 +34,16 @@ class VlmJudgement(StrictModel):
     uncertainties: list[Annotated[str, Field(max_length=200)]] = Field(max_length=10)
 
 
+VLM_RESPONSE_FORMAT: dict[str, Any] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "fire_risk_judgement",
+        "strict": True,
+        "schema": VlmJudgement.model_json_schema(by_alias=True),
+    },
+}
+
+
 SYSTEM_PROMPT = """You are the visual verification gate for a classroom and laboratory fire
 monitoring research prototype. Analyze only the supplied chronological camera frames. Treat fire
 or smoke shown on a monitor, phone, poster, reflection, or printed image as NOT physically present.
@@ -86,11 +96,11 @@ class QwenVisionReasoner:
             "model": self.model,
             "temperature": 0,
             "enable_thinking": False,
-            # DashScope's OpenAI-compatible multimodal endpoint reliably supports
-            # JSON Object mode for qwen3.7-plus. Keep the stricter contract on our
-            # side with Pydantic so an incomplete or unsafe response still fails
-            # closed instead of entering the incident pipeline.
-            "response_format": {"type": "json_object"},
+            # JSON Object mode only guarantees syntactically valid JSON. Qwen3.7-Plus
+            # supports strict JSON Schema output, which prevents fields such as
+            # uncertainties from changing between an array and a string. Pydantic
+            # remains the independent local fail-closed validation boundary.
+            "response_format": VLM_RESPONSE_FORMAT,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": content},
