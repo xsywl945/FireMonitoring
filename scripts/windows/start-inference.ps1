@@ -3,13 +3,15 @@ param(
     [switch]$LiveCamera,
     [long]$ZoneId = 1,
     [long]$CameraId = 1,
-    [int]$CameraIndex = 0
+    [int]$CameraIndex = 0,
+    [ValidateRange(1, 30)][double]$TargetFps = 5
 )
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 Set-ApplicationEnvironment | Out-Null
 
 $inferenceRoot = Join-Path $WorkspaceRoot 'apps\inference'
+$env:PYTHONPATH = Join-Path $inferenceRoot 'src'
 $python = Join-Path $inferenceRoot '.conda\python.exe'
 if (-not (Test-Path -LiteralPath $python)) {
     throw 'Inference environment is missing. Run bootstrap.ps1 first.'
@@ -28,7 +30,7 @@ if ($DemoReplay) {
     [IO.File]::WriteAllLines($demoFile, $rewritten, [Text.UTF8Encoding]::new($false))
     $arguments += @('--replay', $demoFile, '--pace', '1')
 }
-if ($LiveCamera) {
+if (-not $DemoReplay) {
     $model = Join-Path $WorkspaceRoot 'data\training-archive\2026-08-12-yolo11s-primary-v2\models\deployment\best.pt'
     if (-not (Test-Path -LiteralPath $model)) {
         throw "Local YOLO model is missing: $model"
@@ -41,10 +43,11 @@ if ($LiveCamera) {
         '--device', '0',
         '--imgsz', '640',
         '--confidence', '0.25',
-        '--target-fps', '5',
+        '--target-fps', [string]$TargetFps,
         '--enrich'
     )
 }
+if (-not $LiveCamera -and -not $DemoReplay) { $arguments += '--no-camera-autostart' }
 
 Start-ManagedProcess -Name 'inference' -FilePath $python -ArgumentList $arguments -WorkingDirectory $inferenceRoot
 Wait-HttpHealthy -Uri 'http://127.0.0.1:8091/readyz'

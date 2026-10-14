@@ -29,6 +29,9 @@ public class IncidentController {
         return incidents.list(status, severity);
     }
 
+    @GetMapping("/analyses")
+    public List<IncidentAnalysis> analyses() { return incidents.analyses(); }
+
     @GetMapping("/{incidentId}")
     public IncidentDetail detail(@PathVariable Long incidentId) { return incidents.get(incidentId); }
 

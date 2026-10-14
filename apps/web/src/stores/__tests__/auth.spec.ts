@@ -6,7 +6,7 @@ describe('auth store', () => {
 
   it('persists a successful mock login and clears it on logout', async () => {
     const store = useAuthStore()
-    await store.login('admin', 'FireAdmin123!')
+    await store.login('admin', '123456')
 
     expect(store.isAuthenticated).toBe(true)
     expect(store.isAdmin).toBe(true)

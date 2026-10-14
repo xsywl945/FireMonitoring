@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-默认 `VITE_USE_MOCKS=true`，无需启动后端即可使用演示账号 `admin / FireAdmin123!` 浏览全部流程。将其改为 `false` 后，前端会按照 `contracts/openapi/fire-monitoring-v1.yaml` 请求 Spring Boot 服务。
+默认 `VITE_USE_MOCKS=true`，无需启动后端即可使用演示账号 `admin / 123456` 浏览全部流程。将其改为 `false` 后，前端会按照 `contracts/openapi/fire-monitoring-v1.yaml` 请求 Spring Boot 服务。
 
 ## 验证
 

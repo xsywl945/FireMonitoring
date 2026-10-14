@@ -26,6 +26,13 @@ public class ZoneEntity {
         this.createdAt = Instant.now();
     }
 
+    public void update(String name, SceneType sceneType) {
+        this.name = name;
+        this.sceneType = sceneType;
+    }
+
+    public void disable() { this.status = ZoneStatus.DISABLED; }
+
     public Long getId() { return id; }
     public String getName() { return name; }
     public SceneType getSceneType() { return sceneType; }

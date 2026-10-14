@@ -51,6 +51,7 @@ public class AlgorithmEventIngestionService {
         ZoneEntity zone = zones.findById(event.envelope().zoneId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Algorithm event references missing zone: " + event.envelope().zoneId()));
+        if (zone.getStatus() == ZoneStatus.DISABLED) return IngestionResult.IGNORED;
         IncidentConfirmedPayload payload = event.payload();
         IncidentEntity incident = IncidentEntity.fromAlgorithmEvent(zone, payload.severity(), payload.primaryType(),
                 payload.startedAt(), payload.fusionScore(), event.observationsJson(), eventId,

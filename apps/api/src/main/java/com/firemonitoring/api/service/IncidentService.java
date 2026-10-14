@@ -47,6 +47,14 @@ public class IncidentService {
     }
 
     @Transactional(readOnly = true)
+    public List<IncidentAnalysis> analyses() {
+        return incidents.findAllByOrderByStartedAtDesc().stream()
+                .map(incident -> new IncidentAnalysis(summary(incident),
+                        mapSemantic(readNode(incident.getSemanticAnalysisJson()))))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public IncidentDetail get(Long id) { return detail(find(id)); }
 
     @Transactional(readOnly = true)

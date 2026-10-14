@@ -122,6 +122,12 @@ class AlgorithmEventIngestionServiceIntegrationTest {
         });
         assertThat(detail.semanticAnalysis().get("state").asText()).isEqualTo("COMPLETED");
         assertThat(detail.semanticAnalysis().get("summary").asText()).isEqualTo("Visible flame.");
+        assertThat(incidentService.analyses())
+                .filteredOn(record -> record.incident().id().equals(incident.getId()))
+                .singleElement().satisfies(record -> {
+                    assertThat(record.semanticAnalysis()).isEqualTo(detail.semanticAnalysis());
+                    assertThat(record.incident().status()).isEqualTo(IncidentStatus.NEW);
+                });
         assertThat(timeline.findByIncidentIdOrderByOccurredAtAsc(incident.getId()))
                 .extracting(IncidentTimelineEntity::getEventType)
                 .containsExactly(

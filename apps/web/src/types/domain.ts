@@ -21,13 +21,6 @@ export interface AuthResponse {
   user: User
 }
 
-export interface DashboardSummary {
-  onlineCameras: number
-  totalCameras: number
-  newIncidents: number
-  handlingIncidents: number
-  todayIncidents: number
-}
 
 export interface Zone {
   id: number
@@ -51,6 +44,7 @@ export interface Camera {
   id: number
   name: string
   sourceType: SourceType
+  targetFps?: number
   streamKey: string
   maskedSource?: string
   status: CameraStatus
@@ -68,6 +62,7 @@ export interface CameraUpsert {
 
 export interface CameraProbeResult {
   reachable: boolean
+  configurationValid: boolean
   checkedAt: string
   width?: number
   height?: number
@@ -149,23 +144,12 @@ export interface IncidentQuery {
   severity?: Severity
 }
 
-export interface TrendPoint {
-  label: string
-  fire: number
-  smoke: number
-}
 
-export interface ServiceHealth {
-  key: string
-  name: string
-  description: string
-  status: 'HEALTHY' | 'DEGRADED' | 'OFFLINE' | 'UNKNOWN'
-  latencyMs?: number
-  updatedAt: string
-}
 
 export interface InferenceRuntime {
-  status: 'IDLE' | 'RUNNING' | 'STOPPED' | 'FAILED'
+  cameraId?: number
+  zoneId?: number
+  status: 'IDLE' | 'STARTING' | 'RUNNING' | 'STOPPED' | 'FAILED'
   modelVersion: string
   framesProcessed: number
   eventsPublished: number
@@ -182,4 +166,20 @@ export interface InferenceLiveStatus {
   processTimeMs?: number
   framesProcessed?: number
   detections: Detection[]
+}
+
+export interface IncidentAnalysis {
+  incident: IncidentSummary
+  semanticAnalysis: SemanticAnalysis | null
+}
+
+export interface InferenceConfig {
+  dashscope_configured: boolean
+  dashscope_model: string
+  vlm_gate_enabled: boolean
+}
+
+export interface LocalCameraDevice {
+  index: number
+  name: string
 }

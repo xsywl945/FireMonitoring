@@ -35,15 +35,45 @@ public class CameraService {
     public List<CameraResponse> list() { return cameras.findAll().stream().map(this::map).toList(); }
 
     @Transactional
+    public CameraResponse update(Long id, CameraUpsert request) {
+        CameraEntity camera = get(id);
+        String source = blankToNull(request.sourceUri());
+        // A blank address while editing keeps an existing masked RTSP credential.
+        if (source == null && request.sourceType() == camera.getSourceType()) source = camera.getSourceUri();
+        validateSource(request.sourceType(), source);
+        camera.update(request.name().trim(), request.sourceType(), source, request.targetFps());
+        return map(cameras.save(camera));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        CameraEntity camera = get(id);
+        bindings.deleteAllByCameraId(id);
+        bindings.flush();
+        cameras.delete(camera);
+    }
+
+    private void validateSource(SourceType type, String source) {
+        if ((type == SourceType.NETWORK_RTSP || type == SourceType.DEMO_FILE) && source == null)
+            throw new BadRequestException("请填写视频地址");
+        if (type == SourceType.NETWORK_RTSP) {
+            try {
+                URI uri = URI.create(source);
+                if (!"rtsp".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null)
+                    throw new IllegalArgumentException();
+            } catch (IllegalArgumentException exception) {
+                throw new BadRequestException("RTSP 地址格式不正确");
+            }
+        }
+        if ((type == SourceType.INTEGRATED || type == SourceType.USB)
+                && source != null && !source.matches("\\d{1,2}"))
+            throw new BadRequestException("设备编号应为 0 到 99");
+    }
+
+    @Transactional
     public CameraResponse create(CameraUpsert request) {
         String sourceUri = blankToNull(request.sourceUri());
-        if ((request.sourceType() == SourceType.NETWORK_RTSP || request.sourceType() == SourceType.DEMO_FILE)
-                && sourceUri == null) {
-            throw new BadRequestException("sourceUri is required for network and demo-file cameras");
-        }
-        if (request.sourceType() == SourceType.NETWORK_RTSP && !sourceUri.toLowerCase().startsWith("rtsp://")) {
-            throw new BadRequestException("Network camera sourceUri must use rtsp://");
-        }
+        validateSource(request.sourceType(), sourceUri);
         return map(cameras.save(new CameraEntity(request.name().trim(), request.sourceType(), sourceUri, request.targetFps())));
     }
 
@@ -51,18 +81,11 @@ public class CameraService {
     public CameraProbeResult probe(Long id) {
         CameraEntity camera = get(id);
         Instant checkedAt = Instant.now();
-        boolean reachable = switch (camera.getSourceType()) {
-            case INTEGRATED, USB -> true;
-            case DEMO_FILE -> camera.getSourceUri() != null;
-            case NETWORK_RTSP -> camera.getSourceUri() != null && camera.getSourceUri().startsWith("rtsp://");
-        };
-        camera.recordProbe(reachable, checkedAt);
-        cameras.save(camera);
-        String message = reachable
-                ? "Configuration accepted (MVP probe stub; media-plane verification is pending)"
-                : "Camera source is not configured";
-        return new CameraProbeResult(reachable, checkedAt, null, null,
-                reachable ? camera.getTargetFps() : null, message);
+        boolean valid;
+        try { validateSource(camera.getSourceType(), camera.getSourceUri()); valid = true; }
+        catch (BadRequestException exception) { valid = false; }
+        return new CameraProbeResult(false, valid, checkedAt, null, null, null,
+                valid ? "配置有效，连接状态以视频画面为准" : "视频地址未配置");
     }
 
     @Transactional(readOnly = true)
@@ -83,13 +106,14 @@ public class CameraService {
         return new CameraResponse(camera.getId(), camera.getName(), camera.getSourceType(), camera.getStreamKey(),
                 mask(camera.getSourceUri()), camera.getStatus(), camera.getLastSeenAt(),
                 binding.map(item -> item.getZone().getId()).orElse(null),
-                binding.map(ZoneCameraBindingEntity::getViewRole).orElse(null));
+                binding.map(ZoneCameraBindingEntity::getViewRole).orElse(null), camera.getTargetFps());
     }
 
     private static String mask(String source) {
         if (source == null || source.isBlank()) return null;
         try {
             URI uri = URI.create(source);
+            if (uri.getScheme() == null) return source;
             if (uri.getUserInfo() == null) return uri.getScheme() + "://" + uri.getHost()
                     + (uri.getPort() > 0 ? ":" + uri.getPort() : "") + (uri.getPath() == null ? "" : uri.getPath());
             return uri.getScheme() + "://***:***@" + uri.getHost()

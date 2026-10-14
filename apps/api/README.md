@@ -33,7 +33,7 @@ $env:DEMO_ADMIN_PASSWORD = '<strong local demo password>'
 mvn spring-boot:run
 ```
 
-For the current project defaults, the API listens on `http://localhost:8080`. Login is `POST /api/v1/auth/login`. The development-only seeded username is `admin`; when `DEMO_ADMIN_PASSWORD` is not set its fallback is `FireAdmin123!`. Never use that fallback outside an isolated local demo.
+For the current project defaults, the API listens on `http://localhost:8080`. Login is `POST /api/v1/auth/login`. The development-only seeded username is `admin`; when `DEMO_ADMIN_PASSWORD` is not set its fallback is `123456`. Never use that fallback outside an isolated local demo.
 
 ## Test and package
 

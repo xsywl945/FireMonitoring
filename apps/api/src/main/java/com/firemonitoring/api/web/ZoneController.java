@@ -28,11 +28,22 @@ public class ZoneController {
         return ResponseEntity.status(HttpStatus.CREATED).body(zones.create(request));
     }
 
+    @PutMapping("/{zoneId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
+    public ZoneResponse update(@PathVariable Long zoneId, @Valid @RequestBody ZoneUpsert request) {
+        return zones.update(zoneId, request);
+    }
+
+    @DeleteMapping("/{zoneId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
+    public void delete(@PathVariable Long zoneId) { zones.delete(zoneId); }
+
     @PutMapping("/{zoneId}/camera-bindings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
     public void replaceBindings(@PathVariable Long zoneId,
-                                @RequestBody @Size(min = 1, max = 2) List<@Valid CameraBindingRequest> requests) {
+                                @RequestBody @Size(max = 2) List<@Valid CameraBindingRequest> requests) {
         zones.replaceBindings(zoneId, requests);
     }
 }

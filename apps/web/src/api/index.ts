@@ -1,21 +1,21 @@
 import { http, isMockMode } from './client'
-import { mockCameras, mockIncidentDetails, mockIncidents, mockServices, mockSummary, mockTrend, mockZones } from './mockData'
+import { mockCameras, mockIncidentDetails, mockIncidents, mockZones } from './mockData'
 import type {
   AuthResponse,
   Camera,
+  LocalCameraDevice,
   CameraBinding,
   CameraProbeResult,
   CameraUpsert,
-  DashboardSummary,
   IncidentActionRequest,
   IncidentDetail,
   IncidentQuery,
   IncidentSummary,
+  IncidentAnalysis,
   InferenceLiveStatus,
   InferenceRuntime,
-  ServiceHealth,
+  InferenceConfig,
   StreamTicket,
-  TrendPoint,
   User,
   Zone,
   ZoneUpsert,
@@ -28,7 +28,7 @@ export const authApi = {
   async login(username: string, password: string): Promise<AuthResponse> {
     if (isMockMode) {
       await wait(420)
-      if (!username || password.length < 8) throw new Error('用户名或密码不正确')
+      if (username !== 'admin' || password !== '123456') throw new Error('用户名或密码不正确')
       return {
         accessToken: 'mock-jwt-for-local-demo',
         expiresInSeconds: 28_800,
@@ -46,35 +46,40 @@ export const authApi = {
   },
 }
 
-export const dashboardApi = {
-  async summary(): Promise<DashboardSummary> {
-    if (isMockMode) return clone(mockSummary)
-    return (await http.get<DashboardSummary>('/dashboard/summary')).data
-  },
-  async trend(): Promise<TrendPoint[]> {
-    if (isMockMode) return clone(mockTrend)
-    const incidents = await incidentApi.list()
-    const counts = new Map<string, TrendPoint>()
-    incidents.forEach((incident) => {
-      const label = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(incident.startedAt))
-      const current = counts.get(label) || { label, fire: 0, smoke: 0 }
-      if (incident.primaryType !== 'SMOKE') current.fire += 1
-      if (incident.primaryType !== 'FIRE') current.smoke += 1
-      counts.set(label, current)
-    })
-    return [...counts.values()]
-  },
-}
-
 export const zoneApi = {
+  async update(id: number, input: ZoneUpsert): Promise<Zone> {
+    if (isMockMode) {
+      const zone = mockZones.find((item) => item.id === id)
+      if (!zone) throw new Error('教室不存在')
+      if (mockZones.some((item) => item.id !== id && item.name === input.name.trim())) throw new Error('教室名称已存在')
+      Object.assign(zone, input, { name: input.name.trim() })
+      mockIncidentDetails.filter((item) => item.zoneId === id).forEach((item) => { item.zoneName = zone.name })
+      mockIncidents.filter((item) => item.zoneId === id).forEach((item) => { item.zoneName = zone.name })
+      return clone(zone)
+    }
+    return (await http.put<Zone>(`/zones/${id}`, input)).data
+  },
+  async delete(id: number): Promise<void> {
+    if (isMockMode) {
+      const zone = mockZones.find((item) => item.id === id)
+      if (zone) {
+        if (mockIncidents.some((item) => item.zoneId === id)) zone.status = 'DISABLED'
+        else mockZones.splice(mockZones.indexOf(zone), 1)
+      }
+      mockCameras.filter((item) => item.zoneId === id).forEach((item) => { delete item.zoneId; delete item.viewRole })
+      return
+    }
+    await http.delete(`/zones/${id}`)
+  },
   async list(): Promise<Zone[]> {
-    if (isMockMode) return clone(mockZones)
+    if (isMockMode) return clone(mockZones.filter((item) => item.status === 'ENABLED'))
     return (await http.get<Zone[]>('/zones')).data
   },
   async create(input: ZoneUpsert): Promise<Zone> {
     if (isMockMode) {
       await wait()
-      const zone: Zone = { ...input, id: Date.now(), status: 'ENABLED' }
+      if (mockZones.some((item) => item.name === input.name.trim())) throw new Error('教室名称已存在')
+      const zone: Zone = { ...input, name: input.name.trim(), id: Date.now(), status: 'ENABLED' }
       mockZones.push(zone)
       return clone(zone)
     }
@@ -83,6 +88,7 @@ export const zoneApi = {
   async replaceBindings(zoneId: number, bindings: CameraBinding[]): Promise<void> {
     if (isMockMode) {
       await wait()
+      if (bindings.some((binding) => mockCameras.some((camera) => camera.id === binding.cameraId && camera.zoneId && camera.zoneId !== zoneId))) throw new Error('摄像头已绑定其他教室，请先解除绑定')
       mockCameras.forEach((camera) => {
         if (camera.zoneId === zoneId) {
           delete camera.zoneId
@@ -103,6 +109,36 @@ export const zoneApi = {
 }
 
 export const cameraApi = {
+  async localDevices(): Promise<LocalCameraDevice[]> {
+    if (isMockMode) return [{ index: 0, name: '前置摄像头（模拟）' }, { index: 1, name: 'USB 摄像头（模拟）' }]
+    return (await http.get<LocalCameraDevice[]>('/cameras/local-devices')).data
+  },
+  async start(id: number): Promise<InferenceRuntime> {
+    if (isMockMode) throw new Error('请连接实际服务后启动摄像头')
+    return (await http.post<InferenceRuntime>(`/cameras/${id}/start`)).data
+  },
+  async stop(): Promise<InferenceRuntime> {
+    if (isMockMode) throw new Error('当前为模拟模式')
+    return (await http.post<InferenceRuntime>('/cameras/local-stop')).data
+  },
+  async update(id: number, input: CameraUpsert): Promise<Camera> {
+    if (isMockMode) {
+      const camera = mockCameras.find((item) => item.id === id)
+      if (!camera) throw new Error('摄像头不存在')
+      Object.assign(camera, { name: input.name, sourceType: input.sourceType, targetFps: input.targetFps, status: 'UNKNOWN', lastSeenAt: null })
+      if (input.sourceUri) camera.maskedSource = input.sourceType === 'NETWORK_RTSP' ? 'rtsp://***:***@camera/stream' : input.sourceUri
+      return clone(camera)
+    }
+    return (await http.put<Camera>(`/cameras/${id}`, input)).data
+  },
+  async delete(id: number): Promise<void> {
+    if (isMockMode) {
+      const index = mockCameras.findIndex((item) => item.id === id)
+      if (index >= 0) mockCameras.splice(index, 1)
+      return
+    }
+    await http.delete(`/cameras/${id}`)
+  },
   async list(): Promise<Camera[]> {
     if (isMockMode) return clone(mockCameras)
     return (await http.get<Camera[]>('/cameras')).data
@@ -113,6 +149,7 @@ export const cameraApi = {
       const camera: Camera = {
         id: Date.now(),
         name: input.name,
+        targetFps: input.targetFps,
         sourceType: input.sourceType,
         streamKey: `camera-${Date.now()}`,
         maskedSource: input.sourceType === 'NETWORK_RTSP' ? 'rtsp://***:***@camera/stream' : input.sourceUri,
@@ -128,11 +165,8 @@ export const cameraApi = {
     if (isMockMode) {
       await wait(650)
       const camera = mockCameras.find((item) => item.id === cameraId)
-      if (camera) {
-        camera.status = 'ONLINE'
-        camera.lastSeenAt = new Date().toISOString()
-      }
-      return { reachable: Boolean(camera), checkedAt: new Date().toISOString(), width: 1280, height: 720, fps: 25, message: '视频源连接正常' }
+
+      return { reachable: false, configurationValid: Boolean(camera), checkedAt: new Date().toISOString(), message: '配置有效，连接状态以视频画面为准' }
     }
     return (await http.post<CameraProbeResult>(`/cameras/${cameraId}/probe`)).data
   },
@@ -150,6 +184,10 @@ export const cameraApi = {
 }
 
 export const incidentApi = {
+  async analyses(): Promise<IncidentAnalysis[]> {
+    if (isMockMode) return clone(mockIncidentDetails.map((detail) => ({ incident: detail, semanticAnalysis: detail.semanticAnalysis })))
+    return (await http.get<IncidentAnalysis[]>('/incidents/analyses')).data
+  },
   async list(query: IncidentQuery = {}): Promise<IncidentSummary[]> {
     if (isMockMode) {
       await wait(120)
@@ -209,34 +247,13 @@ export const incidentApi = {
 }
 
 async function inferenceGet<T>(path: string): Promise<T> {
-  const response = await fetch(`/inference/api/v1${path}`, { cache: 'no-store' })
+  const response = await fetch(`/inference/api/v1${path}`, { cache: 'no-store', signal: AbortSignal.timeout(5000) })
   if (!response.ok) throw new Error(`推理服务请求失败 (${response.status})`)
   return response.json() as Promise<T>
 }
 
 export const inferenceApi = {
+  config: () => inferenceGet<InferenceConfig>('/config'),
   runtime: () => inferenceGet<InferenceRuntime>('/runtime'),
   liveStatus: () => inferenceGet<InferenceLiveStatus>('/live/status'),
-}
-
-export const healthApi = {
-  async services(): Promise<ServiceHealth[]> {
-    if (isMockMode) return clone(mockServices)
-    const started = performance.now()
-    try {
-      await dashboardApi.summary()
-      return [
-        {
-          key: 'api',
-          name: '业务控制服务',
-          description: 'API 连接正常；其他服务健康信息待后端聚合接口提供',
-          status: 'HEALTHY',
-          latencyMs: Math.round(performance.now() - started),
-          updatedAt: new Date().toISOString(),
-        },
-      ]
-    } catch {
-      return [{ key: 'api', name: '业务控制服务', description: '无法访问业务 API', status: 'OFFLINE', updatedAt: new Date().toISOString() }]
-    }
-  },
 }

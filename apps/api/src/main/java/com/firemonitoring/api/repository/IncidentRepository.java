@@ -13,6 +13,7 @@ public interface IncidentRepository extends JpaRepository<IncidentEntity, Long> 
     List<IncidentEntity> findByStatusAndSeverityOrderByStartedAtDesc(IncidentStatus status, Severity severity);
     long countByStatus(IncidentStatus status);
     long countByStartedAtGreaterThanEqual(Instant from);
+    boolean existsByZoneId(Long zoneId);
     boolean existsBySourceEventId(String sourceEventId);
     Optional<IncidentEntity> findBySourceEventId(String sourceEventId);
     Optional<IncidentEntity> findFirstByTraceIdOrderByIdAsc(String traceId);

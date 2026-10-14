@@ -54,7 +54,7 @@ if ($null -eq $camera) {
 }
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8080/api/v1/cameras/$($camera.id)/probe" `
     -Headers $headers | Out-Null
-$bindingBody = ConvertTo-Json -InputObject @(@{ cameraId = $camera.id; viewRole = 'VIEW_A'; weight = 1.0 }) -Compress
+$bindingBody = ConvertTo-Json -InputObject @(@{ cameraId = $camera.id; viewRole = 'SINGLE'; weight = 1.0 }) -Compress
 Invoke-RestMethod -Method Put -Uri "http://127.0.0.1:8080/api/v1/zones/$($zone.id)/camera-bindings" `
     -Headers $headers -ContentType 'application/json' -Body $bindingBody | Out-Null
 

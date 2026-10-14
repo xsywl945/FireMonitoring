@@ -91,6 +91,12 @@ class LiveFrameBuffer:
             self._condition.notify_all()
         return annotated
 
+    def clear(self) -> None:
+        with self._condition:
+            self._jpeg = None
+            self._metadata = {"ready": False, "detections": []}
+            self._condition.notify_all()
+
     def status(self) -> dict[str, Any]:
         with self._condition:
             return dict(self._metadata)

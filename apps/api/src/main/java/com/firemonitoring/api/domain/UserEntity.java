@@ -33,6 +33,8 @@ public class UserEntity {
         this.createdAt = Instant.now();
     }
 
+    public void changePassword(String hash) { this.passwordHash = hash; }
+
     public Long getId() { return id; }
     public String getUsername() { return username; }
     public String getDisplayName() { return displayName; }

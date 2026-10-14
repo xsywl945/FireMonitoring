@@ -2,6 +2,8 @@ package com.firemonitoring.api.web;
 
 import com.firemonitoring.api.dto.*;
 import com.firemonitoring.api.service.CameraService;
+import com.firemonitoring.api.service.LocalCameraService;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,7 +16,24 @@ import java.util.List;
 public class CameraController {
     private final CameraService cameras;
 
-    public CameraController(CameraService cameras) { this.cameras = cameras; }
+    private final LocalCameraService local;
+
+    public CameraController(CameraService cameras, LocalCameraService local) {
+        this.cameras = cameras;
+        this.local = local;
+    }
+
+    @GetMapping("/local-devices")
+    public JsonNode localDevices() { return local.devices(); }
+
+    @PostMapping("/{cameraId}/start")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
+    public JsonNode start(@PathVariable Long cameraId) { return local.start(cameraId); }
+
+    @PostMapping("/local-stop")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
+    public JsonNode stop() { return local.stop(); }
 
     @GetMapping
     public List<CameraResponse> list() { return cameras.list(); }
@@ -24,6 +43,17 @@ public class CameraController {
     public ResponseEntity<CameraResponse> create(@Valid @RequestBody CameraUpsert request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(cameras.create(request));
     }
+
+    @PutMapping("/{cameraId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
+    public CameraResponse update(@PathVariable Long cameraId, @Valid @RequestBody CameraUpsert request) {
+        return cameras.update(cameraId, request);
+    }
+
+    @DeleteMapping("/{cameraId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
+    public void delete(@PathVariable Long cameraId) { cameras.delete(cameraId); }
 
     @PostMapping("/{cameraId}/probe")
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")

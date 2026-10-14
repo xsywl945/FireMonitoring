@@ -19,3 +19,16 @@ def test_management_api_does_not_expose_cloud_secret() -> None:
     assert response.json["dashscope_configured"] is True
     assert "do-not-leak" not in response.get_data(as_text=True)
     assert "redis-secret" not in response.get_data(as_text=True)
+
+
+def test_runtime_identifies_the_active_camera() -> None:
+    from fire_monitoring_inference.runtime import RuntimeState
+
+    runtime = RuntimeState(model_version="test-model")
+    runtime.set_camera(camera_id=7, zone_id=3)
+    runtime.start()
+    client = create_app(runtime=runtime).test_client()
+    response = client.get("/api/v1/runtime")
+    assert response.json["cameraId"] == 7
+    assert response.json["zoneId"] == 3
+    assert response.json["status"] == "RUNNING"

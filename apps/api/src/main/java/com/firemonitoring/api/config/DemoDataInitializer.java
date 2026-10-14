@@ -31,7 +31,13 @@ public class DemoDataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        users.findByUsername(username).orElseGet(() -> users.save(new UserEntity(
-                username, displayName, passwordEncoder.encode(password), List.of("ADMIN"))));
+        var existing = users.findByUsername(username);
+        if (existing.isEmpty()) {
+            users.save(new UserEntity(username, displayName, passwordEncoder.encode(password), List.of("ADMIN")));
+        } else if ("123456".equals(password)
+                && passwordEncoder.matches("FireAdmin123!", existing.get().getPasswordHash())) {
+            existing.get().changePassword(passwordEncoder.encode(password));
+            users.save(existing.get());
+        }
     }
 }

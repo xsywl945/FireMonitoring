@@ -81,7 +81,7 @@ function Read-DotEnv {
     }
     $defaults = @{
         DEMO_ADMIN_USERNAME = 'admin'
-        DEMO_ADMIN_PASSWORD = 'FireAdmin123!'
+        DEMO_ADMIN_PASSWORD = '123456'
     }
     foreach ($item in $defaults.GetEnumerator()) {
         if (-not $values.ContainsKey($item.Key)) { $values[$item.Key] = $item.Value }

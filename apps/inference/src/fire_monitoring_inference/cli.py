@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import logging
 import sys
@@ -11,6 +12,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .api import create_app
+from .camera_control import CameraControl, CameraStart
 from .config import ServiceConfig
 from .contracts import EventEnvelope
 from .detectors.mock import MockDetector
@@ -40,6 +42,7 @@ def _parser() -> argparse.ArgumentParser:
     serve.add_argument("--replay", type=Path, help="run a JSONL replay in a worker thread")
     serve.add_argument("--pace", type=float, default=0)
     serve.add_argument("--camera-model", type=Path, help="run one local camera with this model")
+    serve.add_argument("--camera-autostart", action=argparse.BooleanOptionalAction, default=True)
     serve.add_argument("--camera-index", type=int, default=0)
     serve.add_argument("--device", default="0")
     serve.add_argument("--imgsz", type=int, default=640)
@@ -146,8 +149,10 @@ def _serve_camera(
     publisher: EventPublisher,
     runtime: RuntimeState,
     live_frames: LiveFrameBuffer,
+    stop_event: threading.Event | None = None,
 ) -> None:
     enrichment = None
+    source = None
     try:
         from .detectors.ultralytics_adapter import UltralyticsDetector
         from .enrichment import IncidentEnrichmentWorker
@@ -226,11 +231,14 @@ def _serve_camera(
             cv2_module=source.cv2_module,
             frame_buffer=live_frames,
             enrichment=enrichment,
+            stop_event=stop_event,
         ).run()
     except Exception:
         runtime.fail("LIVE_CAMERA_START_FAILED")
         logging.getLogger(__name__).exception("live camera worker stopped")
     finally:
+        if source is not None:
+            source.release()
         if enrichment is not None:
             enrichment.stop()
 
@@ -350,6 +358,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         publisher = _publisher("redis" if args.redis else "memory", config)
         runtime = RuntimeState(model_version=config.model_version)
         live_frames = None
+        control = None
+        if args.replay and args.camera_model:
+            print("replay and camera control cannot run together", file=sys.stderr)
+            return 2
         if args.replay:
             frames = load_jsonl(args.replay)
             worker = threading.Thread(
@@ -370,24 +382,30 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"live camera dependencies are unavailable: {exc}", file=sys.stderr)
                 return 1
             live_frames = LiveFrameBuffer(cv2)
-            camera_worker = threading.Thread(
-                target=_serve_camera,
-                kwargs={
-                    "args": args,
-                    "config": config,
-                    "publisher": publisher,
-                    "runtime": runtime,
-                    "live_frames": live_frames,
-                },
-                name="live-camera-worker",
-                daemon=True,
-            )
-            camera_worker.start()
+
+            def run_camera(request: CameraStart, stop: threading.Event) -> None:
+                camera_args = copy.copy(args)
+                camera_args.camera_id = request.cameraId
+                camera_args.zone_id = request.zoneId
+                camera_args.camera_index = request.cameraIndex
+                camera_args.target_fps = request.targetFps
+                _serve_camera(
+                    args=camera_args, config=config, publisher=publisher,
+                    runtime=runtime, live_frames=live_frames, stop_event=stop,
+                )
+
+            control = CameraControl(worker=run_camera, runtime=runtime, frames=live_frames)
+            if args.camera_autostart:
+                control.start(CameraStart(
+                    cameraId=args.camera_id, zoneId=args.zone_id,
+                    cameraIndex=args.camera_index, targetFps=args.target_fps,
+                ))
         app = create_app(
             config=config,
             runtime=runtime,
             publisher=publisher,
             live_frames=live_frames,
+            camera_control=control,
         )
         app.run(
             host=args.host or config.host,

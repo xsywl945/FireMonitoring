@@ -39,6 +39,15 @@ public class CameraEntity {
         this.createdAt = Instant.now();
     }
 
+    public void update(String name, SourceType sourceType, String sourceUri, Double targetFps) {
+        this.name = name;
+        this.sourceType = sourceType;
+        this.sourceUri = sourceUri;
+        this.targetFps = BigDecimal.valueOf(targetFps == null ? 5.0 : targetFps);
+        this.status = CameraStatus.UNKNOWN;
+        this.lastSeenAt = null;
+    }
+
     public void recordProbe(boolean reachable, Instant checkedAt) {
         this.status = reachable ? CameraStatus.ONLINE : CameraStatus.OFFLINE;
         if (reachable) this.lastSeenAt = checkedAt;

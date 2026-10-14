@@ -41,6 +41,13 @@ hs_err_pid*
 data/
 datasets/
 weights/
+runs/
+artifacts/
+*.safetensors
+*.pth
+*.npz
+*.npy
+*.zip
 recordings/
 runtime/
 *.mp4
@@ -54,3 +61,6 @@ tmp/
 logs/
 coverage/
 
+# Browser verification artifacts
+.playwright-cli/
+output/playwright/

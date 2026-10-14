@@ -18,6 +18,7 @@ class ServiceConfig(BaseModel):
 
     host: str = "127.0.0.1"
     port: int = Field(default=8091, ge=1, le=65535)
+    control_token: SecretStr = SecretStr("local-camera-control")
     source: str = Field(default="inference-worker-1", min_length=1, max_length=100)
     model_version: str = Field(default="mock-fire-yolo-0.1.0", max_length=100)
     redis_url: str = "redis://127.0.0.1:6379/0"
@@ -55,6 +56,7 @@ class ServiceConfig(BaseModel):
         minio_access_key = os.getenv("MINIO_ROOT_USER")
         minio_secret_key = os.getenv("MINIO_ROOT_PASSWORD")
         return cls(
+            control_token=SecretStr(_env("INFERENCE_CONTROL_TOKEN", "local-camera-control")),
             host=_env("INFERENCE_HOST", "127.0.0.1"),
             port=_env("INFERENCE_PORT", 8091),
             source=_env("INFERENCE_SOURCE", "inference-worker-1"),
@@ -87,6 +89,7 @@ class ServiceConfig(BaseModel):
     def public_dict(self) -> dict[str, Any]:
         data = self.model_dump(
             exclude={
+                "control_token",
                 "dashscope_api_key",
                 "redis_url",
                 "minio_access_key",

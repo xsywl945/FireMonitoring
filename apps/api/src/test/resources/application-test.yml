@@ -18,7 +18,7 @@ app:
     expiration-seconds: 3600
   demo:
     admin-username: admin
-    admin-password: FireAdmin123!
+    admin-password: 123456
     admin-display-name: Test Admin
   redis:
     events:

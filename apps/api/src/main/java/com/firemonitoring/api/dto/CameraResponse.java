@@ -7,4 +7,4 @@ import java.time.Instant;
 
 public record CameraResponse(Long id, String name, SourceType sourceType, String streamKey,
                              String maskedSource, CameraStatus status, Instant lastSeenAt,
-                             Long zoneId, ViewRole viewRole) {}
+                             Long zoneId, ViewRole viewRole, double targetFps) {}

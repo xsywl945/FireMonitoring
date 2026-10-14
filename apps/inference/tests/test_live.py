@@ -99,3 +99,21 @@ def test_live_camera_runner_marks_failure_and_releases_camera() -> None:
 
     assert source.released is True
     assert runtime.snapshot()["status"] == "FAILED"
+
+
+def test_stopped_camera_releases_device_without_reading_a_frame() -> None:
+    import threading
+
+    source = FakeSource(1)
+    stop = threading.Event()
+    stop.set()
+    runtime = RuntimeState(model_version="test-model")
+    pipeline = InferencePipeline(
+        publisher=MemoryEventPublisher(), source="test", model_version="test", runtime=runtime,
+    )
+    LiveCameraRunner(
+        source=source, detector=FakeDetector(), pipeline=pipeline,
+        config=LiveCameraConfig(), stop_event=stop,
+    ).run()
+    assert source.released
+    assert len(source.frames) == 1

@@ -37,16 +37,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-  /dashboard/summary:
+  /incidents/analyses:
     get:
-      operationId: getDashboardSummary
+      operationId: listIncidentAnalyses
       responses:
         '200':
-          description: Summary
+          description: Semantic review records for published incidents, newest first
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardSummary'
+                type: array
+                items:
+                  $ref: '#/components/schemas/IncidentAnalysis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /zones:
     get:
       operationId: listZones
@@ -74,6 +78,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Zone'
+  /zones/{zoneId}:
+    parameters:
+      - name: zoneId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    put:
+      operationId: updateZone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ZoneUpsert'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteZone
+      description: Disable room and remove camera bindings while preserving incidents.
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
   /zones/{zoneId}/camera-bindings:
     put:
       operationId: replaceZoneCameraBindings
@@ -85,7 +122,7 @@ paths:
           application/json:
             schema:
               type: array
-              minItems: 1
+              minItems: 0
               maxItems: 2
               items:
                 $ref: '#/components/schemas/CameraBinding'
@@ -119,6 +156,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Camera'
+  /cameras/local-devices:
+    get:
+      operationId: listLocalCameraDevices
+      responses:
+        '200':
+          description: Local DirectShow camera list, each item contains index and name
+  /cameras/{cameraId}/start:
+    post:
+      operationId: startLocalCamera
+      parameters:
+        - name: cameraId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      description: Start the saved local device for its bound room. Poll inference runtime for readiness.
+      responses:
+        '202':
+          description: Camera starting
+        '409':
+          description: Another camera is running
+  /cameras/local-stop:
+    post:
+      operationId: stopLocalCamera
+      responses:
+        '200':
+          description: Camera released and buffered frames cleared
+        '409':
+          description: Stop still in progress; retry before switching cameras
+  /cameras/{cameraId}:
+    parameters:
+      - name: cameraId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    put:
+      operationId: updateCamera
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CameraUpsert'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteCamera
+      description: Remove camera and its room bindings.
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
   /cameras/{cameraId}/probe:
     post:
       operationId: probeCamera
@@ -262,7 +362,7 @@ components:
           maxLength: 50
         password:
           type: string
-          minLength: 8
+          minLength: 6
           maxLength: 100
     AuthResponse:
       type: object
@@ -336,7 +436,7 @@ components:
           format: int64
         viewRole:
           type: string
-          enum: [VIEW_A, VIEW_B]
+          enum: [VIEW_A, VIEW_B, SINGLE]
         weight:
           type: number
           minimum: 0
@@ -353,6 +453,8 @@ components:
         sourceType:
           type: string
           enum: [INTEGRATED, USB, NETWORK_RTSP, DEMO_FILE]
+        targetFps:
+          type: number
         streamKey:
           type: string
         maskedSource:
@@ -367,7 +469,7 @@ components:
           format: int64
         viewRole:
           type: [string, 'null']
-          enum: [VIEW_A, VIEW_B, null]
+          enum: [VIEW_A, VIEW_B, SINGLE, null]
     CameraUpsert:
       type: object
       additionalProperties: false
@@ -390,10 +492,13 @@ components:
           default: 5
     CameraProbeResult:
       type: object
-      required: [reachable, checkedAt]
+      required: [reachable, configurationValid, checkedAt]
       properties:
+        configurationValid:
+          type: boolean
         reachable:
           type: boolean
+          description: Configuration checks do not prove video connectivity.
         checkedAt:
           type: string
           format: date-time
@@ -574,17 +679,13 @@ components:
         falseAlarmReason:
           type: string
           enum: [STEAM, DUST, LIGHT, SCREEN_CONTENT, OTHER]
-    DashboardSummary:
+    IncidentAnalysis:
       type: object
-      required: [onlineCameras, totalCameras, newIncidents, handlingIncidents, todayIncidents]
+      required: [incident, semanticAnalysis]
       properties:
-        onlineCameras:
-          type: integer
-        totalCameras:
-          type: integer
-        newIncidents:
-          type: integer
-        handlingIncidents:
-          type: integer
-        todayIncidents:
-          type: integer
+        incident:
+          $ref: '#/components/schemas/IncidentSummary'
+        semanticAnalysis:
+          oneOf:
+            - $ref: '#/components/schemas/SemanticAnalysis'
+            - type: 'null'

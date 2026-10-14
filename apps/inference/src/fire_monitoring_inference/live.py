@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -157,6 +158,7 @@ class LiveCameraRunner:
         cv2_module: Any | None = None,
         frame_buffer: LiveFrameBuffer | None = None,
         enrichment: IncidentEnrichmentWorker | None = None,
+        stop_event: threading.Event | None = None,
     ) -> None:
         self.source = source
         self.detector = detector
@@ -165,6 +167,7 @@ class LiveCameraRunner:
         self._cv2 = cv2_module
         self.frame_buffer = frame_buffer
         self.enrichment = enrichment
+        self.stop_event = stop_event or threading.Event()
 
     def run(self) -> LiveRunSummary:
         processed = 0
@@ -175,7 +178,9 @@ class LiveCameraRunner:
         recent_frames: deque[FramePacket] = deque(maxlen=3)
         self.pipeline.runtime.start()
         try:
-            while self.config.max_frames == 0 or processed < self.config.max_frames:
+            while not self.stop_event.is_set() and (
+                self.config.max_frames == 0 or processed < self.config.max_frames
+            ):
                 packet = self.source.read()
                 now = time.monotonic()
                 if period and now < next_due:

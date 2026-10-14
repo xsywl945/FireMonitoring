@@ -36,6 +36,7 @@ packages = ["src/fire_monitoring_inference"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100

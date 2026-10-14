@@ -45,6 +45,9 @@ management:
       enabled: ${REDIS_EVENTS_ENABLED:false}
 
 app:
+  inference:
+    base-url: ${INFERENCE_BASE_URL:http://127.0.0.1:8091}
+    control-token: ${INFERENCE_CONTROL_TOKEN:local-camera-control}
   jwt:
     secret: ${JWT_SECRET:local-development-secret-change-before-deployment-0123456789abcdef}
     expiration-seconds: ${JWT_EXPIRATION_SECONDS:3600}
@@ -62,7 +65,7 @@ app:
     max-bytes: ${EVIDENCE_MAX_BYTES:5242880}
   demo:
     admin-username: ${DEMO_ADMIN_USERNAME:admin}
-    admin-password: ${DEMO_ADMIN_PASSWORD:FireAdmin123!}
+    admin-password: ${DEMO_ADMIN_PASSWORD:123456}
     admin-display-name: ${DEMO_ADMIN_DISPLAY_NAME:演示管理员}
   redis:
     events:

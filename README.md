@@ -2,6 +2,8 @@
 
 面向教室和实验室的智能火灾监控研究原型。当前里程碑采用单摄像头，由实时视频、YOLO 推理、单摄时序证据、千问多模态语义研判、站内预警和人工处置组成；双摄融合为后续扩展。
 
+协作训练从 [模型训练协作](docs/training/collaboration.md) 开始。仓库包含代码和训练工具，不包含数据集、模型权重或本地密钥。
+
 ## Repository layout
 
 ```text
@@ -33,10 +35,23 @@ docs/           Architecture, plans, runbooks, and test reports
 - One integrated camera and optional UVC USB camera
 - Native Windows FFmpeg/Python inference; Docker Compose for supporting services
 
+## Competition prototype scope
+
+比赛版前端仅保留三个入口：火灾识别与预警、大模型研判、预警响应。
+识别页展示实际画面和模型置信度；研判页展示已发布预警的多模态复核记录；
+响应页支持确认、开始处置、解决和误报标注，并保留关键帧与时间线。
+统计总览和健康页已移除；教室与摄像头页支持新建、编辑、删除及单摄绑定。
+删除有历史预警的教室时仅归档，不删除预警。管理员默认密码为 `123456`。
+本机摄像头接入窗口支持设备列表、启动识别与停止。前置和 USB 摄像头共用单摄推理链路。
+网络摄像头需通过 MediaMTX 预览。
+`GET /api/v1/incidents/analyses` 提供研判列表，不暴露证据存储地址。
+界面采用简洁的浅色布局；模拟数据与实际服务明确标识。
+本次不调整模型权重、识别阈值、训练流程或仓库目录。
+
 ## Current MVP
 
 - Spring Boot control plane with JWT/RBAC, zones, cameras, incident workflow, Flyway, WebSocket and Redis Stream ingestion;
-- Vue 3 operator console with real/mock API modes, local annotated stream, device binding, incident handling and health views;
+- Vue 3 operator console with real/mock API modes, local annotated stream, device binding, incident handling and semantic review;
 - Python 3.11 inference service with bounded latest-frame queues, N/M temporal evidence, Redis publishing, Ultralytics live inference and Qwen 3.7 Plus structured-output integration;
 - local MySQL, Redis, MinIO and MediaMTX infrastructure;
 - repeatable Windows bootstrap/start/verify/stop scripts.
@@ -44,6 +59,11 @@ docs/           Architecture, plans, runbooks, and test reports
 ## Safe local demo
 
 Docker Desktop and Clash Verge TUN should be running. The script uses system networking and never stores a proxy endpoint.
+
+本机摄像头控制：完成服务启动后，在「教室与摄像头」添加前置或 USB 摄像头，刷新并选择实际设备，绑定教室后点击「接入 → 启动识别」。切换设备前点击停止。虚拟摄像头也占用编号，USB 不一定为 1。
+单独启动等待页面选设备的推理服务可执行 `scripts/windows/start-inference.ps1`（不加参数）；保留 `-LiveCamera` 可继续自动启动。
+控制接口为 `GET /api/v1/cameras/local-devices`、`POST /api/v1/cameras/{id}/start` 和 `POST /api/v1/cameras/local-stop`。
+控制请求经业务 API 验证登录和权限后转发；可在服务器设置 `INFERENCE_CONTROL_TOKEN`，Java/Python 两端保持一致，该值不发送到浏览器。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup-local-yolo.ps1
@@ -67,6 +87,7 @@ cd .\apps\api
 
 # Inference
 cd ..\inference
+$env:PYTHONPATH = Join-Path (Get-Location) "src"
 .\.conda\python.exe -m pytest -q
 .\.conda\python.exe -m ruff check src tests
 

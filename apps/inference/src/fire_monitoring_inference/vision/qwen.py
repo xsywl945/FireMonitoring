@@ -52,7 +52,10 @@ hasVisibleFire or hasVisibleSmoke true only for a real physical phenomenon visib
 scene. Never claim that emergency services were contacted, power was cut, or an evacuation
 happened. Return exactly one JSON object matching the requested schema. When evidence is
 insufficient, set both visibility fields false, use sourceNature=unknown, lower confidence, and
-explain uncertainty."""
+explain uncertainty. Write reasoningSummary, burningObjects, recommendedActions and uncertainties
+in concise Simplified Chinese. Keep the summary within two short sentences, recommendations to at
+most three concrete actions, and avoid boilerplate or repeated caveats.
+Keep enum values unchanged."""
 
 USER_PROMPT = """Assess these chronological classroom/laboratory camera evidence frames jointly.
 Use temporal consistency across frames to reject screen content, reflections and transient

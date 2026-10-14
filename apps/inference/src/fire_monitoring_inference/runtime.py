@@ -22,6 +22,18 @@ class RuntimeState:
             "lastError": None,
         }
 
+    def set_camera(self, *, camera_id: int, zone_id: int) -> None:
+        with self._lock:
+            self._state.update(cameraId=camera_id, zoneId=zone_id)
+
+    def prepare_camera(self, *, camera_id: int, zone_id: int, camera_index: int) -> None:
+        with self._lock:
+            self._state.update(
+                status="STARTING", cameraId=camera_id, zoneId=zone_id, cameraIndex=camera_index,
+                framesProcessed=0, eventsPublished=0, incidentsConfirmed=0,
+                lastFrameAt=None, lastError=None,
+            )
+
     def start(self) -> None:
         with self._lock:
             self._state.update(status="RUNNING", startedAt=utc_now(), lastError=None)
