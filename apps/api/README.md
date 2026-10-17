@@ -8,8 +8,9 @@ Spring Boot 3 / Java 17 business-control API for the intelligent fire-monitoring
 - role-protected zone/camera mutation and authenticated read APIs;
 - one/two-camera zone bindings with duplicate-camera/view validation;
 - source URI masking, configuration-only probe stub, and short-lived MediaMTX URLs;
-- dashboard summary;
-- incident queries, detail timeline, strict state transitions, optimistic locking, and UUID idempotency keys;
+- read-only incident queries, evidence and detail timelines; manual review/action writes removed;
+- authenticated pump status proxy and ADMIN/OPERATOR emergency stop with automatic activation lock;
+- per-camera start/stop for two independent UVC sessions;
 - consistent JSON errors with `X-Trace-Id`;
 - STOMP endpoint at `/ws/events` and incident updates on `/topic/incidents` (send the JWT in the STOMP `CONNECT` `Authorization` header);
 - optional password-authenticated Redis Stream consumer for algorithm `INCIDENT_CONFIRMED` events;
@@ -42,7 +43,7 @@ mvn test
 mvn clean package
 ```
 
-Tests use an isolated in-memory H2 database in MySQL compatibility mode. They verify login/authentication, error envelopes, validation, zone/camera binding and RTSP masking, stream ticket generation, incident state transitions, false-alarm validation, and idempotent retries.
+Tests use an isolated in-memory H2 database in MySQL compatibility mode. They verify login/authentication, error envelopes, validation, zone/camera binding and RTSP masking, stream ticket generation, removed manual action routes, pump role checks, and durable algorithm-event deduplication.
 
 ## Runtime configuration
 

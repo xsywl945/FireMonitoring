@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Fire Monitoring Business API
-  version: 1.0.0
-  description: Contract between the Vue operator console and Spring Boot business service.
+  version: 2.0.0
+  description: Automatic suppression revision. Human review actions are removed; retained endpoints keep the /api/v1 URL namespace.
 servers:
   - url: /api/v1
 security:

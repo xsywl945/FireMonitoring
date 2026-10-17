@@ -1,17 +1,18 @@
 # Python inference service
 
-该目录是 Windows 原生算法进程的 MVP。它负责检测摘要、单摄 N/M 时序证据、500 ms
-双摄决策融合、Redis Streams 事件发布和云端视觉研判适配；不管理用户、不写 MySQL，也不向
-浏览器传输视频。
+该目录是 Windows 原生算法进程。支持两个 UVC 设备同时独立进行 YOLO + N/M 时序识别、千问复核、Redis 事件发布及 MinIO 关键帧保存。每路有独立运行状态和 MJPEG 预览，单个共享 ESP32 串口控制器按覆盖教室、置信度、证据时效和冷却条件自动启动水泵。
 
-当前 MVP 可在没有 PyTorch、显卡或摄像头的环境中完整回放事件链。真正的摄像头/RTSP
-采集和事件视频证据提取是后续集成项；队列与检测器边界已经固定，接入时不应改变共享事件契约。
+不管理用户、不写 MySQL。`replay` 不构造硬件控制器；`serve --camera-model` 才提供双摄和可选泵联动。跨视角融合模块供离线测试保留，实时基础功能分别识别两路。
+
+硬件配置、固件和验收见 [双 UVC + ESP32 自动喷水](../../docs/runbooks/esp32-pump.md)。
 
 ## 目录
 
 ```text
 src/fire_monitoring_inference/
-  api.py                    Flask 健康与运行状态 API
+  api.py                    Flask 健康、双摄状态与授权设备控制 API
+  camera_control.py         双 UVC 会话控制
+  pump.py                   串口握手、时效校验、指令持久化与紧急锁定
   contracts.py              contracts/events/v1 的 Pydantic 映射
   frames.py                 保留最新帧的 1–3 帧有界队列
   temporal.py               单摄 NORMAL/SUSPECT/CONFIRMED/COOLDOWN
@@ -29,7 +30,7 @@ tests/                      时序、融合、Schema、回放与安全测试
 不要安装到 Anaconda base。Windows PowerShell 示例：
 
 ```powershell
-cd C:\Users\xsywl\Desktop\FireMonitoring\apps\inference
+cd .\apps\inference
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip

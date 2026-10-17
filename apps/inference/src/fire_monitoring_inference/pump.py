@@ -31,6 +31,7 @@ class PumpConfig(BaseModel):
 
 
 class PumpTransport(Protocol):
+    def prepare(self) -> None: ...
     def request(self, command: str) -> str: ...
     def close(self) -> None: ...
 
@@ -42,7 +43,7 @@ class SerialPumpTransport:
         self.port = port
         self._serial = None
 
-    def request(self, command: str) -> str:
+    def prepare(self) -> None:
         try:
             if self._serial is None:
                 import serial
@@ -58,6 +59,13 @@ class SerialPumpTransport:
                 self._serial.reset_input_buffer()
                 if self._exchange("HELLO") != "READY FIRE_PUMP_V1":
                     raise OSError("unexpected pump firmware")
+        except Exception:
+            self.close()
+            raise
+
+    def request(self, command: str) -> str:
+        try:
+            self.prepare()
             return self._exchange(command)
         except Exception:
             self.close()
@@ -122,6 +130,18 @@ class PumpController:
         )
         self._db.commit()
 
+    def _live_rejection(
+        self, captured_at: datetime, cancelled: threading.Event | None
+    ) -> str | None:
+        if cancelled is not None and cancelled.is_set():
+            return "CAMERA_STOPPED"
+        if self._inhibited:
+            return "EMERGENCY_STOP_LATCHED"
+        age = (self.clock() - captured_at).total_seconds()
+        if not 0 <= age <= self.config.max_evidence_age_seconds:
+            return "STALE_EVIDENCE"
+        return None
+
     def trigger(
         self,
         event: EventEnvelope,
@@ -136,12 +156,9 @@ class PumpController:
             ).fetchone():
                 return
             now = self.clock()
-            reason = None
-            age = (now - captured_at).total_seconds()
-            if cancelled is not None and cancelled.is_set():
-                reason = "CAMERA_STOPPED"
-            elif self._inhibited:
-                reason = "EMERGENCY_STOP_LATCHED"
+            reason = self._live_rejection(captured_at, cancelled)
+            if reason is not None:
+                pass
             elif not self.config.enabled:
                 reason = "PUMP_DISABLED"
             elif event.zone_id != self.config.zone_id:
@@ -153,8 +170,6 @@ class PumpController:
                 and judgement.confidence >= self.config.min_confidence
             ):
                 reason = "VLM_NOT_CONFIRMED"
-            elif not 0 <= age <= self.config.max_evidence_age_seconds:
-                reason = "STALE_EVIDENCE"
             elif any(
                 record.get("attemptedAt")
                 and (now - datetime.fromisoformat(record["attemptedAt"])).total_seconds()
@@ -178,6 +193,13 @@ class PumpController:
             record["attemptedAt"] = now.isoformat()
             self._save(record)
             try:
+                self.transport.prepare()
+                reason = self._live_rejection(captured_at, cancelled)
+                if reason is not None:
+                    record.update(status="SKIPPED", reason=reason)
+                    record.pop("attemptedAt", None)
+                    self._save(record)
+                    return
                 reply = self.transport.request(
                     f"RUN {event.trace_id.hex} {self.config.duration_ms}"
                 )
@@ -226,8 +248,9 @@ class PumpController:
                 self._error = "DEVICE_STATUS_UNAVAILABLE"
 
     def emergency_stop(self) -> dict:
+        # Latch immediately, including while a camera is waiting for a serial reconnect.
+        self._inhibited = True
         with self._lock:
-            self._inhibited = True
             if self.config.enabled:
                 try:
                     if self.transport.request("STOP") != "STOPPED":

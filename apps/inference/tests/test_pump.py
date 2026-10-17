@@ -13,6 +13,9 @@ class Device:
         self.commands = []
         self.active = "-"
 
+    def prepare(self):
+        pass
+
     def request(self, command):
         self.commands.append(command)
         if command.startswith("RUN "):
@@ -182,3 +185,36 @@ def test_emergency_stop_keeps_retrying_safe_stop_until_device_confirms_off(tmp_p
     pump.refresh()
     assert pump.snapshot()["deviceState"] == "OFF"
     assert pump.snapshot()["inhibited"] is True
+
+
+@pytest.mark.parametrize(
+    "case,reason",
+    [
+        ("stale", "STALE_EVIDENCE"),
+        ("cancelled", "CAMERA_STOPPED"),
+    ],
+)
+def test_serial_reconnect_cannot_start_expired_or_stopped_camera(tmp_path, case, reason):
+    current = [utc_now()]
+    captured_at = current[0] - timedelta(seconds=29)
+    cancelled = threading.Event()
+
+    class SlowConnect(Device):
+        def prepare(self):
+            current[0] += timedelta(seconds=2)
+            if case == "cancelled":
+                cancelled.set()
+
+    device = SlowConnect()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM4", zone_id=2),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+        clock=lambda: current[0],
+    )
+    judgement = FakeReasoner().analyze(
+        incident_id=None, image_data_urls=["data:image/jpeg;base64,a"]
+    )
+    pump.trigger(_gate_job().confirmed, judgement, captured_at=captured_at, cancelled=cancelled)
+    assert pump.snapshot()["records"][0]["reason"] == reason
+    assert not any(x.startswith("RUN ") for x in device.commands)
