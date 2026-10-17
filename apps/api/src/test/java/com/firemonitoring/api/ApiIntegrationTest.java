@@ -26,6 +26,23 @@ class ApiIntegrationTest {
     @Autowired com.firemonitoring.api.repository.IncidentRepository incidentRepository;
 
     @Test
+    void manualReviewActionEndpointIsRemoved() throws Exception {
+        String token = login();
+        var zone = zones.save(new com.firemonitoring.api.domain.ZoneEntity(
+                "No manual review-" + UUID.randomUUID(),
+                com.firemonitoring.api.domain.SceneType.CLASSROOM));
+        long id = incidentRepository.save(new com.firemonitoring.api.domain.IncidentEntity(
+                zone, com.firemonitoring.api.domain.Severity.HIGH,
+                com.firemonitoring.api.domain.PrimaryType.FIRE, java.time.Instant.now(), 0.9)).getId();
+        mvc.perform(post("/api/v1/incidents/{id}/actions", id)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"ACKNOWLEDGE\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void loginReturnsJwtAndCurrentUser() throws Exception {
         String token = login();
         mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
@@ -46,6 +63,11 @@ class ApiIntegrationTest {
     @Test
     void analysesReturnsSemanticRecordsWithoutEvidenceStorageKeys() throws Exception {
         String token = login();
+        var zone = zones.save(new com.firemonitoring.api.domain.ZoneEntity(
+                "Analysis read-" + UUID.randomUUID(), com.firemonitoring.api.domain.SceneType.CLASSROOM));
+        incidentRepository.save(new com.firemonitoring.api.domain.IncidentEntity(zone,
+                com.firemonitoring.api.domain.Severity.HIGH,
+                com.firemonitoring.api.domain.PrimaryType.FIRE, java.time.Instant.now(), 0.9));
         mvc.perform(get("/api/v1/incidents/analyses").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].incident.id").isNumber())

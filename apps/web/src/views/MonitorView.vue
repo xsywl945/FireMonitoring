@@ -52,6 +52,7 @@ let polling = false
 const zoneCameras = computed(() => cameras.value.filter((camera) => camera.zoneId === selectedZone.value))
 const selectedCamera = computed(() => zoneCameras.value.find((camera) => camera.id === selectedCameraId.value))
 const usesLiveInference = computed(() => Boolean(selectedCamera.value && (runtime.value?.status === 'RUNNING' || runtime.value?.status === 'STARTING') && runtime.value?.cameraId === selectedCamera.value.id && runtime.value?.zoneId === selectedZone.value))
+watch(selectedCameraId, () => { runtime.value = undefined; live.value = undefined; void poll() })
 watch(zoneCameras, (items) => {
   if (!items.some((camera) => camera.id === selectedCameraId.value)) selectedCameraId.value = items[0]?.id
 })
@@ -64,7 +65,7 @@ async function poll() {
   try {
     if (isMockMode) { incidents.value = await incidentApi.list(); return }
     const [runtimeResult, liveResult, incidentResult] = await Promise.allSettled([
-      inferenceApi.runtime(), inferenceApi.liveStatus(), incidentApi.list(),
+      inferenceApi.runtime(selectedCameraId.value), inferenceApi.liveStatus(selectedCameraId.value), incidentApi.list(),
     ])
     runtime.value = runtimeResult.status === 'fulfilled' ? runtimeResult.value : undefined
     live.value = liveResult.status === 'fulfilled' ? liveResult.value : undefined

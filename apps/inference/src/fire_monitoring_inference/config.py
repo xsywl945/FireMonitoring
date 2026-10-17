@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
+from .pump import PumpConfig
+
 
 def _env(name: str, default: Any) -> Any:
     value = os.getenv(name)
@@ -41,6 +43,7 @@ class ServiceConfig(BaseModel):
     minio_secret_key: SecretStr | None = None
     minio_bucket: str = "fire-evidence"
     minio_secure: bool = False
+    pump: PumpConfig = Field(default_factory=PumpConfig)
 
     @model_validator(mode="after")
     def validate_temporal_thresholds(self) -> ServiceConfig:
@@ -84,6 +87,14 @@ class ServiceConfig(BaseModel):
             minio_secret_key=SecretStr(minio_secret_key) if minio_secret_key else None,
             minio_bucket=_env("MINIO_BUCKET", "fire-evidence"),
             minio_secure=_env("INFERENCE_MINIO_SECURE", False),
+            pump=PumpConfig(
+                enabled=_env("PUMP_ENABLED", False),
+                port=_env("PUMP_SERIAL_PORT", ""),
+                zone_id=os.getenv("PUMP_ZONE_ID") or None,
+                duration_ms=_env("PUMP_DURATION_MS", 5000),
+                cooldown_seconds=_env("PUMP_COOLDOWN_SECONDS", 60),
+                min_confidence=_env("INFERENCE_VLM_GATE_MIN_CONFIDENCE", 0.7),
+            ),
         )
 
     def public_dict(self) -> dict[str, Any]:
@@ -94,6 +105,7 @@ class ServiceConfig(BaseModel):
                 "redis_url",
                 "minio_access_key",
                 "minio_secret_key",
+                "pump",
             }
         )
         data["redis_configured"] = bool(self.redis_url)

@@ -7,9 +7,4 @@ describe('mock incident API', () => {
     expect(incidents[0]?.primaryType).toBe('FIRE_AND_SMOKE')
   })
 
-  it('uses the allowed transition action names', async () => {
-    const detail = await incidentApi.transition(24071600, { action: 'RESOLVE', note: '现场已排除风险' })
-    expect(detail.status).toBe('RESOLVED')
-    expect(detail.timeline[0]?.note).toBe('现场已排除风险')
-  })
 })

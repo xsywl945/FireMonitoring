@@ -7,7 +7,6 @@ import type {
   CameraBinding,
   CameraProbeResult,
   CameraUpsert,
-  IncidentActionRequest,
   IncidentDetail,
   IncidentQuery,
   IncidentSummary,
@@ -15,6 +14,7 @@ import type {
   InferenceLiveStatus,
   InferenceRuntime,
   InferenceConfig,
+  PumpStatus,
   StreamTicket,
   User,
   Zone,
@@ -117,9 +117,9 @@ export const cameraApi = {
     if (isMockMode) throw new Error('请连接实际服务后启动摄像头')
     return (await http.post<InferenceRuntime>(`/cameras/${id}/start`)).data
   },
-  async stop(): Promise<InferenceRuntime> {
+  async stop(id?: number): Promise<InferenceRuntime> {
     if (isMockMode) throw new Error('当前为模拟模式')
-    return (await http.post<InferenceRuntime>('/cameras/local-stop')).data
+    return (await http.post<InferenceRuntime>(id ? `/cameras/${id}/stop` : '/cameras/local-stop')).data
   },
   async update(id: number, input: CameraUpsert): Promise<Camera> {
     if (isMockMode) {
@@ -208,39 +208,6 @@ export const incidentApi = {
     }
     return (await http.get<IncidentDetail>(`/incidents/${incidentId}`)).data
   },
-  async transition(incidentId: number, input: IncidentActionRequest): Promise<IncidentDetail> {
-    if (isMockMode) {
-      await wait(280)
-      const detail = mockIncidentDetails.find((item) => item.id === incidentId)
-      const summary = mockIncidents.find((item) => item.id === incidentId)
-      if (!detail || !summary) throw new Error('事件不存在')
-      const statusMap = {
-        ACKNOWLEDGE: 'ACKNOWLEDGED',
-        START_HANDLING: 'HANDLING',
-        RESOLVE: 'RESOLVED',
-        MARK_FALSE_ALARM: 'FALSE_ALARM',
-      } as const
-      detail.status = statusMap[input.action]
-      summary.status = detail.status
-      if (input.action === 'ACKNOWLEDGE') {
-        detail.acknowledgedAt = new Date().toISOString()
-        summary.acknowledgedAt = detail.acknowledgedAt
-      }
-      detail.timeline.unshift({
-        id: crypto.randomUUID(),
-        action: input.action === 'MARK_FALSE_ALARM' ? '标记误报' : input.action === 'RESOLVE' ? '事件解决' : input.action === 'ACKNOWLEDGE' ? '人工确认' : '开始处置',
-        actor: '石旭生',
-        note: input.note,
-        occurredAt: new Date().toISOString(),
-      })
-      return clone(detail)
-    }
-    return (
-      await http.post<IncidentDetail>(`/incidents/${incidentId}/actions`, input, {
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
-      })
-    ).data
-  },
   async evidence(incidentId: number, index: number): Promise<Blob> {
     return (await http.get<Blob>(`/incidents/${incidentId}/evidence/${index}`, { responseType: 'blob' })).data
   },
@@ -254,6 +221,19 @@ async function inferenceGet<T>(path: string): Promise<T> {
 
 export const inferenceApi = {
   config: () => inferenceGet<InferenceConfig>('/config'),
-  runtime: () => inferenceGet<InferenceRuntime>('/runtime'),
-  liveStatus: () => inferenceGet<InferenceLiveStatus>('/live/status'),
+  runtime: (id?: number) => inferenceGet<InferenceRuntime>(`/runtime${id ? `?cameraId=${id}` : ''}`),
+  runtimes: () => inferenceGet<InferenceRuntime[]>('/live/cameras'),
+  liveStatus: (id?: number) => inferenceGet<InferenceLiveStatus>(`/live/status${id ? `?cameraId=${id}` : ''}`),
+}
+
+export const pumpApi = {
+  async status(): Promise<PumpStatus> {
+    if (isMockMode) return { enabled: false, connected: false, inhibited: false,
+      deviceState: 'DISABLED', durationMs: 5000, cooldownSeconds: 60, lastError: null, records: [] }
+    return (await http.get<PumpStatus>('/pump')).data
+  },
+  async stop(): Promise<PumpStatus> {
+    if (isMockMode) throw new Error('模拟模式不能控制实际水泵')
+    return (await http.post<PumpStatus>('/pump/stop')).data
+  },
 }

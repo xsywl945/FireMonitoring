@@ -7,7 +7,7 @@
     <nav class="research-nav" aria-label="主导航">
       <RouterLink to="/monitor">火灾识别与预警</RouterLink>
       <RouterLink to="/analysis">大模型研判</RouterLink>
-      <RouterLink to="/incidents">预警响应</RouterLink>
+      <RouterLink to="/suppression">自动喷水</RouterLink>
       <RouterLink class="settings-link" to="/rooms">教室与摄像头</RouterLink>
     </nav>
     <main class="page-container"><RouterView /></main>

@@ -8,6 +8,47 @@ servers:
 security:
   - bearerAuth: []
 paths:
+  /pump:
+    get:
+      operationId: getPumpStatus
+      description: Controller output feedback and latest 100 durable commands. Requires login. No water-flow sensor is present.
+      responses:
+        '200':
+          description: Pump status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /pump/stop:
+    post:
+      operationId: emergencyStopPump
+      description: ADMIN or OPERATOR only. Stop output and latch automatic suppression until inference service restart. Check lastError; unknown output requires physical intervention.
+      responses:
+        '200':
+          description: Locked status; device stop acknowledgement may be unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpStatus'
+        '403':
+          description: Operator role required
+  /cameras/{cameraId}/stop:
+    post:
+      operationId: stopOneLocalCamera
+      parameters:
+        - name: cameraId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Selected camera stopped; other camera continues
+        '409':
+          description: Camera still stopping or not started
   /auth/login:
     post:
       security: []
@@ -177,7 +218,7 @@ paths:
         '202':
           description: Camera starting
         '409':
-          description: Another camera is running
+          description: Camera/device already running or two-camera limit reached
   /cameras/local-stop:
     post:
       operationId: stopLocalCamera
@@ -276,30 +317,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IncidentDetail'
-  /incidents/{incidentId}/actions:
-    post:
-      operationId: transitionIncident
-      parameters:
-        - $ref: '#/components/parameters/IncidentId'
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/IncidentActionRequest'
-      responses:
-        '200':
-          description: Updated incident
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IncidentDetail'
+
   /incidents/{incidentId}/evidence/{evidenceIndex}:
     get:
       operationId: getIncidentEvidence
@@ -350,6 +368,8 @@ components:
   responses:
     Unauthorized:
       description: Authentication failed
+    NotFound:
+      description: Requested resource does not exist
   schemas:
     LoginRequest:
       type: object
@@ -665,20 +685,6 @@ components:
         occurredAt:
           type: string
           format: date-time
-    IncidentActionRequest:
-      type: object
-      additionalProperties: false
-      required: [action]
-      properties:
-        action:
-          type: string
-          enum: [ACKNOWLEDGE, START_HANDLING, RESOLVE, MARK_FALSE_ALARM]
-        note:
-          type: string
-          maxLength: 2000
-        falseAlarmReason:
-          type: string
-          enum: [STEAM, DUST, LIGHT, SCREEN_CONTENT, OTHER]
     IncidentAnalysis:
       type: object
       required: [incident, semanticAnalysis]
@@ -689,3 +695,57 @@ components:
           oneOf:
             - $ref: '#/components/schemas/SemanticAnalysis'
             - type: 'null'
+
+    PumpStatus:
+      type: object
+      required: [enabled, connected, inhibited, deviceState, durationMs, cooldownSeconds, records]
+      properties:
+        enabled:
+          type: boolean
+        zoneId:
+          type: [integer, 'null']
+        connected:
+          type: boolean
+        inhibited:
+          type: boolean
+        deviceState:
+          type: string
+          enum: ['ON', 'OFF', UNKNOWN, DISABLED]
+        lastError:
+          type: [string, 'null']
+        durationMs:
+          type: integer
+        cooldownSeconds:
+          type: integer
+        records:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/PumpRecord'
+    PumpRecord:
+      type: object
+      required: [traceId, zoneId, cameraId, createdAt, durationMs, status, reason]
+      properties:
+        traceId:
+          type: string
+          format: uuid
+        zoneId:
+          type: integer
+        cameraId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        attemptedAt:
+          type: string
+          format: date-time
+        stoppedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+        status:
+          type: string
+          enum: [ATTEMPTING, RUNNING, STOPPED, UNKNOWN, SKIPPED]
+        reason:
+          type: [string, 'null']

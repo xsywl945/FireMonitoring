@@ -77,6 +77,11 @@ public class GlobalExceptionHandler {
         return error(401, "UNAUTHORIZED", "Invalid username or password", request);
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    ResponseEntity<ApiError> forbidden(Exception exception, HttpServletRequest request) {
+        return error(403, "FORBIDDEN", "You do not have permission to perform this operation", request);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ApiError> dataConflict(DataIntegrityViolationException exception, HttpServletRequest request) {
         return error(409, "DATA_CONFLICT", "The operation conflicts with existing data", request);

@@ -9,10 +9,6 @@
           <p><span><el-icon><Warning /></el-icon> {{ primaryTypeLabels[incident.primaryType] }}</span><span><el-icon><Clock /></el-icon> {{ formatDate(incident.startedAt) }}</span><span><el-icon><Location /></el-icon> 教室 {{ incident.zoneId }}</span></p>
         </div>
         <div class="hero-score"><strong>{{ incident.fusionScore != null ? incident.fusionScore.toFixed(2) : '未记录' }}</strong><span>时序证据分</span></div>
-        <div v-if="availableActions.length" class="incident-actions">
-          <el-button v-for="action in availableActions" :key="action.action" :type="action.primary ? 'primary' : 'default'" @click="openAction(action.action)">{{ action.label }}</el-button>
-        </div>
-        <div v-else class="incident-closed"><el-icon><CircleCheck /></el-icon> 已结束</div>
       </header>
 
       <section class="detail-layout">
@@ -43,10 +39,10 @@
 
         <aside class="detail-side-column">
           <article class="panel timeline-panel">
-            <header class="panel-header"><div><h2>处理记录</h2></div></header>
+            <header class="panel-header"><div><h2>事件记录</h2></div></header>
             <div class="handling-records">
               <div v-for="entry in handlingRecords" :key="entry.id" class="handling-entry"><time>{{ formatDate(entry.occurredAt) }}</time><div><strong>{{ entry.action }}</strong><span v-if="entry.actor"> · {{ entry.actor }}</span><p v-if="entry.note && !entry.note.startsWith('eventId=')">{{ entry.note }}</p></div></div>
-              <p v-if="!handlingRecords.length" class="muted">暂无处理记录</p>
+              <p v-if="!handlingRecords.length" class="muted">暂无事件记录</p>
             </div>
           </article>
 
@@ -55,50 +51,28 @@
     </template>
     <el-result v-else-if="!loading" icon="warning" title="事件不存在" sub-title="该事件可能已被删除或你没有查看权限"><template #extra><RouterLink to="/incidents"><el-button type="primary">返回事件列表</el-button></RouterLink></template></el-result>
 
-    <el-dialog v-model="actionDialog" :title="actionTitle" width="min(500px, 92vw)">
-      <el-form label-position="top">
-        <el-form-item v-if="selectedAction === 'MARK_FALSE_ALARM'" label="误报原因" required><el-select v-model="actionForm.falseAlarmReason" style="width:100%" placeholder="请选择"><el-option label="水蒸气" value="STEAM" /><el-option label="灰尘" value="DUST" /><el-option label="强光" value="LIGHT" /><el-option label="屏幕内容" value="SCREEN_CONTENT" /><el-option label="其他" value="OTHER" /></el-select></el-form-item>
-        <el-form-item label="处置说明"><el-input v-model="actionForm.note" type="textarea" :rows="4" maxlength="2000" show-word-limit placeholder="填写处理情况（选填）" /></el-form-item>
-      </el-form>
-      <template #footer><el-button @click="actionDialog = false">取消</el-button><el-button type="primary" :loading="submitting" @click="submitAction">提交</el-button></template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft, CircleCheck, Clock, Location, Warning } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ArrowLeft, Clock, Location, Warning } from '@element-plus/icons-vue'
 import AnalysisResult from '@/components/AnalysisResult.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { incidentApi } from '@/api'
 import { primaryTypeLabels } from '@/config/labels'
-import type { IncidentAction, IncidentDetail } from '@/types/domain'
+import type { IncidentDetail } from '@/types/domain'
 
 const route = useRoute()
 const loading = ref(true)
 let pollTimer: number | undefined
 let refreshing = false
-const submitting = ref(false)
 const incident = ref<IncidentDetail>()
-const actionDialog = ref(false)
-const selectedAction = ref<IncidentAction>('ACKNOWLEDGE')
-const actionForm = reactive<{ note: string; falseAlarmReason?: 'STEAM' | 'DUST' | 'LIGHT' | 'SCREEN_CONTENT' | 'OTHER' }>({ note: '' })
 const evidenceUrls = ref<Record<number, string>>({})
-const actionTitle = computed(() => ({ ACKNOWLEDGE: '确认预警', START_HANDLING: '开始处置', RESOLVE: '解决事件', MARK_FALSE_ALARM: '标记误报' }[selectedAction.value]))
 const handlingRecords = computed(() => (incident.value?.timeline || [])
-  .filter((entry) => ['模型确认预警', '事件创建', '人工确认', '开始处置', '事件解决', '解决事件', '标记误报'].includes(entry.action))
-  .map((entry) => ['模型确认预警', '事件创建'].includes(entry.action) ? { ...entry, action: '预警创建', actor: '', note: undefined } : entry)
-  .sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt)))
-const availableActions = computed(() => {
-  if (!incident.value) return []
-  if (incident.value.status === 'NEW') return [{ action: 'ACKNOWLEDGE' as const, label: '确认事件', primary: true }, { action: 'MARK_FALSE_ALARM' as const, label: '标记误报' }]
-  if (incident.value.status === 'ACKNOWLEDGED') return [{ action: 'START_HANDLING' as const, label: '开始处置', primary: true }, { action: 'MARK_FALSE_ALARM' as const, label: '标记误报' }]
-  if (incident.value.status === 'HANDLING') return [{ action: 'RESOLVE' as const, label: '解决事件', primary: true }]
-  return []
-})
+  .slice().sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt)))
 
 async function load() {
   loading.value = true
@@ -111,19 +85,13 @@ async function load() {
     }))
   } catch { incident.value = undefined } finally { loading.value = false }
 }
-function openAction(action: IncidentAction) { selectedAction.value = action; actionForm.note = ''; actionForm.falseAlarmReason = undefined; actionDialog.value = true }
-async function submitAction() {
-  if (selectedAction.value === 'MARK_FALSE_ALARM' && !actionForm.falseAlarmReason) { ElMessage.warning('请选择误报原因'); return }
-  submitting.value = true
-  try { incident.value = await incidentApi.transition(Number(route.params.id), { action: selectedAction.value, note: actionForm.note || undefined, falseAlarmReason: actionForm.falseAlarmReason }); actionDialog.value = false; ElMessage.success('事件状态已更新') } catch { ElMessage.error('提交失败，请刷新后重试') } finally { submitting.value = false }
-}
 function formatDate(date: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(date)) }
 function formatTime(date: string) { return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(date)) }
 function detectionStyle(box: [number, number, number, number], width: number, height: number) { return { left: `${(box[0] / width) * 100}%`, top: `${(box[1] / height) * 100}%`, width: `${((box[2] - box[0]) / width) * 100}%`, height: `${((box[3] - box[1]) / height) * 100}%` } }
 function viewOriginal(index: number) { if (evidenceUrls.value[index]) window.open(evidenceUrls.value[index], '_blank', 'noopener,noreferrer') }
 function cleanupEvidence() { Object.values(evidenceUrls.value).forEach(URL.revokeObjectURL); evidenceUrls.value = {} }
 async function refresh() {
-  if (refreshing || loading.value || submitting.value) return
+  if (refreshing || loading.value) return
   refreshing = true
   try {
     const latest = await incidentApi.get(Number(route.params.id))

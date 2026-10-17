@@ -2,10 +2,13 @@ param(
     [switch]$SkipCamera,
     [switch]$SkipBuild,
     [switch]$LiveInference,
+    [switch]$SelectCameras,
     [string]$IntegratedDeviceName = 'Integrated Camera'
 )
 
 . (Join-Path $PSScriptRoot 'common.ps1')
+
+if ($SelectCameras -and -not $LiveInference) { throw '-SelectCameras requires -LiveInference.' }
 
 & (Join-Path $PSScriptRoot 'preflight.ps1')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -27,6 +30,13 @@ Wait-HttpHealthy -Uri 'http://127.0.0.1:9997/v3/config/global/get'
 & (Join-Path $PSScriptRoot 'start-api.ps1')
 
 $settings = Set-ApplicationEnvironment
+if ($SelectCameras) {
+    & (Join-Path $PSScriptRoot 'start-inference.ps1')
+    & (Join-Path $PSScriptRoot 'start-web.ps1')
+    Write-Host 'Ready at http://127.0.0.1:5173. Select and start up to two UVC cameras in Rooms.' -ForegroundColor Green
+    Write-Host 'Existing rooms and camera bindings are preserved. Pump follows repository .env configuration.' -ForegroundColor Yellow
+    return
+}
 $login = @{
     username = $settings['DEMO_ADMIN_USERNAME']
     password = $settings['DEMO_ADMIN_PASSWORD']

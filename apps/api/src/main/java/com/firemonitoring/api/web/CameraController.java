@@ -35,6 +35,10 @@ public class CameraController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
     public JsonNode stop() { return local.stop(); }
 
+    @PostMapping("/{cameraId}/stop")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OPERATOR')")
+    public JsonNode stopOne(@PathVariable Long cameraId) { return local.stop(cameraId); }
+
     @GetMapping
     public List<CameraResponse> list() { return cameras.list(); }
 

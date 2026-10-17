@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch, nextTick, computed } from 'vue'
 import Hls from 'hls.js'
 import { cameraApi } from '@/api'
 import { isMockMode } from '@/api/client'
@@ -60,7 +60,7 @@ const videoEl = ref<HTMLVideoElement>()
 const mode = ref<PlaybackMode>('loading')
 const inferenceReady = ref(false)
 const errorMessage = ref('')
-const inferenceStreamUrl = '/inference/api/v1/live/stream.mjpg'
+const inferenceStreamUrl = computed(() => `/inference/api/v1/live/stream.mjpg?cameraId=${props.camera.id}`)
 let peer: RTCPeerConnection | undefined
 let hls: Hls | undefined
 

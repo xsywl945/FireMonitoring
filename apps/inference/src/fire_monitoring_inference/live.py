@@ -95,6 +95,8 @@ class OpenCVCameraSource:
                 f"cannot open camera index {camera_index}; close Camera/Teams/Zoom and retry"
             )
 
+        if hasattr(self._cv2, "VideoWriter_fourcc"):
+            self._set_if_available("CAP_PROP_FOURCC", self._cv2.VideoWriter_fourcc(*"MJPG"))
         self._set_if_available("CAP_PROP_FRAME_WIDTH", width)
         self._set_if_available("CAP_PROP_FRAME_HEIGHT", height)
         self._set_if_available("CAP_PROP_BUFFERSIZE", 1)

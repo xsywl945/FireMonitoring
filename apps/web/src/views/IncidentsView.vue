@@ -1,6 +1,6 @@
 <template>
   <div class="incidents-page">
-    <PageHeader title="预警响应">
+    <PageHeader title="识别记录">
       <template #actions><el-button :loading="loading" @click="load">刷新</el-button></template>
     </PageHeader>
 
@@ -23,8 +23,6 @@
         <el-table-column label="教室" min-width="220"><template #default="{ row }"><div class="zone-cell"><span class="zone-mini-icon"><el-icon><Location /></el-icon></span><div><strong>{{ row.zoneName }}</strong></div></div></template></el-table-column>
         <el-table-column label="检测类型" width="150"><template #default="{ row }"><span class="type-chip">{{ primaryTypeLabels[row.primaryType as PrimaryType] }}</span></template></el-table-column>
         <el-table-column label="风险等级" width="130"><template #default="{ row }"><SeverityBadge :severity="row.severity" /></template></el-table-column>
-        <el-table-column label="处置状态" width="130"><template #default="{ row }"><StatusBadge :status="row.status" /></template></el-table-column>
-        <el-table-column label="响应耗时" width="120"><template #default="{ row }"><span :class="{ 'response-pending': !row.acknowledgedAt }">{{ responseTime(row) }}</span></template></el-table-column>
         <el-table-column width="70" fixed="right"><template #default><el-icon class="row-arrow"><ArrowRight /></el-icon></template></el-table-column>
       </el-table>
       <div v-if="!loading && !filteredIncidents.length" class="table-empty"><el-empty description="没有符合条件的事件" /></div>
@@ -39,7 +37,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Location, Search } from '@element-plus/icons-vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
 import { incidentApi } from '@/api'
 import { primaryTypeLabels, severityLabels, statusLabels } from '@/config/labels'
 import type { IncidentStatus, IncidentSummary, PrimaryType, Severity } from '@/types/domain'
@@ -61,11 +58,6 @@ const filteredIncidents = computed(() => incidents.value.filter((item) => (!filt
 async function load() { if (loading.value) return; loading.value = true; try { incidents.value = await incidentApi.list(); error.value = '' } catch { error.value = '预警列表更新失败，请检查业务服务连接。' } finally { loading.value = false } }
 function openIncident(row: IncidentSummary) { router.push(`/incidents/${row.id}`) }
 function formatDate(date: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(date)) }
-function responseTime(incident: IncidentSummary) {
-  if (!incident.acknowledgedAt) return '等待响应'
-  const seconds = Math.floor((new Date(incident.acknowledgedAt).getTime() - new Date(incident.startedAt).getTime()) / 1000)
-  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
-}
 watch(() => filters.status, (status) => router.replace({ query: status ? { status } : {} }))
 onMounted(() => { void load(); pollTimer = window.setInterval(load, 5000) })
 onBeforeUnmount(() => window.clearInterval(pollTimer))

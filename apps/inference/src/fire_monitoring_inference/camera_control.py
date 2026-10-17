@@ -21,6 +21,11 @@ class CameraStart(BaseModel):
     targetFps: float = Field(default=5, ge=1, le=30)
 
 
+class CameraStop(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cameraId: int | None = Field(default=None, gt=0, strict=True)
+
+
 def local_devices() -> list[dict[str, Any]]:
     if sys.platform != "win32":
         raise RuntimeError("本机摄像头列表仅支持 Windows")
@@ -68,6 +73,10 @@ class CameraControl:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
 
+    @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
     def start(self, request: CameraStart) -> dict[str, Any]:
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
@@ -88,6 +97,7 @@ class CameraControl:
             self._thread.start()
             return self.runtime.snapshot()
 
+
     def _run(self, request: CameraStart, stop: threading.Event) -> None:
         try:
             self.worker(request, stop)
@@ -106,3 +116,53 @@ class CameraControl:
             self.runtime.stop()
             self.frames.clear()
             return self.runtime.snapshot()
+
+
+class MultiCameraControl:
+    """Two independent camera pipelines with exclusive ownership of each USB device."""
+
+    def __init__(self, *, factory: Callable[[], CameraControl],
+                 devices: Callable[[], list[dict[str, Any]]] = local_devices) -> None:
+        self.factory = factory
+        self.devices = devices
+        self._sessions: dict[int, CameraControl] = {}
+        self._lock = threading.RLock()
+
+    def start(self, request: CameraStart) -> dict[str, Any]:
+        with self._lock:
+            running = [session for session in self._sessions.values() if session.is_running]
+            if any(session.runtime.snapshot().get("cameraIndex") == request.cameraIndex
+                   for session in running):
+                raise RuntimeError("该 USB 设备已在运行")
+            if len(running) >= 2:
+                raise RuntimeError("最多同时运行两路摄像头")
+            session = self._sessions.get(request.cameraId)
+            if session is not None and session.is_running:
+                raise RuntimeError("该摄像头已在运行")
+            if session is None:
+                session = self.factory()
+                self._sessions[request.cameraId] = session
+            return session.start(request)
+
+    def session(self, camera_id: int | None = None) -> CameraControl | None:
+        with self._lock:
+            if camera_id is not None:
+                return self._sessions.get(camera_id)
+            return next((s for s in self._sessions.values() if s.is_running),
+                        next(iter(self._sessions.values()), None))
+
+    def snapshots(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [session.runtime.snapshot() for session in self._sessions.values()]
+
+    def stop(self, camera_id: int | None = None) -> dict[str, Any]:
+        with self._lock:
+            if camera_id is not None:
+                session = self._sessions.get(camera_id)
+                if session is None:
+                    raise RuntimeError("该摄像头未启动")
+                return session.stop()
+            result: dict[str, Any] = {"status": "STOPPED"}
+            for session in self._sessions.values():
+                result = session.stop()
+            return result

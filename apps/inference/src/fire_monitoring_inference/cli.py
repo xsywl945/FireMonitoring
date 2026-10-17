@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import copy
 import json
 import logging
@@ -12,7 +13,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .api import create_app
-from .camera_control import CameraControl, CameraStart
+from .camera_control import CameraControl, CameraStart, MultiCameraControl
 from .config import ServiceConfig
 from .contracts import EventEnvelope
 from .detectors.mock import MockDetector
@@ -26,6 +27,7 @@ from .publisher import (
     RedisStreamPublisher,
     StdoutEventPublisher,
 )
+from .pump import PumpController
 from .replay import MockReplayRunner, built_in_demo_frames, load_jsonl, write_example
 from .runtime import RuntimeState
 from .temporal import TemporalConfig
@@ -150,6 +152,7 @@ def _serve_camera(
     runtime: RuntimeState,
     live_frames: LiveFrameBuffer,
     stop_event: threading.Event | None = None,
+    pump: PumpController | None = None,
 ) -> None:
     enrichment = None
     source = None
@@ -170,7 +173,9 @@ def _serve_camera(
         source = OpenCVCameraSource(
             camera_index=args.camera_index,
             camera_id=args.camera_id,
-            requested_fps=args.target_fps,
+            requested_fps=30,
+            width=1920,
+            height=1080,
         )
         if config.vlm_gate_enabled and not args.enrich:
             raise RuntimeError("VLM gate requires --enrich")
@@ -204,6 +209,8 @@ def _serve_camera(
                 gate_min_confidence=config.vlm_gate_min_confidence,
                 gate_fail_open=config.vlm_gate_fail_open,
                 runtime=runtime,
+                pump=pump,
+                stop_event=stop_event,
             )
             enrichment.start()
         logging.getLogger(__name__).info(
@@ -359,6 +366,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         runtime = RuntimeState(model_version=config.model_version)
         live_frames = None
         control = None
+        # Replay never constructs a hardware controller.
+        pump = None
         if args.replay and args.camera_model:
             print("replay and camera control cannot run together", file=sys.stderr)
             return 2
@@ -381,20 +390,31 @@ def main(argv: Sequence[str] | None = None) -> int:
             except ImportError as exc:
                 print(f"live camera dependencies are unavailable: {exc}", file=sys.stderr)
                 return 1
-            live_frames = LiveFrameBuffer(cv2)
+            pump = PumpController(config=config.pump,
+                                  journal_path=Path("runtime/pump.sqlite3"))
+            pump.start()
+            atexit.register(pump.close)
 
-            def run_camera(request: CameraStart, stop: threading.Event) -> None:
-                camera_args = copy.copy(args)
-                camera_args.camera_id = request.cameraId
-                camera_args.zone_id = request.zoneId
-                camera_args.camera_index = request.cameraIndex
-                camera_args.target_fps = request.targetFps
-                _serve_camera(
-                    args=camera_args, config=config, publisher=publisher,
-                    runtime=runtime, live_frames=live_frames, stop_event=stop,
-                )
+            def camera_session() -> CameraControl:
+                session_runtime = RuntimeState(model_version=config.model_version)
+                session_frames = LiveFrameBuffer(cv2)
 
-            control = CameraControl(worker=run_camera, runtime=runtime, frames=live_frames)
+                def run_camera(request: CameraStart, stop: threading.Event) -> None:
+                    camera_args = copy.copy(args)
+                    camera_args.camera_id = request.cameraId
+                    camera_args.zone_id = request.zoneId
+                    camera_args.camera_index = request.cameraIndex
+                    camera_args.target_fps = request.targetFps
+                    _serve_camera(
+                        args=camera_args, config=config, publisher=publisher,
+                        runtime=session_runtime, live_frames=session_frames, stop_event=stop,
+                        pump=pump,
+                    )
+
+                return CameraControl(worker=run_camera, runtime=session_runtime,
+                                     frames=session_frames)
+
+            control = MultiCameraControl(factory=camera_session)
             if args.camera_autostart:
                 control.start(CameraStart(
                     cameraId=args.camera_id, zoneId=args.zone_id,
@@ -406,6 +426,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             publisher=publisher,
             live_frames=live_frames,
             camera_control=control,
+            pump=pump,
         )
         app.run(
             host=args.host or config.host,

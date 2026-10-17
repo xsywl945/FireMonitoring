@@ -8,7 +8,7 @@ export const severityLabels: Record<Severity, string> = {
 }
 
 export const statusLabels: Record<IncidentStatus, string> = {
-  NEW: '待确认',
+  NEW: '模型已确认',
   ACKNOWLEDGED: '已确认',
   HANDLING: '处置中',
   RESOLVED: '已解决',

@@ -20,6 +20,7 @@ from .evidence import EvidenceStore
 from .frames import FramePacket
 from .live_frames import encode_jpeg
 from .publisher import EventPublisher
+from .pump import PumpController
 from .runtime import RuntimeState
 from .vision.base import VisionReasoner
 
@@ -49,6 +50,8 @@ class IncidentEnrichmentWorker:
         gate_min_confidence: float = 0.7,
         gate_fail_open: bool = False,
         runtime: RuntimeState | None = None,
+        pump: PumpController | None = None,
+        stop_event: threading.Event | None = None,
     ) -> None:
         self.publisher = publisher
         self.evidence_store = evidence_store
@@ -58,6 +61,8 @@ class IncidentEnrichmentWorker:
         self.gate_min_confidence = gate_min_confidence
         self.gate_fail_open = gate_fail_open
         self.runtime = runtime
+        self.pump = pump
+        self.stop_event = stop_event or threading.Event()
         self._jobs: queue.Queue[IncidentEnrichmentJob | None] = queue.Queue(maxsize=capacity)
         self._thread = threading.Thread(target=self._run, name="incident-enrichment", daemon=True)
 
@@ -73,6 +78,7 @@ class IncidentEnrichmentWorker:
             return False
 
     def stop(self, *, timeout: float = 5.0) -> None:
+        self.stop_event.set()
         try:
             self._jobs.put_nowait(None)
         except queue.Full:
@@ -114,6 +120,10 @@ class IncidentEnrichmentWorker:
                     judgement.error_code,
                 )
                 return []
+
+        if self.pump is not None:
+            self.pump.trigger(job.confirmed, judgement, captured_at=job.frame.captured_at,
+                              cancelled=self.stop_event)
 
         object_key: str | None = None
         try:

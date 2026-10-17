@@ -5,12 +5,10 @@ import com.fasterxml.jackson.databind.*;
 import com.firemonitoring.api.domain.*;
 import com.firemonitoring.api.dto.*;
 import com.firemonitoring.api.repository.*;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
-import java.security.MessageDigest;
 import java.util.*;
 
 @Service
@@ -18,22 +16,15 @@ public class IncidentService {
     private final IncidentRepository incidents;
     private final IncidentTimelineRepository timeline;
     private final CameraRepository cameras;
-    private final IdempotencyRecordRepository idempotency;
-    private final IncidentStateMachine stateMachine;
     private final ObjectMapper objectMapper;
-    private final SimpMessagingTemplate messaging;
 
     public IncidentService(IncidentRepository incidents, IncidentTimelineRepository timeline,
                            CameraRepository cameras,
-                           IdempotencyRecordRepository idempotency, IncidentStateMachine stateMachine,
-                           ObjectMapper objectMapper, SimpMessagingTemplate messaging) {
+                           ObjectMapper objectMapper) {
         this.incidents = incidents;
         this.timeline = timeline;
         this.cameras = cameras;
-        this.idempotency = idempotency;
-        this.stateMachine = stateMachine;
         this.objectMapper = objectMapper;
-        this.messaging = messaging;
     }
 
     @Transactional(readOnly = true)
@@ -69,33 +60,6 @@ public class IncidentService {
             throw new ResourceNotFoundException("Evidence image is not ready");
         }
         return value.asText();
-    }
-
-    @Transactional
-    public IncidentDetail transition(Long id, UUID key, IncidentActionRequest request, String actor) {
-        String fingerprint = fingerprint(request);
-        var prior = idempotency.findByIdempotencyKey(key.toString());
-        if (prior.isPresent()) {
-            if (!prior.get().getIncidentId().equals(id) || prior.get().getRequestAction() != request.action()
-                    || !prior.get().getRequestFingerprint().equals(fingerprint)) {
-                throw new ConflictException("Idempotency-Key has already been used for another operation");
-            }
-            return readStoredResponse(prior.get().getResponseJson());
-        }
-        if (request.action() == IncidentAction.MARK_FALSE_ALARM && request.falseAlarmReason() == null) {
-            throw new BadRequestException("falseAlarmReason is required when marking a false alarm");
-        }
-        IncidentEntity incident = find(id);
-        IncidentStatus target = stateMachine.target(incident.getStatus(), request.action());
-        Instant now = Instant.now();
-        incident.transitionTo(target, now);
-        incidents.save(incident);
-        timeline.save(new IncidentTimelineEntity(incident, request.action().name(), blankToNull(request.note()),
-                request.falseAlarmReason(), actor, now));
-        IncidentDetail result = detail(incident);
-        idempotency.save(new IdempotencyRecordEntity(key, id, request.action(), fingerprint, target, writeResponse(result)));
-        messaging.convertAndSend("/topic/incidents", result);
-        return result;
     }
 
     private IncidentEntity find(Long id) {
@@ -235,30 +199,10 @@ public class IncidentService {
         catch (Exception e) { return null; }
     }
 
-    private String fingerprint(IncidentActionRequest request) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(request));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (Exception exception) {
-            throw new IllegalStateException("Unable to fingerprint idempotent request", exception);
-        }
-    }
-
-    private String writeResponse(IncidentDetail response) {
-        try { return objectMapper.writeValueAsString(response); }
-        catch (Exception exception) { throw new IllegalStateException("Unable to store idempotent response", exception); }
-    }
-
-    private IncidentDetail readStoredResponse(String json) {
-        try { return objectMapper.readValue(json, IncidentDetail.class); }
-        catch (Exception exception) { throw new IllegalStateException("Unable to read idempotent response", exception); }
-    }
-
     private static IncidentSummary summary(IncidentEntity incident) {
         return new IncidentSummary(incident.getId(), incident.getZone().getId(), incident.getZone().getName(),
                 incident.getStatus(), incident.getSeverity(), incident.getPrimaryType(), incident.getStartedAt(),
                 incident.getAcknowledgedAt());
     }
 
-    private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 }

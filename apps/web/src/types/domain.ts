@@ -5,7 +5,6 @@ export type CameraStatus = 'ONLINE' | 'OFFLINE' | 'DEGRADED' | 'UNKNOWN'
 export type SceneType = 'CLASSROOM' | 'LABORATORY' | 'CORRIDOR' | 'OTHER'
 export type SourceType = 'INTEGRATED' | 'USB' | 'NETWORK_RTSP' | 'DEMO_FILE'
 export type ViewRole = 'VIEW_A' | 'VIEW_B' | 'SINGLE'
-export type IncidentAction = 'ACKNOWLEDGE' | 'START_HANDLING' | 'RESOLVE' | 'MARK_FALSE_ALARM'
 export type PrimaryType = 'FIRE' | 'SMOKE' | 'FIRE_AND_SMOKE'
 
 export interface User {
@@ -133,12 +132,6 @@ export interface IncidentDetail extends IncidentSummary {
   timeline: TimelineEntry[]
 }
 
-export interface IncidentActionRequest {
-  action: IncidentAction
-  note?: string
-  falseAlarmReason?: 'STEAM' | 'DUST' | 'LIGHT' | 'SCREEN_CONTENT' | 'OTHER'
-}
-
 export interface IncidentQuery {
   status?: IncidentStatus
   severity?: Severity
@@ -182,4 +175,28 @@ export interface InferenceConfig {
 export interface LocalCameraDevice {
   index: number
   name: string
+}
+
+export interface PumpRecord {
+  traceId: string
+  zoneId: number
+  cameraId: number
+  createdAt: string
+  attemptedAt?: string
+  stoppedAt?: string
+  durationMs: number
+  status: 'ATTEMPTING' | 'RUNNING' | 'STOPPED' | 'UNKNOWN' | 'SKIPPED'
+  reason: string | null
+}
+
+export interface PumpStatus {
+  enabled: boolean
+  zoneId?: number | null
+  connected: boolean
+  deviceState: 'ON' | 'OFF' | 'UNKNOWN' | 'DISABLED'
+  inhibited: boolean
+  lastError: string | null
+  durationMs: number
+  cooldownSeconds: number
+  records: PumpRecord[]
 }

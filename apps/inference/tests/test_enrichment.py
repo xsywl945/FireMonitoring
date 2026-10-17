@@ -242,3 +242,60 @@ def test_vlm_gate_failure_is_strict_by_default_but_can_fail_open() -> None:
         EventType.INCIDENT_EVIDENCE_READY,
         EventType.VLM_ANALYSIS_FAILED,
     ]
+
+
+def test_live_enrichment_dispatches_pump_only_after_positive_vlm(tmp_path) -> None:
+    from test_pump import Device
+
+    from fire_monitoring_inference.contracts import utc_now
+    from fire_monitoring_inference.pump import PumpConfig, PumpController
+
+    device = Device()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM4", zone_id=2),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    job = _gate_job()
+    fresh = FramePacket(
+        camera_id=3, captured_at=utc_now(), monotonic_ns=1, image=object(), width=640, height=480
+    )
+    job = IncidentEnrichmentJob(confirmed=job.confirmed, frame=fresh, detections=job.detections)
+    worker = IncidentEnrichmentWorker(
+        publisher=MemoryEventPublisher(),
+        evidence_store=FakeEvidenceStore(),
+        reasoner=FakeReasoner(),
+        cv2_module=FakeCv2(),
+        gate_confirmed=True,
+        pump=pump,
+    )
+    worker.process(job)
+    assert pump.snapshot()["records"][0]["status"] == "RUNNING"
+
+
+def test_cancelled_camera_cannot_dispatch_delayed_vlm_result(tmp_path) -> None:
+    import threading
+
+    from test_pump import Device
+
+    from fire_monitoring_inference.pump import PumpConfig, PumpController
+
+    device = Device()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM4", zone_id=2),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    stop = threading.Event()
+    stop.set()
+    worker = IncidentEnrichmentWorker(
+        publisher=MemoryEventPublisher(),
+        evidence_store=FakeEvidenceStore(),
+        reasoner=FakeReasoner(),
+        cv2_module=FakeCv2(),
+        gate_confirmed=True,
+        pump=pump,
+        stop_event=stop,
+    )
+    worker.process(_gate_job())
+    assert not any(x.startswith("RUN ") for x in device.commands)

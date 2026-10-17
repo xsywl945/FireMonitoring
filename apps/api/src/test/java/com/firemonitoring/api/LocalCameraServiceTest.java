@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firemonitoring.api.domain.*;
 import com.firemonitoring.api.repository.*;
 import com.firemonitoring.api.service.LocalCameraService;
+import com.firemonitoring.api.service.InferenceControlClient;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -42,8 +43,8 @@ class LocalCameraServiceTest {
         });
         server.start();
         try {
-            var service = new LocalCameraService(cameras, bindings, mapper,
-                    "http://127.0.0.1:" + server.getAddress().getPort(), "test-control-token");
+            var service = new LocalCameraService(cameras, bindings, new InferenceControlClient(mapper,
+                    "http://127.0.0.1:" + server.getAddress().getPort(), "test-control-token"));
             assertThat(service.start(9L).path("status").asText()).isEqualTo("STARTING");
             var payload = mapper.readTree(received.get());
             assertThat(payload.path("cameraIndex").asInt()).isEqualTo(2);

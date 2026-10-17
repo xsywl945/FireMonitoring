@@ -92,3 +92,52 @@ def test_virtual_camera_filters_do_not_shift_device_indices(monkeypatch) -> None
         lambda *args, **kwargs: subprocess.CompletedProcess(args=[], returncode=1, stderr=output),
     )
     assert local_devices()[2] == {"index": 2, "name": "USB Camera"}
+
+
+def test_two_uvc_sessions_are_isolated_and_duplicate_device_is_rejected():
+    from fire_monitoring_inference.camera_control import MultiCameraControl
+
+    def factory():
+        runtime = RuntimeState(model_version="test")
+
+        def worker(request, stop):
+            runtime.start()
+            stop.wait(10)
+            runtime.stop()
+
+        return CameraControl(worker=worker, runtime=runtime, frames=LiveFrameBuffer(object()))
+
+    control = MultiCameraControl(factory=factory)
+    client = create_app(camera_control=control).test_client()
+    headers = {"X-Control-Token": "local-camera-control"}
+    try:
+        for camera_id, index in [(11, 1), (12, 2)]:
+            assert (
+                client.post(
+                    "/api/v1/local-cameras/start",
+                    headers=headers,
+                    json={"cameraId": camera_id, "cameraIndex": index, "zoneId": 7},
+                ).status_code
+                == 202
+            )
+        assert client.get("/api/v1/runtime?cameraId=11").json["cameraIndex"] == 1
+        assert client.get("/api/v1/runtime?cameraId=12").json["cameraIndex"] == 2
+        assert (
+            client.post(
+                "/api/v1/local-cameras/start",
+                headers=headers,
+                json={"cameraId": 13, "cameraIndex": 1, "zoneId": 8},
+            ).status_code
+            == 409
+        )
+        assert (
+            client.post(
+                "/api/v1/local-cameras/stop", headers=headers, json={"cameraId": 11}
+            ).status_code
+            == 200
+        )
+        assert client.get("/api/v1/runtime?cameraId=11").json["status"] == "STOPPED"
+        assert client.get("/api/v1/runtime?cameraId=12").json["status"] in {"RUNNING", "STARTING"}
+        assert client.get("/api/v1/runtime?cameraId=invalid").status_code == 400
+    finally:
+        control.stop()

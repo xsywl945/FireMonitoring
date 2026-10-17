@@ -8,7 +8,7 @@
       <el-table v-loading="loading" :data="rooms" row-key="id" empty-text="暂无教室">
         <el-table-column prop="name" label="名称" min-width="180" />
         <el-table-column label="类型" width="100"><template #default="{ row }">{{ sceneLabels[row.sceneType as SceneType] }}</template></el-table-column>
-        <el-table-column label="摄像头" min-width="180"><template #default="{ row }">{{ roomCamera(row.id)?.name || '未接入' }}</template></el-table-column>
+        <el-table-column label="摄像头" min-width="180"><template #default="{ row }">{{ roomCameras(row.id).map((camera) => camera.name).join('、') || '未接入' }}</template></el-table-column>
         <el-table-column v-if="canEdit" label="操作" width="240"><template #default="{ row }"><el-button link type="primary" @click="editRoom(row)">编辑</el-button><el-button link type="primary" @click="bindCamera(row)">绑定摄像头</el-button><el-button link type="danger" @click="deleteRoom(row)">删除</el-button></template></el-table-column>
       </el-table>
     </section>
@@ -33,7 +33,7 @@
     </el-dialog>
 
     <el-dialog v-model="bindingDialog" :title="`绑定摄像头 · ${bindingRoom?.name || ''}`" width="min(440px, 92vw)">
-      <el-select v-model="bindingId" clearable placeholder="选择摄像头，清空可解除绑定" style="width:100%"><el-option v-for="camera in availableCameras" :key="camera.id" :label="camera.name" :value="camera.id" /></el-select>
+      <el-select v-model="bindingIds" multiple :multiple-limit="2" clearable placeholder="最多选择两只摄像头，清空解除绑定" style="width:100%"><el-option v-for="camera in availableCameras" :key="camera.id" :label="camera.name" :value="camera.id" /></el-select>
       <p v-if="!availableCameras.length" class="muted">请先新增摄像头。</p>
       <template #footer><el-button @click="bindingDialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="saveBinding">保存</el-button></template>
     </el-dialog>
@@ -105,7 +105,8 @@ const deviceIndex = ref<number | undefined>(0)
 const devices = ref<LocalCameraDevice[]>([])
 const scanning = ref(false)
 const deviceError = ref('')
-const runtime = ref<InferenceRuntime>()
+const runtimes = ref<InferenceRuntime[]>([])
+const runtime = computed(() => runtimes.value.find((item) => item.cameraId === connectionCamera.value?.id))
 const controlling = ref(false)
 let pollTimer: number | undefined
 const running = computed(() => runtime.value?.status === 'RUNNING' || runtime.value?.status === 'STARTING')
@@ -116,21 +117,21 @@ async function scanDevices() {
   catch (cause) { deviceError.value = message(cause) }
   finally { scanning.value = false }
 }
-async function pollRuntime() { if (isMockMode) return; try { runtime.value = await inferenceApi.runtime() } catch { runtime.value = undefined } }
+async function pollRuntime() { if (isMockMode) return; try { runtimes.value = await inferenceApi.runtimes() } catch { runtimes.value = [] } }
 async function startCamera() {
   if (!connectionCamera.value) return
   controlling.value = true
-  try { runtime.value = await cameraApi.start(connectionCamera.value.id); ElMessage.success('正在启动') }
+  try { await cameraApi.start(connectionCamera.value.id); await pollRuntime(); ElMessage.success('正在启动') }
   catch (cause) { ElMessage.error(message(cause)) } finally { controlling.value = false }
 }
 async function stopCamera() {
   controlling.value = true
-  try { runtime.value = await cameraApi.stop(); ElMessage.success('已停止') }
+  try { await cameraApi.stop(connectionCamera.value?.id); await pollRuntime(); ElMessage.success('已停止') }
   catch (cause) { ElMessage.error(message(cause)) } finally { controlling.value = false }
 }
 const bindingDialog = ref(false)
 const bindingRoom = ref<Zone>()
-const bindingId = ref<number>()
+const bindingIds = ref<number[]>([])
 const availableCameras = computed(() => cameras.value.filter((camera) => !camera.zoneId || camera.zoneId === bindingRoom.value?.id))
 const connectionDialog = ref(false)
 const connectionCamera = ref<Camera>()
@@ -148,7 +149,7 @@ async function load() {
   catch { error.value = '加载失败，请刷新' }
   finally { loading.value = false }
 }
-function roomCamera(id: number) { return cameras.value.find((camera) => camera.zoneId === id) }
+function roomCameras(id: number) { return cameras.value.filter((camera) => camera.zoneId === id) }
 function editRoom(room?: Zone) { roomId.value = room?.id; Object.assign(roomForm, { name: room?.name || '', sceneType: room?.sceneType || 'CLASSROOM' }); roomDialog.value = true; roomFormRef.value?.clearValidate() }
 async function saveRoom() {
   if (!await roomFormRef.value?.validate().catch(() => false)) return
@@ -162,11 +163,11 @@ async function deleteRoom(room: Zone) {
   catch { return }
   try { await zoneApi.delete(room.id); await load(); ElMessage.success('已删除') } catch (cause) { ElMessage.error(message(cause)) }
 }
-function bindCamera(room: Zone) { bindingRoom.value = room; bindingId.value = roomCamera(room.id)?.id; bindingDialog.value = true }
+function bindCamera(room: Zone) { bindingRoom.value = room; bindingIds.value = roomCameras(room.id).map((camera) => camera.id); bindingDialog.value = true }
 async function saveBinding() {
   if (!bindingRoom.value) return
   saving.value = true
-  try { await zoneApi.replaceBindings(bindingRoom.value.id, bindingId.value ? [{ cameraId: bindingId.value, viewRole: 'SINGLE', weight: 1 }] : []); bindingDialog.value = false; await load(); ElMessage.success('已保存') }
+  try { await zoneApi.replaceBindings(bindingRoom.value.id, bindingIds.value.map((cameraId, index) => ({ cameraId, viewRole: bindingIds.value.length === 1 ? 'SINGLE' as const : index === 0 ? 'VIEW_A' as const : 'VIEW_B' as const, weight: 1 / bindingIds.value.length }))); bindingDialog.value = false; await load(); ElMessage.success('已保存') }
   catch (cause) { ElMessage.error(message(cause)) } finally { saving.value = false }
 }
 function editCamera(camera?: Camera, sourceType: SourceType = 'INTEGRATED') { cameraId.value = camera?.id; Object.assign(cameraForm, { name: camera?.name || (sourceType === 'USB' ? 'USB 摄像头' : sourceType === 'INTEGRATED' ? '前置摄像头' : ''), sourceType: camera?.sourceType || sourceType, sourceUri: '', targetFps: camera?.targetFps || 5 }); deviceIndex.value = /^\d+$/.test(camera?.maskedSource || '') ? Number(camera?.maskedSource) : (camera?.sourceType || sourceType) === 'USB' ? undefined : 0; cameraDialog.value = true; void scanDevices(); cameraFormRef.value?.clearValidate() }
