@@ -24,6 +24,9 @@ hs_err_pid*
 **/.vite/
 *.tsbuildinfo
 
+# PlatformIO firmware build state
+**/.pio/
+
 # Python
 **/__pycache__/
 **/.pytest_cache/
