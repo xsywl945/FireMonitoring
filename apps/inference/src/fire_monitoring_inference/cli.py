@@ -124,6 +124,7 @@ def _pipeline(
     *,
     model_version: str,
     defer_confirmed: bool = False,
+    fire_only: bool = False,
 ) -> InferencePipeline:
     temporal = TemporalConfig(
         n=config.temporal_n,
@@ -141,6 +142,7 @@ def _pipeline(
         fusion=DualCameraFusion(FusionConfig(sync_window_ms=config.fusion_window_ms)),
         runtime=runtime,
         defer_confirmed=defer_confirmed,
+        fire_only=fire_only,
     )
 
 
@@ -177,9 +179,9 @@ def _serve_camera(
             width=1920,
             height=1080,
         )
-        if config.vlm_gate_enabled and not args.enrich:
-            raise RuntimeError("VLM gate requires --enrich")
-        if config.vlm_gate_enabled and config.dashscope_api_key is None:
+        if (config.vlm_gate_active or config.pump.enabled) and not args.enrich:
+            raise RuntimeError("Automatic pump or VLM gate requires --enrich")
+        if config.vlm_gate_active and config.dashscope_api_key is None:
             raise RuntimeError("VLM gate requires DASHSCOPE_API_KEY")
         if args.enrich:
             if config.minio_access_key is None or config.minio_secret_key is None:
@@ -199,13 +201,13 @@ def _serve_camera(
                 ),
                 base_url=config.dashscope_base_url,
                 model=config.dashscope_model,
-            )
+            ) if config.vlm_enabled else None
             enrichment = IncidentEnrichmentWorker(
                 publisher=publisher,
                 evidence_store=evidence_store,
                 reasoner=reasoner,
                 cv2_module=source.cv2_module,
-                gate_confirmed=config.vlm_gate_enabled,
+                gate_confirmed=config.vlm_gate_active,
                 gate_min_confidence=config.vlm_gate_min_confidence,
                 gate_fail_open=config.vlm_gate_fail_open,
                 runtime=runtime,
@@ -227,7 +229,8 @@ def _serve_camera(
                 publisher,
                 runtime,
                 model_version=config.model_version,
-                defer_confirmed=config.vlm_gate_enabled,
+                defer_confirmed=config.vlm_gate_active,
+                fire_only=not config.vlm_enabled,
             ),
             config=LiveCameraConfig(
                 site_id=args.site_id,

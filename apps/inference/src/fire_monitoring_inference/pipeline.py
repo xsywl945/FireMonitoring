@@ -32,6 +32,7 @@ class InferencePipeline:
         fusion: DualCameraFusion | None = None,
         runtime: RuntimeState | None = None,
         defer_confirmed: bool = False,
+        fire_only: bool = False,
     ) -> None:
         self.publisher = publisher
         self.source = source
@@ -40,6 +41,7 @@ class InferencePipeline:
         self.fusion = fusion or DualCameraFusion()
         self.runtime = runtime or RuntimeState(model_version=model_version)
         self.defer_confirmed = defer_confirmed
+        self.fire_only = fire_only
         self._trackers: dict[tuple[int, int, str], TemporalStateMachine] = {}
         self._latest: dict[tuple[int, int, str], TemporalEvidence] = {}
         self._zone_status: dict[int, FusionStatus] = defaultdict(lambda: FusionStatus.NONE)
@@ -151,7 +153,8 @@ class InferencePipeline:
                 )
 
         zone_evidence = [
-            item for (item_zone, _, _), item in self._latest.items() if item_zone == zone_id
+            item for (item_zone, _, _), item in self._latest.items()
+            if item_zone == zone_id and (not self.fire_only or item.class_name == "fire")
         ]
         decision = self.fusion.decide(
             zone_evidence,

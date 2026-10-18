@@ -717,6 +717,12 @@ components:
           type: integer
         cooldownSeconds:
           type: integer
+        recognitionMode:
+          type: string
+          enum: [LOCAL_YOLO, VLM]
+        activationSource:
+          type: [string, 'null']
+          enum: [AUTO, BOOT, null]
         records:
           type: array
           maxItems: 100

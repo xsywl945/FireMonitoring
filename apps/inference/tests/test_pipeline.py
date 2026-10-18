@@ -46,3 +46,35 @@ def test_pipeline_can_defer_confirmed_event_for_vlm_gate() -> None:
     assert all(event.event_type != EventType.INCIDENT_CONFIRMED for event in publisher.events)
     assert pipeline.runtime.snapshot()["incidentsConfirmed"] == 0
     assert pipeline.runtime.snapshot()["eventsPublished"] == len(publisher.events)
+
+
+def test_local_fire_mode_does_not_let_stronger_smoke_hide_later_flames():
+    from datetime import timedelta
+
+    from fire_monitoring_inference.contracts import Detection, utc_now
+
+    publisher = MemoryEventPublisher()
+    pipeline = InferencePipeline(
+        publisher=publisher, source="live-test", model_version="test", fire_only=True
+    )
+    start = utc_now()
+    for index in range(6):
+        detections = [Detection(className="smoke", confidence=0.99, bboxXyxy=[10, 10, 50, 50])]
+        if index >= 3:
+            detections.append(
+                Detection(className="fire", confidence=0.8, bboxXyxy=[10, 10, 50, 50])
+            )
+        pipeline.process(
+            site_id=1,
+            zone_id=2,
+            camera_id=3,
+            view_role="SINGLE",
+            timestamp=start + timedelta(milliseconds=index * 200),
+            image_width=640,
+            image_height=480,
+            detections=detections,
+        )
+    confirmed = [e for e in publisher.events if e.event_type == EventType.INCIDENT_CONFIRMED]
+    assert len(confirmed) == 1
+    assert confirmed[0].payload["primaryType"] == "FIRE"
+    assert confirmed[0].payload["observations"][0]["effectiveFrames"] == 3

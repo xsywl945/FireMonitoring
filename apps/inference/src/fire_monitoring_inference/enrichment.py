@@ -43,7 +43,7 @@ class IncidentEnrichmentWorker:
         *,
         publisher: EventPublisher,
         evidence_store: EvidenceStore,
-        reasoner: VisionReasoner,
+        reasoner: VisionReasoner | None,
         cv2_module: object,
         capacity: int = 4,
         gate_confirmed: bool = False,
@@ -56,6 +56,8 @@ class IncidentEnrichmentWorker:
         self.publisher = publisher
         self.evidence_store = evidence_store
         self.reasoner = reasoner
+        if gate_confirmed and reasoner is None:
+            raise ValueError("VLM gate requires an enabled reasoner")
         self._cv2 = cv2_module
         self.gate_confirmed = gate_confirmed
         self.gate_min_confidence = gate_min_confidence
@@ -93,10 +95,15 @@ class IncidentEnrichmentWorker:
             "data:image/jpeg;base64," + base64.b64encode(item).decode("ascii")
             for item in encoded_frames
         ]
-        judgement = self.reasoner.analyze(incident_id=None, image_data_urls=image_urls)
+        judgement = (
+            self.reasoner.analyze(incident_id=None, image_data_urls=image_urls)
+            if self.reasoner is not None
+            else None
+        )
 
         gated_events: list[EventEnvelope] = []
         if self.gate_confirmed:
+            assert judgement is not None
             if self._accepted_by_gate(judgement):
                 self.publisher.publish(job.confirmed)
                 gated_events.append(job.confirmed)
@@ -122,8 +129,12 @@ class IncidentEnrichmentWorker:
                 return []
 
         if self.pump is not None:
-            self.pump.trigger(job.confirmed, judgement, captured_at=job.frame.captured_at,
-                              cancelled=self.stop_event)
+            self.pump.trigger(
+                job.confirmed,
+                judgement,
+                captured_at=job.frame.captured_at,
+                cancelled=self.stop_event,
+            )
 
         object_key: str | None = None
         try:
@@ -158,14 +169,16 @@ class IncidentEnrichmentWorker:
         )
         self.publisher.publish(evidence_event)
 
-        vlm_type = (
-            EventType.VLM_ANALYSIS_COMPLETED
-            if judgement.status == "SUCCEEDED"
-            else EventType.VLM_ANALYSIS_FAILED
-        )
-        vlm_event = self._related_event(job.confirmed, event_type=vlm_type, payload=judgement)
-        self.publisher.publish(vlm_event)
-        events = [*gated_events, evidence_event, vlm_event]
+        events = [*gated_events, evidence_event]
+        if judgement is not None:
+            vlm_type = (
+                EventType.VLM_ANALYSIS_COMPLETED
+                if judgement.status == "SUCCEEDED"
+                else EventType.VLM_ANALYSIS_FAILED
+            )
+            vlm_event = self._related_event(job.confirmed, event_type=vlm_type, payload=judgement)
+            self.publisher.publish(vlm_event)
+            events.append(vlm_event)
         if self.runtime is not None:
             self.runtime.record_events(len(events), confirmed=bool(gated_events))
         return events

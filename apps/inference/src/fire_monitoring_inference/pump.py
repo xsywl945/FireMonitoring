@@ -9,9 +9,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
-from .contracts import EventEnvelope, VlmAnalysisPayload, utc_now
+from .contracts import (
+    EventEnvelope,
+    EventType,
+    IncidentConfirmedPayload,
+    VlmAnalysisPayload,
+    utc_now,
+)
 
 
 class PumpConfig(BaseModel):
@@ -22,6 +28,9 @@ class PumpConfig(BaseModel):
     cooldown_seconds: int = Field(default=60, ge=60, le=3600)
     min_confidence: float = Field(default=0.7, ge=0, le=1)
     max_evidence_age_seconds: int = Field(default=30, ge=1, le=60)
+    require_vlm: bool = True
+    local_min_confidence: float = Field(default=0.45, ge=0, le=1)
+    local_min_frames: int = Field(default=3, ge=1, le=100)
 
     @model_validator(mode="after")
     def configured(self) -> PumpConfig:
@@ -110,6 +119,8 @@ class PumpController:
         self._connected = False
         self._device_state = "UNKNOWN" if config.enabled else "DISABLED"
         self._error: str | None = None
+        self._activation_source: str | None = None
+        self._manual_last_seen: datetime | None = None
         journal_path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(journal_path, check_same_thread=False)
         self._db.execute("CREATE TABLE IF NOT EXISTS commands (trace TEXT PRIMARY KEY, data TEXT)")
@@ -145,7 +156,7 @@ class PumpController:
     def trigger(
         self,
         event: EventEnvelope,
-        judgement: VlmAnalysisPayload,
+        judgement: VlmAnalysisPayload | None,
         *,
         captured_at: datetime,
         cancelled: threading.Event | None = None,
@@ -163,13 +174,23 @@ class PumpController:
                 reason = "PUMP_DISABLED"
             elif event.zone_id != self.config.zone_id:
                 reason = "ZONE_NOT_COVERED"
-            elif not (
-                judgement.status == "SUCCEEDED"
+            elif self.config.require_vlm and not (
+                judgement is not None
+                and judgement.status == "SUCCEEDED"
                 and (judgement.has_visible_fire or judgement.has_visible_smoke)
                 and judgement.confidence is not None
                 and judgement.confidence >= self.config.min_confidence
             ):
                 reason = "VLM_NOT_CONFIRMED"
+            elif not self.config.require_vlm and not self._local_fire_confirmed(event):
+                reason = "LOCAL_FIRE_NOT_CONFIRMED"
+            elif self._activation_source == "BOOT":
+                reason = "BOOT_ACTIVE"
+            elif (
+                self._manual_last_seen is not None
+                and (now - self._manual_last_seen).total_seconds() < self.config.cooldown_seconds
+            ):
+                reason = "COOLDOWN"
             elif any(
                 record.get("attemptedAt")
                 and (now - datetime.fromisoformat(record["attemptedAt"])).total_seconds()
@@ -208,6 +229,7 @@ class PumpController:
                 record.update(status="RUNNING", reason=None)
                 self._connected = True
                 self._device_state = "ON"
+                self._activation_source = "AUTO"
                 self._error = None
             except Exception:
                 record.update(status="UNKNOWN", reason="DEVICE_ACK_UNAVAILABLE")
@@ -215,6 +237,20 @@ class PumpController:
                 self._device_state = "UNKNOWN"
                 self._error = "DEVICE_ACK_UNAVAILABLE"
             self._save(record)
+
+    def _local_fire_confirmed(self, event: EventEnvelope) -> bool:
+        if event.event_type != EventType.INCIDENT_CONFIRMED:
+            return False
+        try:
+            payload = IncidentConfirmedPayload.model_validate(event.payload)
+        except ValidationError:
+            return False
+        return payload.primary_type in {"FIRE", "FIRE_AND_SMOKE"} and any(
+            observation.class_name == "fire"
+            and observation.score >= self.config.local_min_confidence
+            and observation.effective_frames >= self.config.local_min_frames
+            for observation in payload.observations
+        )
 
     def refresh(self) -> None:
         if not self.config.enabled:
@@ -229,11 +265,20 @@ class PumpController:
                     self.emergency_stop()
                     return
                 self._device_state = parts[1]
+                manual = parts[1] == "ON" and parts[2] == "BOOT"
+                self._activation_source = (
+                    "BOOT" if manual else ("AUTO" if parts[1] == "ON" else None)
+                )
+                if manual:
+                    self._manual_last_seen = self.clock()
                 self._connected = True
                 self._error = None
                 for record in self._records():
                     if record["status"] == "RUNNING":
-                        if parts[1] == "OFF":
+                        if manual:
+                            record.update(status="UNKNOWN", reason="BOOT_OVERRIDE")
+                            self._save(record)
+                        elif parts[1] == "OFF":
                             record.update(
                                 status="STOPPED",
                                 reason="DEVICE_REPORTED_OFF",
@@ -256,6 +301,7 @@ class PumpController:
                     if self.transport.request("STOP") != "STOPPED":
                         raise OSError("stop not acknowledged")
                     self._device_state = "OFF"
+                    self._activation_source = None
                     self._connected = True
                     self._error = None
                     for record in self._records():
@@ -284,6 +330,8 @@ class PumpController:
                 durationMs=self.config.duration_ms,
                 cooldownSeconds=self.config.cooldown_seconds,
                 records=self._records()[:100],
+                recognitionMode="VLM" if self.config.require_vlm else "LOCAL_YOLO",
+                activationSource=self._activation_source,
             )
 
     def start(self) -> None:

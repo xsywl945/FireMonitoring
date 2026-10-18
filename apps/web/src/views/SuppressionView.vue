@@ -16,10 +16,12 @@
         <div><dt>覆盖教室</dt><dd>{{ rooms.find((room) => room.id === status?.zoneId)?.name || (status.zoneId ? `教室 #${status.zoneId}` : '未配置') }}</dd></div>
         <div><dt>控制器连接</dt><dd>{{ status.enabled ? status.connected ? '已连接' : '未连接' : '未启用' }}</dd></div>
         <div><dt>水泵输出</dt><dd>{{ { ON: '已开启', OFF: '已关闭', UNKNOWN: '未知，请检查设备', DISABLED: '未启用' }[status.deviceState] }}</dd></div>
+        <div><dt>启动来源</dt><dd>{{ status.deviceState !== 'ON' ? '—' : status.activationSource === 'BOOT' ? 'BOOT 按钮强制喷水' : '自动识别' }}</dd></div>
         <div><dt>单次时长 / 冷却时间</dt><dd>{{ status.durationMs / 1000 }} 秒 / {{ status.cooldownSeconds }} 秒</dd></div>
       </dl>
       <p v-if="status?.lastError" class="error-note">{{ reasonLabel(status.lastError) }}</p>
-      <p class="muted">火灾时序识别 → 大模型确认 → 自动启动水泵。两路摄像头共用一只泵，仅对覆盖教室生效。</p>
+      <p class="muted">{{ status?.recognitionMode === 'VLM' ? '火灾时序识别 → 大模型确认 → 自动启动水泵。' : '本地 YOLO 火灾时序确认 → 自动启动水泵，大模型接口暂时关闭。' }}支持单摄或双摄独立识别，共用一只泵，仅对覆盖教室生效。</p>
+      <p class="muted">BOOT：正常启动后按住喷水，松开停止，单次最多 30 秒。紧急停止优先于持续按住的 BOOT。</p>
       <p class="muted">状态来自控制器回执；当前没有水流传感器，无法确认实际出水。紧急停止后需检查现场并重启推理服务才能恢复自动联动。</p>
     </section>
     <section class="panel settings-section">
@@ -60,6 +62,8 @@ const recordLabels: Record<PumpRecord['status'], string> = {
 const reasons: Record<string, string> = {
   PUMP_DISABLED: '水泵联动未启用', ZONE_NOT_COVERED: '不在水泵覆盖教室',
   VLM_NOT_CONFIRMED: '大模型未确认', STALE_EVIDENCE: '证据已过期',
+  LOCAL_FIRE_NOT_CONFIRMED: '本地火灾时序证据未达标（仅烟雾不启动）',
+  BOOT_ACTIVE: 'BOOT 按钮正在强制喷水', BOOT_OVERRIDE: 'BOOT 接管，原自动指令结果不再跟踪',
   CAMERA_STOPPED: '摄像头已停止', EMERGENCY_STOP_LATCHED: '紧急停止已锁定',
   COOLDOWN: '水泵处于冷却时间内', DEVICE_ACK_UNAVAILABLE: '未收到设备确认，未自动重发',
   DEVICE_REPORTED_OFF: '控制器已报告关闭', EMERGENCY_STOP: '已紧急停止',

@@ -4,7 +4,7 @@ from datetime import timedelta
 import pytest
 from test_enrichment import FakeReasoner, _gate_job
 
-from fire_monitoring_inference.contracts import utc_now
+from fire_monitoring_inference.contracts import EventEnvelope, EventType, utc_now
 from fire_monitoring_inference.pump import PumpConfig, PumpController
 
 
@@ -28,6 +28,84 @@ class Device:
 
     def close(self):
         pass
+
+
+def local_fire_event(primary_type="FIRE"):
+    now = utc_now()
+    return EventEnvelope.create(
+        event_type=EventType.INCIDENT_CONFIRMED,
+        source="live-yolo",
+        site_id=1,
+        zone_id=2,
+        camera_id=3,
+        model_version="real-yolo-test",
+        payload={
+            "dedupKey": "local-fire-test",
+            "primaryType": primary_type,
+            "severity": "HIGH",
+            "fusionMode": "SINGLE_CAMERA",
+            "fusionScore": 0.84,
+            "startedAt": (now - timedelta(milliseconds=400)).isoformat(),
+            "confirmedAt": now.isoformat(),
+            "observations": [
+                {
+                    "cameraId": 3,
+                    "viewRole": "SINGLE",
+                    "className": "smoke" if primary_type == "SMOKE" else "fire",
+                    "score": 0.84,
+                    "effectiveFrames": 3,
+                    "durationMs": 400,
+                }
+            ],
+        },
+    )
+
+
+def test_local_confirmed_fire_runs_without_cloud_judgement(tmp_path):
+    device = Device()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM14", zone_id=2, require_vlm=False),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    event = local_fire_event()
+    pump.trigger(event, None, captured_at=utc_now())
+    assert device.commands == [f"RUN {event.trace_id.hex} 5000"]
+    assert pump.snapshot()["recognitionMode"] == "LOCAL_YOLO"
+
+
+def test_smoke_only_event_does_not_start_local_pump(tmp_path):
+    device = Device()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM14", zone_id=2, require_vlm=False),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    pump.trigger(local_fire_event("SMOKE"), None, captured_at=utc_now())
+    assert device.commands == []
+    assert pump.snapshot()["records"][0]["reason"] == "LOCAL_FIRE_NOT_CONFIRMED"
+
+
+def test_boot_override_is_reported_and_blocks_automatic_restart(tmp_path):
+    device = Device()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM14", zone_id=2, require_vlm=False),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    pump.trigger(local_fire_event(), None, captured_at=utc_now())
+    device.active = "BOOT"
+    pump.refresh()
+    assert pump.snapshot()["activationSource"] == "BOOT"
+    assert pump.snapshot()["lastError"] is None
+    assert pump.snapshot()["records"][0]["reason"] == "BOOT_OVERRIDE"
+    pump.trigger(local_fire_event(), None, captured_at=utc_now())
+    assert pump.snapshot()["records"][0]["reason"] == "BOOT_ACTIVE"
+    device.active = "-"
+    pump.refresh()
+    pump.trigger(local_fire_event(), None, captured_at=utc_now())
+    assert pump.snapshot()["records"][0]["reason"] == "COOLDOWN"
+    assert len([cmd for cmd in device.commands if cmd.startswith("RUN ")]) == 1
 
 
 def test_positive_live_judgement_runs_once_and_persists_before_restart(tmp_path):

@@ -167,6 +167,7 @@ export interface IncidentAnalysis {
 }
 
 export interface InferenceConfig {
+  vlm_enabled: boolean
   dashscope_configured: boolean
   dashscope_model: string
   vlm_gate_enabled: boolean
@@ -199,4 +200,6 @@ export interface PumpStatus {
   durationMs: number
   cooldownSeconds: number
   records: PumpRecord[]
+  recognitionMode?: 'LOCAL_YOLO' | 'VLM'
+  activationSource?: 'AUTO' | 'BOOT' | null
 }

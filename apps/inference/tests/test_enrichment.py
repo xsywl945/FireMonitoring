@@ -299,3 +299,32 @@ def test_cancelled_camera_cannot_dispatch_delayed_vlm_result(tmp_path) -> None:
     )
     worker.process(_gate_job())
     assert not any(x.startswith("RUN ") for x in device.commands)
+
+
+def test_cloud_disabled_keeps_evidence_and_local_pump_without_vlm_events(tmp_path):
+    from test_pump import Device, local_fire_event
+
+    from fire_monitoring_inference.contracts import utc_now
+    from fire_monitoring_inference.pump import PumpConfig, PumpController
+
+    device = Device()
+    publisher = MemoryEventPublisher()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM14", zone_id=2, require_vlm=False),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    frame = FramePacket(
+        camera_id=3, captured_at=utc_now(), monotonic_ns=1, image=object(), width=640, height=480
+    )
+    worker = IncidentEnrichmentWorker(
+        publisher=publisher,
+        evidence_store=FakeEvidenceStore(),
+        reasoner=None,
+        cv2_module=FakeCv2(),
+        pump=pump,
+    )
+    event = local_fire_event()
+    events = worker.process(IncidentEnrichmentJob(confirmed=event, frame=frame, detections=[]))
+    assert [e.event_type for e in events] == [EventType.INCIDENT_EVIDENCE_READY]
+    assert device.commands == [f"RUN {event.trace_id.hex} 5000"]

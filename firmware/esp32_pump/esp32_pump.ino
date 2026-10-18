@@ -13,6 +13,11 @@ constexpr uint8_t PUMP_OFF = LOW;
 constexpr uint32_t MAX_RUN_MS = 30000;
 constexpr uint32_t COOLDOWN_MS = 60000;
 constexpr uint32_t WATCHDOG_MS = 3000;
+constexpr uint8_t BOOT_PIN = 0;
+constexpr uint32_t DEBOUNCE_MS = 30;
+bool manualRun = false;
+bool bootRawPressed = false, bootStablePressed = false, bootBlocked = false;
+uint32_t bootChangedAt = 0;
 bool running = false;
 bool hasRun = false;
 uint32_t runStarted = 0, runDuration = 0, lastHeartbeat = 0, lastRun = 0;
@@ -24,6 +29,29 @@ bool overflow = false;
 void stopPump() {
   digitalWrite(PUMP_PIN, PUMP_OFF);
   running = false;
+  manualRun = false;
+}
+
+void updateBootButton() {
+  bool pressed = digitalRead(BOOT_PIN) == LOW;
+  if (pressed != bootRawPressed) {
+    bootRawPressed = pressed;
+    bootChangedAt = millis();
+  }
+  if (uint32_t(millis() - bootChangedAt) < DEBOUNCE_MS ||
+      bootStablePressed == bootRawPressed) return;
+  bootStablePressed = bootRawPressed;
+  if (!bootStablePressed) {
+    bootBlocked = false;
+    if (manualRun) stopPump();
+  } else if (!bootBlocked) {
+    bootBlocked = true;
+    manualRun = running = hasRun = true;
+    memcpy(lastId, "BOOT", 5);
+    runStarted = lastRun = millis();
+    runDuration = MAX_RUN_MS;
+    digitalWrite(PUMP_PIN, PUMP_ON);
+  }
 }
 
 bool validId(const char* id) {
@@ -41,6 +69,7 @@ void handleCommand(char* line) {
     Serial.println(lastId);
   } else if (strcmp(line, "STOP") == 0) {
     stopPump();
+    bootBlocked = bootStablePressed || bootRawPressed;
     Serial.println("STOPPED");
   } else if (strncmp(line, "RUN ", 4) == 0) {
     char* id = line + 4;
@@ -57,6 +86,7 @@ void handleCommand(char* line) {
     if (duration < 100 || duration > MAX_RUN_MS) {
       Serial.println("ERR DURATION"); return;
     }
+    if (bootStablePressed || bootRawPressed) { Serial.println("ERR BOOT_HELD"); return; }
     // Duplicate RUN never restarts or extends the deadline, including after STOP.
     if (strcmp(lastId, id) == 0) {
       Serial.print("ACK "); Serial.print(id);
@@ -82,12 +112,17 @@ void setup() {
   digitalWrite(PUMP_PIN, PUMP_OFF);
   pinMode(PUMP_PIN, OUTPUT);
   stopPump();
+  pinMode(BOOT_PIN, INPUT_PULLUP);
+  bootRawPressed = bootStablePressed = digitalRead(BOOT_PIN) == LOW;
+  bootBlocked = bootStablePressed;
+  bootChangedAt = millis();
   Serial.begin(115200);
 }
 
 void loop() {
+  updateBootButton();
   if (running && (uint32_t(millis() - runStarted) >= runDuration ||
-                  uint32_t(millis() - lastHeartbeat) >= WATCHDOG_MS)) stopPump();
+                  (!manualRun && uint32_t(millis() - lastHeartbeat) >= WATCHDOG_MS))) stopPump();
   // Bound work per loop so malformed continuous input cannot starve the watchdog.
   for (int budget = 0; budget < 100 && Serial.available(); ++budget) {
     char c = Serial.read();

@@ -3,7 +3,8 @@
     <PageHeader title="大模型研判">
       <template #actions><el-button :loading="loading" @click="load">刷新</el-button></template>
     </PageHeader>
-    <div v-if="config" class="model-connection"><span>{{ config.dashscope_model }}</span><span>{{ config.dashscope_configured ? '已配置' : '未配置密钥' }}</span><details v-if="!config.dashscope_configured"><summary>接入设置</summary><p>在项目 .env 中填写 DASHSCOPE_API_KEY，然后重启推理服务。</p></details></div>
+    <el-alert v-if="config && !config.vlm_enabled" title="大模型接口暂时关闭，当前使用本地 YOLO 时序识别控制喷水。下方仅保留历史研判记录。" type="info" :closable="false" />
+    <div v-if="config?.vlm_enabled" class="model-connection"><span>{{ config.dashscope_model }}</span><span>{{ config.dashscope_configured ? '已配置' : '未配置密钥' }}</span><details v-if="!config.dashscope_configured"><summary>接入设置</summary><p>在项目 .env 中填写 DASHSCOPE_API_KEY，然后重启推理服务。</p></details></div>
     <p v-if="configError" class="muted">模型服务未连接</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <section v-loading="loading" class="analysis-list">

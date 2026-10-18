@@ -17,6 +17,12 @@ The firmware does not emit asynchronous lines. It closes output on timeout or af
 
 Host record statuses: ATTEMPTING (durably claimed before serial write), RUNNING (matching ACK ON), STOPPED (device OFF or STOPPED response), UNKNOWN (ambiguous response or service restart), SKIPPED (policy rejected). GPIO feedback never proves actual water flow. There is no unauthenticated manual RUN HTTP endpoint.
 
+2026-10-18 extension: physical BOOT is GPIO0, active LOW, debounced 30 ms. After normal startup, hold to force output, release to stop, maximum 30000 ms per press. It bypasses automatic-start cooldown and the host heartbeat requirement, while STOP still takes priority and requires a release before another press. RUN while BOOT is held returns `ERR BOOT_HELD`. STATUS reports `STATE ON BOOT` / `STATE OFF BOOT`; no unsolicited button messages are emitted. A press present at setup is blocked until released. Do not hold BOOT during reset, which selects ROM download mode.
+
+The host reports additive `recognitionMode` (`LOCAL_YOLO` or `VLM`) and nullable `activationSource` (`AUTO` or `BOOT`). BOOT takeover makes an interrupted automatic record UNKNOWN/BOOT_OVERRIDE. Host automatic starts are suppressed while BOOT runs and during the subsequent cooldown. A host emergency lock continues to stop output, including BOOT output, until the service is restarted.
+
+Cloud calls are currently disabled by `INFERENCE_VLM_ENABLED=false`. In local mode only validated live fire confirmation with sufficient temporal fire evidence may start the pump; smoke boxes and candidates remain visible but smoke alone cannot start it. Re-enabling the cloud restores the VLM policy. Replay does not construct a hardware controller in either mode.
+
 Internal inference APIs use `X-Control-Token` for `/api/v1/pump` GET and `/api/v1/pump/stop` POST. Business API proxies these with JWT/RBAC. The browser never receives the control token.
 
 Multi-camera reads: `/api/v1/live/cameras` lists session runtimes; `/api/v1/runtime?cameraId=N`, `/api/v1/live/status?cameraId=N`, `/api/v1/live/stream.mjpg?cameraId=N` select one camera. Internal `/api/v1/local-cameras/stop` accepts `{ "cameraId": N }`, or `{}` to stop all. Max two concurrent devices. Each camera has independent pipeline, evidence queue, runtime and frame buffer.

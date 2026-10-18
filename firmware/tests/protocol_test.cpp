@@ -45,5 +45,38 @@ int main() {
   testTime = 0;
   loop();
   assert(outputLevel == LOW);
+  // BOOT works without the host, overrides cooldown, and stops on release.
+  testTime = 100;
+  buttonLevel = LOW; loop(); testTime += 35; loop();
+  assert(outputLevel == HIGH);
+  assert(send("STATUS") == "STATE ON BOOT\n");
+  testTime += 4000; loop();
+  assert(outputLevel == HIGH); // Physical button does not depend on host heartbeat.
+  buttonLevel = HIGH; loop(); testTime += 35; loop();
+  assert(outputLevel == LOW);
+  buttonLevel = LOW; loop(); testTime += 35; loop();
+  assert(outputLevel == HIGH);
+  assert(send("STOP") == "STOPPED\n");
+  testTime += 100; loop();
+  assert(outputLevel == LOW); // Holding BOOT cannot undo an emergency stop.
+  assert(send("RUN " + other + " 5000") != "ACK " + other + " ON\n");
+  buttonLevel = HIGH; loop(); testTime += 35; loop();
+  buttonLevel = LOW; loop(); testTime += 35; loop();
+  assert(outputLevel == HIGH);
+  testTime += 30000; loop();
+  assert(outputLevel == LOW);
+  testTime += 1000; loop();
+  assert(outputLevel == LOW); // Must release and press again after the limit.
+  buttonLevel = HIGH; loop(); testTime += 35; loop();
+  // Firmware never starts merely because the button was already held at setup.
+  buttonLevel = LOW;
+  setup();
+  testTime += 100; loop();
+  assert(outputLevel == LOW);
+  buttonLevel = HIGH; loop(); testTime += 35; loop();
+  buttonLevel = LOW; loop(); testTime += 35; loop();
+  assert(outputLevel == HIGH);
+  buttonLevel = HIGH; loop(); testTime += 35; loop();
+  assert(outputLevel == LOW);
   std::cout << "Pump firmware protocol tests passed\n";
 }
