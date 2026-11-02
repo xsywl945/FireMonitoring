@@ -30,10 +30,9 @@ int main() {
   loop();
   assert(outputLevel == LOW); // Duplicate did not extend the original 5 seconds.
   assert(send("RUN " + id + " 5000") == "ACK " + id + " OFF\n");
-  assert(send("RUN " + other + " 5000") == "ERR COOLDOWN\n");
-  testTime = 60100;
+  // A new command can run immediately after the previous run completes.
   assert(send("RUN " + other + " 30000") == "ACK " + other + " ON\n");
-  testTime = 63100;
+  testTime += 3000;
   loop();
   assert(outputLevel == LOW); // No host heartbeat for 3 seconds.
   assert(send("STOP") == "STOPPED\n");
@@ -45,7 +44,7 @@ int main() {
   testTime = 0;
   loop();
   assert(outputLevel == LOW);
-  // BOOT works without the host, overrides cooldown, and stops on release.
+  // BOOT works without the host and stops on release.
   testTime = 100;
   buttonLevel = LOW; loop(); testTime += 35; loop();
   assert(outputLevel == HIGH);

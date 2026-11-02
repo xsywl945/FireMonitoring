@@ -74,6 +74,26 @@ def test_local_confirmed_fire_runs_without_cloud_judgement(tmp_path):
     assert pump.snapshot()["recognitionMode"] == "LOCAL_YOLO"
 
 
+def test_disabled_cooldown_allows_new_fire_immediately_after_device_stops(tmp_path):
+    device = Device()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM14", zone_id=2, require_vlm=False),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    first = local_fire_event()
+    second = local_fire_event()
+    pump.trigger(first, None, captured_at=utc_now())
+    device.active = "-"
+    pump.refresh()
+    pump.trigger(second, None, captured_at=utc_now())
+    pump.trigger(second, None, captured_at=utc_now())
+    assert [cmd for cmd in device.commands if cmd.startswith("RUN ")] == [
+        f"RUN {first.trace_id.hex} 5000", f"RUN {second.trace_id.hex} 5000"
+    ]
+    assert pump.snapshot()["cooldownSeconds"] == 0
+
+
 def test_smoke_only_event_does_not_start_local_pump(tmp_path):
     device = Device()
     pump = PumpController(
@@ -89,7 +109,9 @@ def test_smoke_only_event_does_not_start_local_pump(tmp_path):
 def test_boot_override_is_reported_and_blocks_automatic_restart(tmp_path):
     device = Device()
     pump = PumpController(
-        config=PumpConfig(enabled=True, port="COM14", zone_id=2, require_vlm=False),
+        config=PumpConfig(
+            enabled=True, port="COM14", zone_id=2, require_vlm=False, cooldown_seconds=60
+        ),
         transport=device,
         journal_path=tmp_path / "pump.sqlite3",
     )
@@ -187,7 +209,7 @@ def test_unqualified_events_never_run_pump(tmp_path, case, reason):
 def test_two_views_share_cooldown_and_only_device_off_completes_record(tmp_path):
     device = Device()
     pump = PumpController(
-        config=PumpConfig(enabled=True, port="COM4", zone_id=2),
+        config=PumpConfig(enabled=True, port="COM4", zone_id=2, cooldown_seconds=60),
         transport=device,
         journal_path=tmp_path / "pump.sqlite3",
     )

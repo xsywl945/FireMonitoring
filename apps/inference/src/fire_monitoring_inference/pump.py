@@ -25,7 +25,7 @@ class PumpConfig(BaseModel):
     port: str = ""
     zone_id: int | None = Field(default=None, gt=0)
     duration_ms: int = Field(default=5000, ge=100, le=30_000)
-    cooldown_seconds: int = Field(default=60, ge=60, le=3600)
+    cooldown_seconds: int = Field(default=0, ge=0, le=3600)
     min_confidence: float = Field(default=0.7, ge=0, le=1)
     max_evidence_age_seconds: int = Field(default=30, ge=1, le=60)
     require_vlm: bool = True

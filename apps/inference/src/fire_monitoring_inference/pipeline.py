@@ -123,7 +123,7 @@ class InferencePipeline:
             )
             if evidence is None:
                 self._latest.pop(tracker_key, None)
-                if tracker.state == TemporalState.NORMAL:
+                if tracker.state in {TemporalState.NORMAL, TemporalState.COOLDOWN}:
                     self._traces.pop(tracker_key, None)
                 continue
             self._latest[tracker_key] = evidence

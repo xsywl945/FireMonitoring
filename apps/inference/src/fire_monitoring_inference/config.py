@@ -30,7 +30,7 @@ class ServiceConfig(BaseModel):
     candidate_n: int = Field(default=1, ge=1, le=100)
     min_confidence: float = Field(default=0.45, ge=0, le=1)
     clear_frames: int = Field(default=3, ge=1, le=100)
-    cooldown_ms: int = Field(default=10_000, ge=0)
+    cooldown_ms: int = Field(default=0, ge=0)
     fusion_window_ms: int = Field(default=500, ge=0, le=10_000)
     dashscope_api_key: SecretStr | None = None
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -76,7 +76,7 @@ class ServiceConfig(BaseModel):
             candidate_n=_env("INFERENCE_CANDIDATE_N", 1),
             min_confidence=_env("INFERENCE_MIN_CONFIDENCE", 0.45),
             clear_frames=_env("INFERENCE_CLEAR_FRAMES", 3),
-            cooldown_ms=_env("INFERENCE_COOLDOWN_MS", 10_000),
+            cooldown_ms=_env("INFERENCE_COOLDOWN_MS", 0),
             fusion_window_ms=_env("INFERENCE_FUSION_WINDOW_MS", 500),
             dashscope_api_key=SecretStr(key) if key else None,
             dashscope_base_url=_env(
@@ -98,7 +98,7 @@ class ServiceConfig(BaseModel):
                 port=_env("PUMP_SERIAL_PORT", ""),
                 zone_id=os.getenv("PUMP_ZONE_ID") or None,
                 duration_ms=_env("PUMP_DURATION_MS", 5000),
-                cooldown_seconds=_env("PUMP_COOLDOWN_SECONDS", 60),
+                cooldown_seconds=_env("PUMP_COOLDOWN_SECONDS", 0),
                 min_confidence=_env("INFERENCE_VLM_GATE_MIN_CONFIDENCE", 0.7),
                 require_vlm=_env("INFERENCE_VLM_ENABLED", False),
                 local_min_confidence=_env("INFERENCE_MIN_CONFIDENCE", 0.45),

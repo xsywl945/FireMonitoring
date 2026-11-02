@@ -20,7 +20,7 @@ class TemporalConfig:
     candidate_n: int = 1
     min_confidence: float = 0.45
     clear_frames: int = 3
-    cooldown_ms: int = 10_000
+    cooldown_ms: int = 0
 
     def __post_init__(self) -> None:
         if not 1 <= self.candidate_n <= self.n <= self.m:

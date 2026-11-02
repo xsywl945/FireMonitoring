@@ -11,7 +11,6 @@
 constexpr uint8_t PUMP_ON = HIGH;
 constexpr uint8_t PUMP_OFF = LOW;
 constexpr uint32_t MAX_RUN_MS = 30000;
-constexpr uint32_t COOLDOWN_MS = 60000;
 constexpr uint32_t WATCHDOG_MS = 3000;
 constexpr uint8_t BOOT_PIN = 0;
 constexpr uint32_t DEBOUNCE_MS = 30;
@@ -19,8 +18,7 @@ bool manualRun = false;
 bool bootRawPressed = false, bootStablePressed = false, bootBlocked = false;
 uint32_t bootChangedAt = 0;
 bool running = false;
-bool hasRun = false;
-uint32_t runStarted = 0, runDuration = 0, lastHeartbeat = 0, lastRun = 0;
+uint32_t runStarted = 0, runDuration = 0, lastHeartbeat = 0;
 char lastId[33] = "-";
 char input[100];
 size_t used = 0;
@@ -46,9 +44,9 @@ void updateBootButton() {
     if (manualRun) stopPump();
   } else if (!bootBlocked) {
     bootBlocked = true;
-    manualRun = running = hasRun = true;
+    manualRun = running = true;
     memcpy(lastId, "BOOT", 5);
-    runStarted = lastRun = millis();
+    runStarted = millis();
     runDuration = MAX_RUN_MS;
     digitalWrite(PUMP_PIN, PUMP_ON);
   }
@@ -93,12 +91,8 @@ void handleCommand(char* line) {
       Serial.println(running ? " ON" : " OFF"); return;
     }
     if (running) { Serial.println("ERR BUSY"); return; }
-    if (hasRun && uint32_t(millis() - lastRun) < COOLDOWN_MS) {
-      Serial.println("ERR COOLDOWN"); return;
-    }
     memcpy(lastId, id, sizeof(lastId));
-    hasRun = true;
-    runStarted = lastHeartbeat = lastRun = millis();
+    runStarted = lastHeartbeat = millis();
     runDuration = duration;
     running = true;
     digitalWrite(PUMP_PIN, PUMP_ON);
