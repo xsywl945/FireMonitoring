@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+export PATH="/root/miniconda3/bin:${PATH}"
 trap 'echo "失败: line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
