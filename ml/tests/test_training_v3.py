@@ -2,6 +2,8 @@ import csv
 import functools
 import http.server
 import json
+import os
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -123,6 +125,118 @@ class TrainingV3Test(unittest.TestCase):
                     if r["split"] == "test"
                 )
             )
+
+    @unittest.skipUnless(
+        os.environ.get("YOLO26S_WEIGHTS"),
+        "set YOLO26S_WEIGHTS for the CPU training self-test",
+    )
+    def test_train_resume_validate_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows = []
+            rng = np.random.default_rng(42)
+            for split, count in (("train", 4), ("val", 2), ("test", 2)):
+                for index in range(count):
+                    image = root / "images" / split / f"{index}.png"
+                    label = root / "labels" / split / f"{index}.txt"
+                    image.parent.mkdir(parents=True, exist_ok=True)
+                    label.parent.mkdir(parents=True, exist_ok=True)
+                    Image.fromarray(
+                        rng.integers(0, 256, (64, 64, 3), dtype=np.uint8)
+                    ).save(image)
+                    label.write_text(
+                        "0 0.3 0.3 0.2 0.2\n1 0.7 0.7 0.3 0.3\n"
+                        if index % 2 == 0
+                        else ""
+                    )
+                    rows.append(
+                        dict(
+                            split=split,
+                            source="ifiresmoke",
+                            target_image=image.relative_to(root).as_posix(),
+                        )
+                    )
+            with (root / "manifest.csv").open("w", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+                writer.writeheader()
+                writer.writerows(rows)
+            config = dict(
+                path=root.as_posix(),
+                train="images/train",
+                val="images/val",
+                test="images/test",
+                names={0: "fire", 1: "smoke"},
+            )
+            (root / "data.yaml").write_text(yaml.safe_dump(config))
+            common = [
+                "--data",
+                root / "data.yaml",
+                "--model",
+                os.environ["YOLO26S_WEIGHTS"],
+                "--project",
+                root / "runs",
+                "--name",
+                "cli",
+                "--epochs",
+                2,
+                "--imgsz",
+                64,
+                "--batch",
+                2,
+                "--workers",
+                0,
+                "--device",
+                "cpu",
+                "--time",
+                1,
+            ]
+            self.run_script("train_baseline.py", *common)
+            run = root / "runs/cli"
+            self.assertTrue((run / "weights/epoch0.pt").is_file())
+            self.run_script(
+                "train_baseline.py", *common, "--resume", run / "weights/epoch0.pt"
+            )
+            with (run / "results.csv").open() as handle:
+                self.assertEqual(len(list(csv.DictReader(handle))), 2)
+            experiment = json.loads((run / "experiment.json").read_text())
+            with Path(os.environ["YOLO26S_WEIGHTS"]).open("rb") as handle:
+                expected = hashlib.file_digest(handle, "sha256").hexdigest()
+            self.assertEqual(experiment["pretrained_model_sha256"], expected)
+            self.assertIn("resume_checkpoint_sha256", experiment)
+            duplicate = root / "another/data.yaml"
+            duplicate.parent.mkdir()
+            duplicate.write_text(yaml.safe_dump(config))
+            self.run_script(
+                "validate_model.py",
+                "--model",
+                run / "weights/best.pt",
+                "--data",
+                root / "data.yaml",
+                "--data",
+                duplicate,
+                "--project",
+                root / "evaluation",
+                "--imgsz",
+                64,
+                "--batch",
+                2,
+                "--device",
+                "cpu",
+            )
+            result = json.loads(
+                (root / "evaluation/validation_summary.json").read_text()
+            )
+            self.assertEqual(len(result["datasets"]), 2)
+            self.assertTrue((root / "evaluation/validation_report.md").is_file())
+            command = "import sys,onnx; from ultralytics import YOLO; p=YOLO(sys.argv[1]).export(format='onnx',imgsz=64,opset=17,simplify=False,device='cpu');onnx.checker.check_model(onnx.load(p))"
+            exported = subprocess.run(
+                [sys.executable, "-c", command, str(run / "weights/best.pt")],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertEqual(exported.returncode, 0, exported.stdout + exported.stderr)
+            self.assertTrue((run / "weights/best.onnx").is_file())
 
     def test_metrics_match_classes_small_boxes_and_negatives(self):
         records = [

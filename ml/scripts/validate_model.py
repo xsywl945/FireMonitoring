@@ -213,17 +213,26 @@ def main():
             per_class[model.names[int(cls)]] = dict(
                 map50=float(metrics.box.ap50[pos]), map50_95=float(metrics.box.ap[pos])
             )
-        group = data.stem.removesuffix("_test")
-        selected = (
-            tests
-            if data == primary
-            else [
-                record_by_path[str((root / r["target_image"]).resolve())]
-                for r in rows
-                if r["split"] == "test" and r["source"] == group
+        group_config = yaml.safe_load(data.read_text(encoding="utf-8"))
+        group_root = Path(group_config["path"])
+        if not group_root.is_absolute():
+            group_root = (data.parent / group_root).resolve()
+        test_path = group_root / group_config["test"]
+        if test_path.suffix == ".txt":
+            selected_paths = [
+                (group_root / line).resolve()
+                for line in test_path.read_text().splitlines()
             ]
-        )
-        summary["datasets"][data.name] = dict(
+        else:
+            selected_paths = [
+                p.resolve()
+                for p in test_path.rglob("*")
+                if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+            ]
+        selected = [record_by_path[str(p)] for p in selected_paths]
+        summary["datasets"][dataset_name] = dict(
+            data=str(data),
+            data_sha256=sha256_file(data),
             map50=float(metrics.box.map50),
             map50_95=float(metrics.box.map),
             per_class=per_class,
@@ -261,6 +270,28 @@ def main():
                 for key, value in summary["datasets"].items()
             },
         )
+    lines = [
+        "# YOLO validation",
+        "",
+        f"Model SHA-256: {summary['model_sha256']}",
+        f"Manifest SHA-256: {summary['manifest_sha256']}",
+        "",
+        f"Validation-selected confidence: {summary['thresholds']}",
+        "",
+        "Small target: area after letterbox scaling < 32² pixels; recall at IoU 0.5.",
+        "",
+        "| Dataset | mAP50-95 | Fire recall @0.25 | Smoke recall @0.25 | Negative image FPR @0.25 | Δ mAP50-95 |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for key, item in summary["datasets"].items():
+        point = item["fixed_conf_025"]
+        delta = summary["comparison"]["map50_95_delta"][key] if args.compare else None
+        lines.append(
+            f"| {Path(item['data']).stem} | {item['map50_95']:.6f} | {point['per_class']['fire']['recall']} | {point['per_class']['smoke']['recall']} | {point['negative_image_fpr']} | {delta} |"
+        )
+    (project / "validation_report.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
     (project / "validation_summary.json").write_text(
         json.dumps(summary, indent=2), encoding="utf-8"
     )

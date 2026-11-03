@@ -20,9 +20,7 @@ PATTERNS = {
     "screens": r"\b(?:television|monitor|screen)\b",
     "steam_fog": r"\b(?:steam|fog|mist|foggy)\b",
 }
-EXCLUDE = (
-    r"\b(?:fires?|flames?|smoke|smoking|burning|candles?|fireplace|bonfire|fireworks)\b"
-)
+EXCLUDE = r"\b(?:fires?|flames?|smoke|smoking|burning|candles?|fireplace|bonfire|fireworks|locomotives?|trains?|chimney|engines?|stoves?|ovens?|grill|cooking)\b"
 
 
 def main():

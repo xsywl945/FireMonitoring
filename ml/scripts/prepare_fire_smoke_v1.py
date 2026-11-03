@@ -13,7 +13,7 @@ from pathlib import Path
 
 import imagehash
 import yaml
-from PIL import Image
+from PIL import Image, ImageOps
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
@@ -182,6 +182,9 @@ def main() -> int:
         if "metadata" in spec:
             with (root / spec["metadata"]).open(encoding="utf-8", newline="") as handle:
                 metadata = {r["filename"]: r for r in csv.DictReader(handle)}
+            shutil.copy2(
+                root / spec["metadata"], output / f"{spec['name']}_metadata.csv"
+            )
         for split, directory in spec["splits"].items():
             image_dir = root / directory / "images"
             images = sorted(
@@ -207,7 +210,7 @@ def main() -> int:
                 with Image.open(image) as opened:
                     opened.load()
                     width, height = opened.size
-                    phash = str(imagehash.phash(opened))
+                    phash = str(imagehash.phash(ImageOps.exif_transpose(opened)))
                 name = (
                     f"{spec['name']}__{image.stem}__{digest[:12]}{image.suffix.lower()}"
                 )

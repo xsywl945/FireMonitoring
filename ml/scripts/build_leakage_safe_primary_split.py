@@ -217,7 +217,11 @@ def main():
     (output / "removals.json").write_text(
         json.dumps(removals, indent=2), encoding="utf-8"
     )
-    for name in ("sources.json", "source_label_repairs.json"):
+    for name in (
+        "sources.json",
+        "source_label_repairs.json",
+        *[p.name for p in args.manifest.parent.glob("*_metadata.csv")],
+    ):
         shutil.copy2(args.manifest.parent / name, output / name)
     files = sorted(p for p in output.rglob("*") if p.is_file())
     (output / "CHECKSUMS.sha256").write_text(
