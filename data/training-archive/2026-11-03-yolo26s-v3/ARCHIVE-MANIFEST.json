@@ -112,7 +112,21 @@
     "cuda": "12.8",
     "tmux": "3.2a",
     "autodl_fs_mounted": false,
-    "training_started": false
+    "training_started": false,
+    "files_uploaded": true,
+    "upload_checksums_verified": true,
+    "cuda_matrix_check": "passed",
+    "dataset_audit": "passed",
+    "gpu_smoke": {
+      "status": "passed",
+      "epochs": 2,
+      "requested_batch": 0.7,
+      "resolved_batch": 22,
+      "amp": true,
+      "fraction": 0.01,
+      "exit_code": 0
+    },
+    "formal_training_started": false
   },
   "planned_outputs": [
     "best.pt",
@@ -145,6 +159,36 @@
       "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/baseline-local/validation_summary.json",
       "bytes": 108075,
       "sha256": "ab0cc7bb76c52eab0bf3e0729f039f245fb003fb547531ec495f809d9edb328a"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/audit.json",
+      "bytes": 2846,
+      "sha256": "6e793d9a3129dead8be7c5120d3ce60274882b60333e6435a28e4e8130a245cb"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/environment-freeze.txt",
+      "bytes": 5150,
+      "sha256": "47a6aabc48c026848bb9342388f2d84506a5e9d4a67c69cf6abecfecb8d1157f"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/preflight.log",
+      "bytes": 18137,
+      "sha256": "ce0370acf94efdd4bcb8cc4119187ae0fe4cb5835aaafbf82d53824fba1eaf8f"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/smoke/args.yaml",
+      "bytes": 1710,
+      "sha256": "c09dbb62abc13d9c6ee3021a8bfedf8d3ef419e1c96f531e43032991d0e77080"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/smoke/experiment.json",
+      "bytes": 1546,
+      "sha256": "5de7464e6d2ebbf75ed9f2aec53565020ebb448149e15563b712919df537e08e"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/smoke/results.csv",
+      "bytes": 436,
+      "sha256": "feca5f46695ae352e3610853a55b3090e481de65c20ab8726b69f850a30f4468"
     },
     {
       "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/dataset/split_summary.json",
