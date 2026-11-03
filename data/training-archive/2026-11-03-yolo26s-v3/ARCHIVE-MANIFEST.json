@@ -1,6 +1,6 @@
 {
   "date": "2026-11-03",
-  "status": "prepared_waiting_for_autodl_fs",
+  "status": "autodl_pipeline_running",
   "model": "YOLO26s",
   "imgsz": 640,
   "classes": {
@@ -111,7 +111,7 @@
     "torch": "2.8.0+cu128",
     "cuda": "12.8",
     "tmux": "3.2a",
-    "autodl_fs_mounted": false,
+    "autodl_fs_mounted": true,
     "training_started": false,
     "files_uploaded": true,
     "upload_checksums_verified": true,
@@ -126,7 +126,10 @@
       "fraction": 0.01,
       "exit_code": 0
     },
-    "formal_training_started": false
+    "formal_training_started": false,
+    "pipeline_started_at_utc": "2026-11-03T13:17:15Z",
+    "outer_limit_hours": 17,
+    "tmux_session": "yolo26s-v3"
   },
   "planned_outputs": [
     "best.pt",
@@ -141,8 +144,7 @@
     "FASDD_CV 未取得可校验下载文件、类别表及数据许可，本轮跳过",
     "IFireSmoke 未暴露测试图只有 6 张，不能单独证明该来源精度提升",
     "WEB 和纯数字图片缺少真实视频/场景身份，仅通过图片身份与 pHash 近似分组",
-    "新模型尚未正式训练，尚未证明精度提升",
-    "AutoDL 文件存储需在控制台初始化后重启实例挂载"
+    "新模型尚未正式训练，尚未证明精度提升"
   ],
   "preparation_files": [
     {
