@@ -26,6 +26,9 @@ $relativeFiles = @(
     "ml/README.md"
     "ml/requirements-autodl.txt"
     "ml/autodl/bootstrap.sh"
+    "ml/autodl/run_all.sh"
+    "ml/configs/fire_smoke_v3.sources.json"
+    "docs/training/yolo26s-v3.md"
 ) + @(
     Get-ChildItem -LiteralPath (Join-Path $repoRoot "ml/scripts") -Filter "*.py" -File |
         Sort-Object Name |

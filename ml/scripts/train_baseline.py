@@ -107,6 +107,8 @@ def main() -> int:
             data.parent / "manifest.csv"
         ):
             raise ValueError("resume dataset manifest changed")
+        if original["dataset_yaml_sha256"] != sha256_file(data):
+            raise ValueError("resume dataset YAML changed")
         elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(
             original["started_at_utc"]
         )
@@ -133,6 +135,10 @@ def main() -> int:
     model = YOLO(str(args.resume) if args.resume else args.model)
     model_file = Path(model.ckpt_path).resolve()
     if args.resume:
+        if model.ckpt["optimizer"] is None:
+            raise ValueError(
+                "checkpoint has no optimizer state; training already finished"
+            )
         history = model.ckpt["train_results"]
         with (requested_run / "results.csv").open(
             "w", encoding="utf-8", newline=""
@@ -140,8 +146,6 @@ def main() -> int:
             writer = csv.writer(handle)
             writer.writerow(history)
             writer.writerows(zip(*history.values()))
-    if model_file.is_file():
-        model_file = model_file.resolve()
     config = {
         **{
             key: str(value) if isinstance(value, Path) else value
@@ -157,14 +161,10 @@ def main() -> int:
         "ultralytics": ultralytics.__version__,
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "dataset_yaml_sha256": sha256_file(data),
-        "dataset_manifest": str(manifest) if manifest.is_file() else None,
-        "dataset_manifest_sha256": sha256_file(manifest)
-        if manifest.is_file()
-        else None,
-        "pretrained_model_file": str(model_file) if model_file.is_file() else None,
-        "pretrained_model_sha256": (
-            sha256_file(model_file) if model_file.is_file() else None
-        ),
+        "dataset_manifest": str(manifest),
+        "dataset_manifest_sha256": sha256_file(manifest),
+        "pretrained_model_file": str(model_file),
+        "pretrained_model_sha256": sha256_file(model_file),
         **git_metadata(),
         **bundle_metadata(),
     }

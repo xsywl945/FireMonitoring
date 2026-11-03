@@ -1,0 +1,50 @@
+[
+  {
+    "name": "dfire",
+    "root": "D:\\FireMonitoring-training-v3\\raw\\dfire",
+    "names": [
+      "smoke",
+      "fire"
+    ],
+    "yaml": "data.yaml",
+    "splits": {
+      "train": "data/train",
+      "val": "data/val",
+      "test": "data/test"
+    },
+    "background": false,
+    "url": "https://github.com/gaia-solutions-on-demand/DFireDataset",
+    "license": "CC0-1.0; third-party PublicDataset images retain original terms"
+  },
+  {
+    "name": "ifiresmoke",
+    "root": "D:\\FireMonitoring-training-v3\\raw\\ifiresmoke\\Indoor FS",
+    "names": [
+      "fire",
+      "smoke"
+    ],
+    "yaml": "data.yaml",
+    "splits": {
+      "train": "train",
+      "val": "valid",
+      "test": "test"
+    },
+    "background": false,
+    "url": "https://huggingface.co/datasets/shahriar-5/IFireSmoke",
+    "license": "CC-BY-4.0"
+  },
+  {
+    "name": "negatives",
+    "root": "D:\\FireMonitoring-training-v3\\raw\\negatives",
+    "names": [],
+    "splits": {
+      "train": "train"
+    },
+    "background": true,
+    "metadata": "metadata.csv",
+    "url": "https://cocodataset.org/#download",
+    "license": "Per-image Creative Commons; see negatives_metadata.csv",
+    "annotations": "captions_train2017.json",
+    "seed": 42
+  }
+]
