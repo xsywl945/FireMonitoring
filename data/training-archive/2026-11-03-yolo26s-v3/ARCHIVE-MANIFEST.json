@@ -1,0 +1,208 @@
+{
+  "date": "2026-11-03",
+  "status": "formal_training_running",
+  "model": "YOLO26s",
+  "imgsz": 640,
+  "classes": {
+    "0": "fire",
+    "1": "smoke"
+  },
+  "git_commit": "c88937d9fcefe568b847846f31cf9e46305858ae",
+  "inputs": [
+    {
+      "path": "fire-smoke-v3.zip",
+      "bytes": 1179442073,
+      "sha256": "968daaa46b027fa73f2262d4c848d064671e2760931ee733c155574386dbf045"
+    },
+    {
+      "path": "yolo26s.pt",
+      "bytes": 20422725,
+      "sha256": "646f8bc3fe0a656803d95c294f7852321748cb29d13466a1af8862e2db384a1b"
+    },
+    {
+      "path": "yolo26n.pt",
+      "bytes": 5544453,
+      "sha256": "9b09cc8bf347f0fc8a5f7657480587f25db09b34bf33b0652110fb03a8ad4fef"
+    },
+    {
+      "path": "yolo11s-best.pt",
+      "bytes": 19183770,
+      "sha256": "3f3e8fec6276b37a5639ebd8a6675e0bfa44fb444ac1aceb9510df552ad4cfde"
+    },
+    {
+      "path": "tmp/autodl-upload/FireMonitoring-AutoDL-20261103-203201.zip",
+      "bytes": 52765,
+      "sha256": "a421fb449a898ca57c15494279f9edf346f9e1c9cc20a6fd454c17d5840c76b0"
+    }
+  ],
+  "dataset_manifest": {
+    "path": "dataset/manifest.csv",
+    "bytes": 10226232,
+    "sha256": "efb96552f6af1f96d6b08c4cd13fdf8b21a84d539fcc604581fcefb22d8e43ee"
+  },
+  "dataset": {
+    "images": {
+      "train": 13164,
+      "val": 868,
+      "test": 879
+    },
+    "by_source": {
+      "dfire/train": 7015,
+      "ifiresmoke/train": 4504,
+      "dfire/val": 534,
+      "dfire/test": 539,
+      "ifiresmoke/val": 3,
+      "ifiresmoke/test": 6,
+      "negatives/train": 1645,
+      "negatives/test": 334,
+      "negatives/val": 331
+    },
+    "removed": 13965,
+    "phash_threshold": 4,
+    "baseline_manifest_sha256": "55f6f96925dc79ebbb49ad7fda2c01db50c661e13a30589f5a317c3bdafe2b5b",
+    "baseline_exposed_test": 0,
+    "train_background_fraction": 0.12496201762382254
+  },
+  "hard_negative_training_fraction": 0.12496201762382254,
+  "label_repairs": 397,
+  "audit": {
+    "errors": 0,
+    "warnings": 0,
+    "exact_cross_split_groups": 0,
+    "near_cross_split_pairs": 0
+  },
+  "selftest": {
+    "command": "$env:YOLO26S_WEIGHTS='D:/FireMonitoring-training-v3/yolo26s.pt'; .venv/Scripts/python.exe -m unittest discover -s ml/tests -v",
+    "tests": 4,
+    "passed": 4,
+    "seconds": 51.775
+  },
+  "baseline": {
+    "model_sha256": "3f3e8fec6276b37a5639ebd8a6675e0bfa44fb444ac1aceb9510df552ad4cfde",
+    "dataset_manifest_sha256": "efb96552f6af1f96d6b08c4cd13fdf8b21a84d539fcc604581fcefb22d8e43ee",
+    "confidence": 0.25,
+    "map50_95": 0.4255285246347409,
+    "negative_test": {
+      "per_class": {
+        "fire": {
+          "fp": 26,
+          "precision": 0.0,
+          "recall": null,
+          "small_recall_iou50": null
+        },
+        "smoke": {
+          "fp": 22,
+          "precision": 0.0,
+          "recall": null,
+          "small_recall_iou50": null
+        }
+      },
+      "negative_images": 334,
+      "negative_fp_images": 39,
+      "negative_image_fpr": 0.11676646706586827,
+      "negative_fp_detections": 48
+    }
+  },
+  "cloud": {
+    "host": "connect.cqa1.seetacloud.com",
+    "port": 26369,
+    "gpu": "NVIDIA GeForce RTX 4090 D",
+    "python": "3.12.3",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "tmux": "3.2a",
+    "autodl_fs_mounted": true,
+    "training_started": true,
+    "files_uploaded": true,
+    "upload_checksums_verified": true,
+    "cuda_matrix_check": "passed",
+    "dataset_audit": "passed",
+    "gpu_smoke": {
+      "status": "passed",
+      "epochs": 2,
+      "requested_batch": 0.7,
+      "resolved_batch": 22,
+      "amp": true,
+      "fraction": 0.01,
+      "exit_code": 0
+    },
+    "formal_training_started": true,
+    "pipeline_started_at_utc": "2026-11-03T13:17:15Z",
+    "outer_limit_hours": 17,
+    "tmux_session": "yolo26s-v3",
+    "formal_training_started_at_utc": "2026-11-03T13:20:56Z"
+  },
+  "planned_outputs": [
+    "best.pt",
+    "last.pt",
+    "best.onnx",
+    "阈值建议",
+    "新旧模型对比报告",
+    "环境冻结",
+    "结果 SHA-256"
+  ],
+  "limitations": [
+    "FASDD_CV 未取得可校验下载文件、类别表及数据许可，本轮跳过",
+    "IFireSmoke 未暴露测试图只有 6 张，不能单独证明该来源精度提升",
+    "WEB 和纯数字图片缺少真实视频/场景身份，仅通过图片身份与 pHash 近似分组",
+    "新模型正在正式训练，尚未完成精度对比"
+  ],
+  "preparation_files": [
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/audit.json",
+      "bytes": 3030,
+      "sha256": "c110d0b54554e239e8fafe3b21f96e63df6179643a54d01f3d554122355428f1"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/baseline-local/validation_report.md",
+      "bytes": 842,
+      "sha256": "6e05f048f0c64a55b0997c42c2da5762790ee9e3d453220699d963c400bfbee4"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/baseline-local/validation_summary.json",
+      "bytes": 108075,
+      "sha256": "ab0cc7bb76c52eab0bf3e0729f039f245fb003fb547531ec495f809d9edb328a"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/audit.json",
+      "bytes": 2846,
+      "sha256": "6e793d9a3129dead8be7c5120d3ce60274882b60333e6435a28e4e8130a245cb"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/environment-freeze.txt",
+      "bytes": 5150,
+      "sha256": "47a6aabc48c026848bb9342388f2d84506a5e9d4a67c69cf6abecfecb8d1157f"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/preflight.log",
+      "bytes": 18137,
+      "sha256": "ce0370acf94efdd4bcb8cc4119187ae0fe4cb5835aaafbf82d53824fba1eaf8f"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/smoke/args.yaml",
+      "bytes": 1710,
+      "sha256": "c09dbb62abc13d9c6ee3021a8bfedf8d3ef419e1c96f531e43032991d0e77080"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/smoke/experiment.json",
+      "bytes": 1546,
+      "sha256": "5de7464e6d2ebbf75ed9f2aec53565020ebb448149e15563b712919df537e08e"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/cloud/smoke/results.csv",
+      "bytes": 436,
+      "sha256": "feca5f46695ae352e3610853a55b3090e481de65c20ab8726b69f850a30f4468"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/dataset/split_summary.json",
+      "bytes": 573,
+      "sha256": "b33a465a425e46d3d1b67539f38ab0efe02d980c858be725e0f4f72e7a345bad"
+    },
+    {
+      "path": "data/training-archive/2026-11-03-yolo26s-v3/preparation/selftest/full-selftest-final.log",
+      "bytes": 654,
+      "sha256": "69320ff5ea4c7953f006273a475290b112e86b34824ca2b11ae1f75dacc94fc5"
+    }
+  ],
+  "local_data_root": "D:/FireMonitoring-training-v3"
+}

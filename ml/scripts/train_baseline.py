@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import platform
@@ -16,11 +17,11 @@ from pathlib import Path
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True, help="Dataset YAML path.")
-    parser.add_argument("--model", default="yolo11s.pt")
+    parser.add_argument("--model", default="yolo26s.pt")
     parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--name", required=True)
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--patience", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=120)
+    parser.add_argument("--patience", type=int, default=25)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument(
         "--batch",
@@ -34,10 +35,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--cache",
         choices=("ram", "disk", "none"),
-        default="ram",
-        help="Dataset cache location. AutoDL defaults to RAM to protect the 50 GB data disk.",
+        default="none",
+        help="Dataset cache location; disabled by default.",
     )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--resume", type=Path)
+    parser.add_argument("--time", type=float, default=14.0)
     return parser.parse_args()
 
 
@@ -93,7 +96,26 @@ def main() -> int:
     if not data.is_file():
         print(f"ERROR: dataset YAML does not exist: {data}", file=sys.stderr)
         return 2
-    if requested_run.exists():
+    initial_request = project / f"{args.name}.request.json"
+    original = None
+    remaining_hours = args.time
+    if args.resume:
+        if args.resume.resolve().parents[1] != requested_run:
+            raise ValueError("--resume must belong to --project/--name")
+        original = json.loads(initial_request.read_text(encoding="utf-8"))
+        if original["dataset_manifest_sha256"] != sha256_file(
+            data.parent / "manifest.csv"
+        ):
+            raise ValueError("resume dataset manifest changed")
+        if original["dataset_yaml_sha256"] != sha256_file(data):
+            raise ValueError("resume dataset YAML changed")
+        elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(
+            original["started_at_utc"]
+        )
+        remaining_hours -= elapsed.total_seconds() / 3600
+        if remaining_hours <= 0:
+            raise ValueError("training time budget exhausted")
+    if requested_run.exists() and not args.resume:
         print(
             f"ERROR: run directory already exists: {requested_run}\n"
             "Use a new --name so an earlier experiment is never overwritten.",
@@ -107,14 +129,29 @@ def main() -> int:
     import torch
     import ultralytics
     from ultralytics import YOLO
+    from ultralytics.models.yolo.detect import DetectionTrainer
 
     project.mkdir(parents=True, exist_ok=True)
     manifest = data.parent / "manifest.csv"
-    model_file = Path(args.model).expanduser()
-    if model_file.is_file():
-        model_file = model_file.resolve()
+    model = YOLO(str(args.resume) if args.resume else args.model)
+    model_file = Path(model.ckpt_path).resolve()
+    if args.resume:
+        if model.ckpt["optimizer"] is None:
+            raise ValueError(
+                "checkpoint has no optimizer state; training already finished"
+            )
+        history = model.ckpt["train_results"]
+        with (requested_run / "results.csv").open(
+            "w", encoding="utf-8", newline=""
+        ) as handle:
+            writer = csv.writer(handle)
+            writer.writerow(history)
+            writer.writerows(zip(*history.values()))
     config = {
-        **vars(args),
+        **{
+            key: str(value) if isinstance(value, Path) else value
+            for key, value in vars(args).items()
+        },
         "data": str(data),
         "project": str(project),
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -125,25 +162,42 @@ def main() -> int:
         "ultralytics": ultralytics.__version__,
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "dataset_yaml_sha256": sha256_file(data),
-        "dataset_manifest": str(manifest) if manifest.is_file() else None,
-        "dataset_manifest_sha256": sha256_file(manifest) if manifest.is_file() else None,
-        "pretrained_model_file": str(model_file) if model_file.is_file() else None,
-        "pretrained_model_sha256": (
-            sha256_file(model_file) if model_file.is_file() else None
-        ),
+        "dataset_manifest": str(manifest),
+        "dataset_manifest_sha256": sha256_file(manifest),
+        "pretrained_model_file": str(model_file),
+        "pretrained_model_sha256": sha256_file(model_file),
         **git_metadata(),
         **bundle_metadata(),
     }
-    request_file = project / f"{args.name}.request.json"
+    if original:
+        config["resume_checkpoint_sha256"] = config["pretrained_model_sha256"]
+        config["pretrained_model_sha256"] = original["pretrained_model_sha256"]
+        config["pretrained_model_file"] = original["pretrained_model_file"]
+        config["started_at_utc"] = original["started_at_utc"]
+    config["remaining_hours"] = remaining_hours
+    request_file = (
+        project / f"{args.name}{'.resume' if args.resume else ''}.request.json"
+    )
     request_file.write_text(
         json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     batch: int | float
-    batch = int(args.batch) if args.batch >= 1 and args.batch.is_integer() else args.batch
+    batch = (
+        int(args.batch) if args.batch >= 1 and args.batch.is_integer() else args.batch
+    )
     cache: str | bool = False if args.cache == "none" else args.cache
-    model = YOLO(args.model)
-    results = model.train(
+
+    class EpochLimitedTrainer(DetectionTrainer):
+        # Ultralytics timed training recomputes an absolute epoch limit even when resuming.
+        def _setup_scheduler(self):
+            self.epochs = self.args.epochs = args.epochs
+            super()._setup_scheduler()
+
+    model.train(
+        trainer=EpochLimitedTrainer,
+        resume=str(args.resume.resolve()) if args.resume else False,
+        time=remaining_hours,
         data=str(data),
         epochs=args.epochs,
         patience=args.patience,
@@ -175,9 +229,7 @@ def main() -> int:
         compile=False,
     )
 
-    save_dir = Path(getattr(results, "save_dir", requested_run))
-    if not save_dir.exists() and getattr(model, "trainer", None) is not None:
-        save_dir = Path(model.trainer.save_dir)
+    save_dir = Path(model.trainer.save_dir)
     config["finished_at_utc"] = datetime.now(timezone.utc).isoformat()
     config["save_dir"] = str(save_dir)
     (save_dir / "experiment.json").write_text(
