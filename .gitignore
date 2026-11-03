@@ -58,6 +58,7 @@ artifacts/
 *.npz
 *.npy
 *.zip
+*.tar.gz
 recordings/
 runtime/
 *.mp4

@@ -38,10 +38,8 @@ def scene_group(source: str, stem: str) -> tuple[str, str]:
 def map_label(
     label_path: Path | None,
     class_map: dict[int, int],
-    *,
-    allow_repairs: bool,
 ) -> tuple[str, tuple[int, int], list[dict[str, object]]]:
-    if label_path is None or not label_path.exists():
+    if label_path is None:
         return "", (0, 0), []
     mapped_lines: list[str] = []
     counts = Counter[int]()
@@ -72,10 +70,6 @@ def map_label(
         target_class = class_map[source_class]
         original = {"x": x, "y": y, "width": width, "height": height}
         if width <= 0 or height <= 0:
-            if not allow_repairs:
-                raise ValueError(
-                    f"{label_path}:{line_number}: non-positive box dimensions"
-                )
             repairs.append(
                 {
                     "line_number": line_number,
@@ -101,10 +95,6 @@ def map_label(
             and bottom <= 1
         )
         if needs_clip:
-            if not allow_repairs:
-                raise ValueError(
-                    f"{label_path}:{line_number}: coordinates outside normalized YOLO range"
-                )
             excess = max(0.0, -left, -top, right - 1, bottom - 1)
             if excess > 0.1:
                 raise ValueError(
@@ -204,7 +194,6 @@ def main() -> int:
                 text, counts, fixes = map_label(
                     None if spec["background"] else source_label,
                     class_map,
-                    allow_repairs=True,
                 )
                 digest = sha256_file(image)
                 with Image.open(image) as opened:
@@ -224,7 +213,7 @@ def main() -> int:
                 label.parent.mkdir(parents=True, exist_ok=True)
                 label.write_text(text, encoding="utf-8")
                 group, method = scene_group(spec["name"], image.stem)
-                extra = metadata.get(image.name, {})
+                extra = metadata[image.name] if "metadata" in spec else {}
                 rows.append(
                     dict(
                         source=spec["name"],

@@ -29,8 +29,11 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--per-category", type=int, default=600)
     parser.add_argument("--images-zip", type=Path)
+    parser.add_argument("--exclusions", type=Path, required=True)
     args = parser.parse_args()
     data = json.loads(args.annotations.read_text(encoding="utf-8"))
+    with args.exclusions.open(encoding="utf-8", newline="") as handle:
+        excluded = {r["filename"] for r in csv.DictReader(handle)}
     captions = defaultdict(list)
     for item in data["annotations"]:
         captions[item["image_id"]].append(item["caption"])
@@ -55,6 +58,7 @@ def main():
         selected.append(
             dict(
                 filename=item["file_name"],
+                category=category,
                 group=f"coco:{item['id']}",
                 group_method="coco_image_id",
                 source_url=item["coco_url"],
@@ -64,6 +68,8 @@ def main():
                 captions=text,
             )
         )
+    selected = [r for r in selected if r["filename"] not in excluded]
+    counts = Counter(r["category"] for r in selected)
     directory = args.output / "train" / "images"
     directory.mkdir(parents=True, exist_ok=True)
 

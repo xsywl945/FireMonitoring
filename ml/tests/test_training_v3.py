@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -319,7 +320,7 @@ class TrainingV3Test(unittest.TestCase):
                         coco_url=url,
                         flickr_url="https://example.org",
                     )
-                    for i in [1, 2]
+                    for i in [4, 2, 1, 3]
                 ],
                 licenses=[
                     dict(id=1, url="https://creativecommons.org/licenses/by/4.0/")
@@ -327,8 +328,12 @@ class TrainingV3Test(unittest.TestCase):
                 annotations=[
                     dict(image_id=1, caption="a red screen"),
                     dict(image_id=2, caption="a red screen with fire"),
+                    dict(image_id=3, caption="a red screen"),
+                    dict(image_id=4, caption="a red screen"),
                 ],
             )
+            exclusions = root / "exclusions.csv"
+            exclusions.write_text("filename,reason\n3.jpg,manual visual exclusion\n")
             path = root / "captions.json"
             path.write_text(json.dumps(data))
             try:
@@ -340,12 +345,36 @@ class TrainingV3Test(unittest.TestCase):
                     root / "out",
                     "--per-category",
                     1,
+                    "--exclusions",
+                    exclusions,
                 )
             finally:
                 server.shutdown()
                 server.server_close()
             self.assertTrue((root / "out/train/images/1.jpg").is_file())
-            self.assertFalse((root / "out/train/images/2.jpg").exists())
+            for index in (2, 3, 4):
+                self.assertFalse((root / f"out/train/images/{index}.jpg").exists())
+            archive = root / "images.zip"
+            with zipfile.ZipFile(archive, "w") as z:
+                z.write(root / "one.jpg", "train2017/1.jpg")
+            next(item for item in data["images"] if item["id"] == 1)["coco_url"] = (
+                "http://images.cocodataset.org/train2017/1.jpg"
+            )
+            path.write_text(json.dumps(data))
+            self.run_script(
+                "prepare_coco_negatives.py",
+                "--annotations",
+                path,
+                "--images-zip",
+                archive,
+                "--output",
+                root / "zip-out",
+                "--per-category",
+                1,
+                "--exclusions",
+                exclusions,
+            )
+            self.assertTrue((root / "zip-out/train/images/1.jpg").is_file())
             with (root / "out/metadata.csv").open() as handle:
                 rows = list(csv.DictReader(handle))
             self.assertEqual(len(rows), 1)

@@ -11,14 +11,14 @@
 | COCO 2017 train | captions 筛选灯光、夕阳、红色物体、屏幕、蒸汽和雾气，生成空标签 | [官方下载](https://cocodataset.org/#download)。图片逐张保留原 URL、Flickr URL 与许可 URL；COCO 标注许可不能替代图片许可。筛选代码见 `prepare_coco_negatives.py`，seed 42，每类上限 600。 |
 | FASDD_CV | 论文说明提供 VOC、COCO、YOLO、TDML；此次未核实实际类别顺序 | [作者仓库](https://github.com/openrsgis/FASDD)、[DOI 下载入口](https://doi.org/10.57760/sciencedb.j00104.00103)。2026-11-03 访问详情 API 返回 `70001 / PERMISSION NO ACCESS`。无法取得可校验下载文件、类别表与数据许可，本轮跳过。 |
 
-COCO 排除 captions 提到火、烟、燃烧、蜡烛、壁炉、烟花、机车、火车、烟囱、发动机、炉灶、烤箱、烧烤和烹饪的图片。筛选规则和逐图 captions 保存在 `negatives_metadata.csv`。空标签是本任务的火焰/烟雾背景标签，COCO 物体框不转换成火焰框。
+COCO 排除 captions 提到火、烟、燃烧、蜡烛、壁炉、烟花、机车、火车、烟囱、发动机、炉灶、烤箱、烧烤和烹饪的图片。2026-11-03 查看了全部 2,354 张候选的缩略图，放大复核 13 张，排除 5 张含烟羽、疑似蜡烛、煤油灯或无法确认来源的人造烟雾的图片，文件与原因见 `ml/configs/coco_negative_exclusions.csv`。筛选规则和逐图 captions 保存在 `negatives_metadata.csv`。空标签是本任务的火焰/烟雾背景标签，COCO 物体框不转换成火焰框。
 
 ## 本地生成
 
 Python 环境先安装 `ml/requirements-autodl.txt`；本地 CPU 自测使用 PyTorch 2.8.0 CPU。AutoDL 使用镜像已有的 PyTorch，安装脚本不会主动重装 torch。
 
 ```powershell
-python ml/scripts/prepare_coco_negatives.py --annotations D:/FireMonitoring-training-v3/raw/coco/annotations/captions_train2017.json --images-zip D:/FireMonitoring-training-v3/train2017.zip --output D:/FireMonitoring-training-v3/raw/negatives --per-category 600
+python ml/scripts/prepare_coco_negatives.py --annotations D:/FireMonitoring-training-v3/raw/coco/annotations/captions_train2017.json --images-zip D:/FireMonitoring-training-v3/train2017.zip --output D:/FireMonitoring-training-v3/raw/negatives-reviewed --per-category 600 --exclusions ml/configs/coco_negative_exclusions.csv
 python ml/scripts/prepare_fire_smoke_v1.py --sources ml/configs/fire_smoke_v3.sources.json --output D:/FireMonitoring-training-v3/merged --link
 python ml/scripts/build_leakage_safe_primary_split.py --manifest D:/FireMonitoring-training-v3/merged/manifest.csv --baseline-manifest data/training-archive/2026-08-12-yolo11s-primary-v2/dataset/metadata/primary_fire_smoke_v2/manifest.csv --output D:/FireMonitoring-training-v3/dataset --link
 python ml/scripts/audit_yolo_dataset.py --data D:/FireMonitoring-training-v3/dataset/data.yaml --output D:/FireMonitoring-training-v3/audit.json --phash-threshold 4
@@ -32,6 +32,10 @@ IFireSmoke 的 `FireDataV*_视频号_帧号` 按视频分组，Roboflow `.rf.` �
 WEB 与纯数字图片缺少原始视频/场景身份，只能通过图片身份和 pHash 近似分组。这不能证明所有未知场景都已完全隔离。旧模型已公布的测试结果也不构成对全新场景的证明。`split_summary.json`、manifest 的 `group_method` 和 `baseline_exposed` 保留这些范围。
 
 数据包根目录包含 `data.yaml`、各来源测试 YAML、相对图片清单、`manifest.csv`、来源配置、标签修复、去重记录和 `CHECKSUMS.sha256`。ZIP 与 ZIP 自身的 SHA-256 文件不提交 Git。
+
+本机最终数据已审计：train 13,164、val 868、test 879；训练 COCO 背景 1,645 张，占 12.496%。test 为 D-Fire 539、IFireSmoke 6、negatives 334 张。跨划分精确重复与 pHash 距离不超过 4 的近重复均为 0，审计错误和警告均为 0。IFireSmoke 只剩 6 张未暴露测试图，不能用它单独证明该来源的精度提升。
+
+数据 ZIP 大小 1,179,442,073 字节，SHA-256 为 `968daaa46b027fa73f2262d4c848d064671e2760931ee733c155574386dbf045`。位置为 `D:/FireMonitoring-training-v3/fire-smoke-v3.zip`。
 
 ## AutoDL 执行
 

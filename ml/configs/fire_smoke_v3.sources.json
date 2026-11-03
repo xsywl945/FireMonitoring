@@ -39,7 +39,7 @@
   },
   {
     "name": "negatives",
-    "root": "D:\\FireMonitoring-training-v3\\raw\\negatives",
+    "root": "D:/FireMonitoring-training-v3/raw/negatives-reviewed",
     "names": [],
     "splits": {
       "train": "train"
@@ -50,6 +50,8 @@
     "license": "Per-image Creative Commons; see negatives_metadata.csv",
     "annotations": "captions_train2017.json",
     "seed": 42,
-    "annotations_sha256": "4b62086319480e0739ef390d04084515defb9c213ff13605a036061e33314317"
+    "annotations_sha256": "4b62086319480e0739ef390d04084515defb9c213ff13605a036061e33314317",
+    "exclusions": "ml/configs/coco_negative_exclusions.csv",
+    "visual_review": "2026-11-03: all 2354 candidates reviewed on contact sheets, 13 enlarged; five excluded"
   }
 ]
