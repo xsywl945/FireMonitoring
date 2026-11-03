@@ -96,16 +96,13 @@ def main():
             if i != winner
         )
     baseline = read_rows(args.baseline_manifest)
-    seen = {
-        Path(r["target_image"]).name
+    seen_hashes = {
+        Path(r["target_image"]).stem.rsplit("__", 1)[1]
         for r in baseline
         if r["target_split"] in {"train", "val"}
     }
-    seen_ids = {n.rsplit("__", 1)[0] for n in seen}
     locked = {
-        scene_ids[i]
-        for i, row in enumerate(rows)
-        if Path(row["target_image"]).name.rsplit("__", 1)[0] in seen_ids
+        scene_ids[i] for i, row in enumerate(rows) if row["sha256"][:10] in seen_hashes
     }
     components = defaultdict(list)
     for i in kept:

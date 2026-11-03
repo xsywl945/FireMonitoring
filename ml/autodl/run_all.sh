@@ -23,7 +23,7 @@ step() {
   local label="$1" seconds="$2"
   shift 2
   echo "开始: $label $(date --iso-8601=seconds)"
-  timeout --signal=TERM --kill-after=60 "$seconds" "$@"
+  timeout --foreground --signal=TERM --kill-after=60 "$seconds" "$@"
   echo "完成: $label $(date --iso-8601=seconds)"
 }
 step 安装依赖 3600 python -m pip install -r ml/requirements-autodl.txt

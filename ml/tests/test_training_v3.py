@@ -47,7 +47,7 @@ class TrainingV3Test(unittest.TestCase):
                     (raw / split / "images").mkdir(parents=True)
                     (raw / split / "labels").mkdir()
                     for index in range(16):
-                        stem = f"image_{split}_{index}"
+                        stem = f"image_{split}_{index}.rf.abc123"
                         Image.fromarray(
                             rng.integers(0, 256, (64, 64, 3), dtype=np.uint8)
                         ).save(raw / split / "images" / f"{stem}.png")
@@ -90,9 +90,19 @@ class TrainingV3Test(unittest.TestCase):
                     handle, fieldnames=["target_image", "target_split"]
                 )
                 writer.writeheader()
-                writer.writerow(
-                    dict(target_image=rows[0]["target_image"], target_split="train")
-                )
+                for row in (
+                    rows[0],
+                    next(r for r in rows if r["source"] == "ifiresmoke"),
+                ):
+                    name = (
+                        Path(row["target_image"])
+                        .stem.rsplit("__", 1)[0]
+                        .replace(".", "_")
+                        + "__"
+                        + row["sha256"][:10]
+                        + ".png"
+                    )
+                    writer.writerow(dict(target_image=name, target_split="train"))
             output = root / "split"
             self.run_script(
                 "build_leakage_safe_primary_split.py",
@@ -118,6 +128,7 @@ class TrainingV3Test(unittest.TestCase):
             with (output / "manifest.csv").open() as handle:
                 result = list(csv.DictReader(handle))
             self.assertEqual({r["split"] for r in result}, {"train", "val", "test"})
+            self.assertEqual(sum(r["baseline_exposed"] == "true" for r in result), 2)
             self.assertTrue(
                 all(
                     r["baseline_exposed"] == "false"
@@ -203,6 +214,33 @@ class TrainingV3Test(unittest.TestCase):
                 expected = hashlib.file_digest(handle, "sha256").hexdigest()
             self.assertEqual(experiment["pretrained_model_sha256"], expected)
             self.assertIn("resume_checkpoint_sha256", experiment)
+            import torch
+            from datetime import datetime, timezone
+            from ultralytics import YOLO
+
+            checkpoint = YOLO(str(run / "weights/epoch0.pt")).ckpt
+            checkpoint["epoch"] = 80
+            checkpoint["train_args"]["epochs"] = 83
+            checkpoint["train_results"]["epoch"] = [81]
+            late = run / "weights/late.pt"
+            torch.save(checkpoint, late)
+            request = root / "runs/cli.request.json"
+            initial = json.loads(request.read_text())
+            initial["started_at_utc"] = datetime.now(timezone.utc).isoformat()
+            request.write_text(json.dumps(initial))
+            self.run_script(
+                "train_baseline.py",
+                *common,
+                "--resume",
+                late,
+                "--epochs",
+                83,
+                "--time",
+                0.01,
+            )
+            with (run / "results.csv").open() as handle:
+                epochs = [int(r["epoch"]) for r in csv.DictReader(handle)]
+            self.assertEqual(epochs, [81, 82, 83])
             duplicate = root / "another/data.yaml"
             duplicate.parent.mkdir()
             duplicate.write_text(yaml.safe_dump(config))

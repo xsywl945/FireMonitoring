@@ -129,6 +129,7 @@ def main() -> int:
     import torch
     import ultralytics
     from ultralytics import YOLO
+    from ultralytics.models.yolo.detect import DetectionTrainer
 
     project.mkdir(parents=True, exist_ok=True)
     manifest = data.parent / "manifest.csv"
@@ -187,13 +188,14 @@ def main() -> int:
     )
     cache: str | bool = False if args.cache == "none" else args.cache
 
-    def cap_epochs(trainer):
-        trainer.epochs = min(trainer.epochs, args.epochs)
-        trainer.args.epochs = trainer.epochs
-        trainer.stop |= trainer.epoch + 1 >= args.epochs
+    class EpochLimitedTrainer(DetectionTrainer):
+        # Ultralytics timed training recomputes an absolute epoch limit even when resuming.
+        def _setup_scheduler(self):
+            self.epochs = self.args.epochs = args.epochs
+            super()._setup_scheduler()
 
-    model.add_callback("on_train_epoch_end", cap_epochs)
     model.train(
+        trainer=EpochLimitedTrainer,
         resume=str(args.resume.resolve()) if args.resume else False,
         time=remaining_hours,
         data=str(data),

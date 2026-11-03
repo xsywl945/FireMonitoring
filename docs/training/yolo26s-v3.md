@@ -48,7 +48,7 @@ tmux attach -t yolo26s-v3
 
 `run_all.sh` 顺序执行：安装依赖、检查 Python 3.12 / PyTorch 2.8.0 / CUDA 12.8 / RTX 4090、核验输入与 ZIP hash、解压、核验包内全部 SHA-256、重写数据根目录、审计、2 epoch 冒烟、正式训练、旧模型评测、新模型评测、ONNX 导出校验、打包到 autodl-fs。任何一步失败会退出并打印命令与行号。要求 `/root/autodl-fs` 已挂载，工作目录必须不存在。
 
-正式训练：最多 120 epoch，patience 25，640，自动 batch 0.7，AMP，seed 42，cos_lr，save_period 5，cache=False，`time=14`。库内 timed training 会改变 epoch 数，入口回调另外限制轮数。外层 `timeout 20h` 限制整个流程，不包含开机前的上传等待；上传/环境阶段仍须遵守 2 小时预算。
+正式训练：最多 120 epoch，patience 25，640，自动 batch 0.7，AMP，seed 42，cos_lr，save_period 5，cache=False，`time=14`。库内 timed training 会改变 epoch 数，训练器在建立 cosine 调度器时固定轮数上限。外层 `timeout 20h` 限制整个流程，不包含开机前的上传等待；上传/环境阶段仍须遵守 2 小时预算。
 
 恢复只使用带 optimizer 的未完成检查点。正常完成后的 best.pt、last.pt 已被 Ultralytics 去掉 optimizer，不能继续 resume。以下命令用于失败后恢复正式训练，不会自动重复已完成的评测步骤：
 

@@ -271,16 +271,16 @@ def main():
             },
         )
     lines = [
-        "# YOLO validation",
+        "# 火焰与烟雾模型评测",
         "",
-        f"Model SHA-256: {summary['model_sha256']}",
-        f"Manifest SHA-256: {summary['manifest_sha256']}",
+        f"模型 SHA-256： {summary['model_sha256']}",
+        f"数据清单 SHA-256： {summary['manifest_sha256']}",
         "",
-        f"Validation-selected confidence: {summary['thresholds']}",
+        f"验证集选择的阈值： {summary['thresholds']}",
         "",
-        "Small target: area after letterbox scaling < 32² pixels; recall at IoU 0.5.",
+        "小目标：缩放后框面积小于 32² 像素；统计 IoU 0.5 召回。",
         "",
-        "| Dataset | mAP50-95 | Fire recall @0.25 | Smoke recall @0.25 | Negative image FPR @0.25 | Δ mAP50-95 |",
+        "| 来源 | mAP50-95 | fire 召回 @0.25 | smoke 召回 @0.25 | 背景图误报率 @0.25 | mAP50-95 差值 |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for key, item in summary["datasets"].items():
