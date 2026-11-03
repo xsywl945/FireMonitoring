@@ -10,6 +10,8 @@ Thumbs.db
 .env.*
 !.env.example
 secrets/
+kaggle.json
+.kaggle/
 *.pem
 *.key
 
@@ -41,7 +43,12 @@ hs_err_pid*
 *.onnx
 *.engine
 *.plan
-data/
+/data/*
+!/data/training-archive/
+/data/training-archive/*
+!/data/training-archive/2026-11-03-yolo26s-v3/
+/data/training-archive/2026-11-03-yolo26s-v3/*
+!/data/training-archive/2026-11-03-yolo26s-v3/ARCHIVE-MANIFEST.json
 datasets/
 weights/
 runs/

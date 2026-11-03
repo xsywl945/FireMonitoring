@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-"""Merge official D-Fire and IFireSmoke splits into a safe two-class dataset.
-
-The source datasets use opposite class identifiers:
-
-* D-Fire: 0=smoke, 1=fire
-* IFireSmoke: 0=fire, 1=smoke
-
-The generated dataset always uses 0=fire and 1=smoke. Source files are never
-modified. Exact duplicate images are kept in only one combined split, with the
-priority test > val > train to prevent exact train/test leakage.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -18,174 +5,34 @@ import csv
 import hashlib
 import json
 import math
+import os
+import re
 import shutil
-import sys
-from collections import Counter, defaultdict
-from dataclasses import dataclass
+from collections import Counter
 from pathlib import Path
-from typing import Iterable
 
+import imagehash
 import yaml
+from PIL import Image
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-SPLIT_PRIORITY = {"train": 1, "val": 2, "test": 3}
-
-
-@dataclass(frozen=True)
-class SourceSpec:
-    name: str
-    root: Path
-    split_aliases: dict[str, tuple[str, ...]]
-    expected_names: tuple[str, str]
-    class_map: dict[int, int]
-    expected_total_images: int
-    expected_background_images: int
-    allow_known_label_repairs: bool
-    max_label_repairs: int
-
-
-@dataclass(frozen=True)
-class Example:
-    source: str
-    split: str
-    image_path: Path
-    label_path: Path | None
-    image_sha256: str
-    mapped_label: str
-    object_counts: tuple[int, int]
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--dfire-root",
-        type=Path,
-        required=True,
-        help="Directory containing D-Fire train/val/test folders.",
-    )
-    parser.add_argument(
-        "--ifiresmoke-root",
-        type=Path,
-        required=True,
-        help="Directory containing IFireSmoke train/valid/test folders.",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        required=True,
-        help="A new, empty output directory. Existing data is never overwritten.",
-    )
-    parser.add_argument(
-        "--link",
-        action="store_true",
-        help="Use hard links for images when possible; otherwise copy files.",
-    )
-    return parser.parse_args()
-
-
-def normalize_name(value: object) -> str:
-    return str(value).strip().lower().replace("_", "").replace("-", "")
-
-
-def find_dataset_root(candidate: Path, train_aliases: tuple[str, ...]) -> Path:
-    candidate = candidate.expanduser().resolve()
-    if not candidate.is_dir():
-        raise ValueError(f"Dataset root is not a directory: {candidate}")
-    aliases = {alias.lower() for alias in train_aliases}
-
-    def has_train(directory: Path) -> bool:
-        return any(
-            child.is_dir() and child.name.lower() in aliases
-            for child in directory.iterdir()
-        )
-
-    if has_train(candidate):
-        return candidate
-    for child in sorted(path for path in candidate.iterdir() if path.is_dir()):
-        if has_train(child):
-            return child
-        for grandchild in sorted(path for path in child.iterdir() if path.is_dir()):
-            if has_train(grandchild):
-                return grandchild
-    raise ValueError(
-        f"Could not find a train folder within two levels under {candidate}"
-    )
-
-
-def find_split(root: Path, aliases: tuple[str, ...]) -> Path:
-    children = {child.name.lower(): child for child in root.iterdir() if child.is_dir()}
-    for alias in aliases:
-        found = children.get(alias.lower())
-        if found is not None:
-            return found
-    raise ValueError(f"None of split folders {aliases} exists under {root}")
-
-
-def find_images_dir(split_dir: Path) -> Path:
-    for child in split_dir.iterdir():
-        if child.is_dir() and child.name.lower() in {"images", "image"}:
-            return child
-    raise ValueError(f"No images directory under {split_dir}")
-
-
-def find_labels_dir(split_dir: Path) -> Path | None:
-    for child in split_dir.iterdir():
-        if child.is_dir() and child.name.lower() in {"labels", "label"}:
-            return child
-    return None
-
-
-def read_declared_names(root: Path) -> tuple[str, ...] | None:
-    yaml_files = sorted(
-        [
-            *root.glob("*.yaml"),
-            *root.glob("*.yml"),
-            *root.parent.glob("*.yaml"),
-            *root.parent.glob("*.yml"),
-        ]
-    )
-    for yaml_file in yaml_files:
-        try:
-            document = yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, yaml.YAMLError):
-            continue
-        if not isinstance(document, dict) or "names" not in document:
-            continue
-        raw_names = document["names"]
-        if isinstance(raw_names, list):
-            return tuple(normalize_name(name) for name in raw_names)
-        if isinstance(raw_names, dict):
-            return tuple(
-                normalize_name(raw_names[index])
-                for index in sorted(raw_names, key=lambda value: int(value))
-            )
-    return None
-
-
-def verify_declared_names(spec: SourceSpec) -> None:
-    observed = read_declared_names(spec.root)
-    expected = tuple(normalize_name(name) for name in spec.expected_names)
-    if observed is None:
-        print(
-            f"WARNING: {spec.name} has no readable data YAML; using documented class "
-            f"order {spec.expected_names}.",
-            file=sys.stderr,
-        )
-        return
-    if observed != expected:
-        raise ValueError(
-            f"{spec.name} class order is {observed}, expected {expected}. "
-            "Stop and inspect the downloaded dataset instead of guessing."
-        )
-    print(f"Verified {spec.name} source classes: {observed}")
 
 
 def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+        return hashlib.file_digest(handle, "sha256").hexdigest()
+
+
+def scene_group(source: str, stem: str) -> tuple[str, str]:
+    stem = stem.split(".rf.")[0]
+    video = re.match(r"(FireDataV[0-9]+_[0-9]+)_", stem)
+    if video:
+        return f"{source}:{video[1]}", "video_filename"
+    if source == "dfire" and stem.startswith(("AoF", "PublicDataset")):
+        prefix = re.match(r"[A-Za-z]+", stem)[0]
+        return f"{source}:{prefix}", "conservative_collection"
+    stem = re.sub(r"(?:_jpg|_png)$", "", stem)
+    return f"{source}:{stem}", "image_identity_phash_only"
 
 
 def map_label(
@@ -221,9 +68,7 @@ def map_label(
             )
         values = (x, y, width, height)
         if not all(math.isfinite(value) for value in values):
-            raise ValueError(
-                f"{label_path}:{line_number}: non-finite coordinates"
-            )
+            raise ValueError(f"{label_path}:{line_number}: non-finite coordinates")
         target_class = class_map[source_class]
         original = {"x": x, "y": y, "width": width, "height": height}
         if width <= 0 or height <= 0:
@@ -295,7 +140,12 @@ def map_label(
             )
         counts[target_class] += 1
         mapped_lines.append(
-            " ".join([str(target_class), *[f"{value:.8f}" for value in (x, y, width, height)]])
+            " ".join(
+                [
+                    str(target_class),
+                    *[f"{value:.8f}" for value in (x, y, width, height)],
+                ]
+            )
         )
     mapped = "\n".join(mapped_lines)
     if mapped:
@@ -303,378 +153,121 @@ def map_label(
     return mapped, (counts[0], counts[1]), repairs
 
 
-def collect_examples(
-    spec: SourceSpec,
-) -> tuple[list[Example], dict[str, object], list[dict[str, object]]]:
-    examples: list[Example] = []
-    repairs: list[dict[str, object]] = []
-    split_images: dict[str, int] = {}
-    missing_label_files = 0
-    empty_label_files = 0
-    for target_split in ("train", "val", "test"):
-        split_dir = find_split(spec.root, spec.split_aliases[target_split])
-        image_dir = find_images_dir(split_dir)
-        labels_dir = find_labels_dir(split_dir)
-        images = sorted(
-            path
-            for path in image_dir.rglob("*")
-            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-        )
-        if not images:
-            raise ValueError(f"No images found in {image_dir}")
-        split_images[target_split] = len(images)
-        for image_path in images:
-            relative_label = image_path.relative_to(image_dir).with_suffix(".txt")
-            label_path = labels_dir / relative_label if labels_dir else None
-            if label_path is None or not label_path.exists():
-                missing_label_files += 1
-            elif not label_path.read_text(encoding="utf-8-sig").strip():
-                empty_label_files += 1
-            mapped_label, object_counts, label_repairs = map_label(
-                label_path,
-                spec.class_map,
-                allow_repairs=spec.allow_known_label_repairs,
-            )
-            for repair in label_repairs:
-                repair.update(
-                    {
-                        "source": spec.name,
-                        "split": target_split,
-                        "label": str(label_path),
-                    }
-                )
-            repairs.extend(label_repairs)
-            examples.append(
-                Example(
-                    source=spec.name,
-                    split=target_split,
-                    image_path=image_path,
-                    label_path=label_path if label_path and label_path.exists() else None,
-                    image_sha256=sha256_file(image_path),
-                    mapped_label=mapped_label,
-                    object_counts=object_counts,
-                )
-            )
-        print(f"Collected {len(images):,} {spec.name} {target_split} images")
-    background_images = sum(not any(example.object_counts) for example in examples)
-    if len(examples) != spec.expected_total_images:
-        raise ValueError(
-            f"{spec.name} contains {len(examples):,} images, expected the documented "
-            f"{spec.expected_total_images:,}; the download may be incomplete or a different version"
-        )
-    if background_images != spec.expected_background_images:
-        raise ValueError(
-            f"{spec.name} contains {background_images:,} images without objects, expected "
-            f"{spec.expected_background_images:,}; missing labels may be hiding positive samples"
-        )
-    if len(repairs) > spec.max_label_repairs:
-        raise ValueError(
-            f"{spec.name} required {len(repairs)} label repairs, above the controlled "
-            f"limit of {spec.max_label_repairs}; inspect the data version"
-        )
-    repair_actions = Counter(str(repair["action"]) for repair in repairs)
-    integrity = {
-        "split_images": split_images,
-        "total_images": len(examples),
-        "background_images": background_images,
-        "missing_source_label_files": missing_label_files,
-        "empty_source_label_files": empty_label_files,
-        "label_repairs": dict(repair_actions),
-    }
-    print(f"Verified {spec.name} source integrity: {integrity}")
-    return examples, integrity, repairs
-
-
-def choose_combined_examples(
-    examples: Iterable[Example],
-) -> tuple[list[Example], list[dict[str, object]], list[dict[str, object]]]:
-    by_hash: dict[str, list[Example]] = defaultdict(list)
-    for example in examples:
-        by_hash[example.image_sha256].append(example)
-
-    kept: list[Example] = []
-    duplicates: list[dict[str, object]] = []
-    conflicts: list[dict[str, object]] = []
-    for digest, group in sorted(by_hash.items()):
-        ordered = sorted(
-            group,
-            key=lambda item: (
-                -SPLIT_PRIORITY[item.split],
-                item.source,
-                item.image_path.as_posix(),
-            ),
-        )
-        image_winner = ordered[0]
-        non_empty_class_sets = {
-            frozenset(index for index, count in enumerate(item.object_counts) if count)
-            for item in group
-            if sum(item.object_counts)
-        }
-        has_disjoint_annotations = any(
-            left.isdisjoint(right)
-            for left in non_empty_class_sets
-            for right in non_empty_class_sets
-            if left != right
-        )
-        if has_disjoint_annotations:
-            conflicts.append(
-                {
-                    "sha256": digest,
-                    "reason": "identical pixels have disjoint non-empty class annotations",
-                    "items": [
-                        {
-                            "source": item.source,
-                            "split": item.split,
-                            "image": str(item.image_path),
-                            "label": str(item.label_path or ""),
-                            "fire_objects": item.object_counts[0],
-                            "smoke_objects": item.object_counts[1],
-                        }
-                        for item in ordered
-                    ],
-                }
-            )
-            continue
-        annotation_winner = sorted(
-            group,
-            key=lambda item: (
-                -sum(item.object_counts),
-                item.source,
-                item.image_path.as_posix(),
-            ),
-        )[0]
-        winner = Example(
-            source=image_winner.source,
-            split=image_winner.split,
-            image_path=image_winner.image_path,
-            label_path=annotation_winner.label_path,
-            image_sha256=image_winner.image_sha256,
-            mapped_label=annotation_winner.mapped_label,
-            object_counts=annotation_winner.object_counts,
-        )
-        kept.append(winner)
-        if len(group) > 1:
-            duplicates.append(
-                {
-                    "sha256": digest,
-                    "kept": {
-                        "source": winner.source,
-                        "split": winner.split,
-                        "path": str(winner.image_path),
-                    },
-                    "annotation_selected": {
-                        "source": annotation_winner.source,
-                        "split": annotation_winner.split,
-                        "path": str(annotation_winner.label_path or ""),
-                    },
-                    "removed": [
-                        {
-                            "source": item.source,
-                            "split": item.split,
-                            "path": str(item.image_path),
-                        }
-                        for item in ordered[1:]
-                    ],
-                }
-            )
-    return (
-        sorted(kept, key=lambda item: (item.split, item.source, str(item.image_path))),
-        duplicates,
-        conflicts,
-    )
-
-
-def target_name(example: Example) -> str:
-    safe_stem = "".join(
-        character if character.isalnum() or character in {"-", "_"} else "_"
-        for character in example.image_path.stem
-    )
-    return (
-        f"{example.source}__{safe_stem}__{example.image_sha256[:10]}"
-        f"{example.image_path.suffix.lower()}"
-    )
-
-
-def materialize(example: Example, root: Path, *, link: bool) -> tuple[Path, Path]:
-    image_dir = root / "images" / example.split
-    label_dir = root / "labels" / example.split
-    image_dir.mkdir(parents=True, exist_ok=True)
-    label_dir.mkdir(parents=True, exist_ok=True)
-    image_target = image_dir / target_name(example)
-    label_target = label_dir / f"{image_target.stem}.txt"
-    if image_target.exists() or label_target.exists():
-        raise FileExistsError(f"Refusing to overwrite generated sample {image_target}")
-    if link:
-        try:
-            image_target.hardlink_to(example.image_path)
-        except OSError:
-            shutil.copy2(example.image_path, image_target)
-    else:
-        shutil.copy2(example.image_path, image_target)
-    label_target.write_text(example.mapped_label, encoding="utf-8")
-    return image_target, label_target
-
-
-def write_data_yaml(path: Path, root: Path, *, test_only: bool = False) -> None:
-    document = {
-        "path": root.resolve().as_posix(),
-        "train": "images/test" if test_only else "images/train",
-        "val": "images/test" if test_only else "images/val",
-        "test": "images/test",
-        "names": {0: "fire", 1: "smoke"},
-    }
-    path.write_text(
-        yaml.safe_dump(document, allow_unicode=True, sort_keys=False), encoding="utf-8"
-    )
-
-
 def main() -> int:
-    args = parse_args()
-    output = args.output.expanduser().resolve()
-    if output.exists() and any(output.iterdir()):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sources", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--link", action="store_true")
+    args = parser.parse_args()
+    output = args.output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    sources = json.loads(args.sources.read_text(encoding="utf-8"))
+    rows, repairs = [], []
+    for spec in sources:
+        root = Path(spec["root"])
+        names = spec["names"]
+        if names:
+            declared = yaml.safe_load(
+                (root / spec["yaml"]).read_text(encoding="utf-8")
+            )["names"]
+            if isinstance(declared, dict):
+                declared = [declared[k] for k in sorted(declared, key=int)]
+            declared = [name.lower() for name in declared]
+            if declared != names:
+                raise ValueError(
+                    f"{spec['name']}: declared classes {declared} != {names}"
+                )
+        class_map = {i: ["fire", "smoke"].index(name) for i, name in enumerate(names)}
+        metadata = {}
+        if "metadata" in spec:
+            with (root / spec["metadata"]).open(encoding="utf-8", newline="") as handle:
+                metadata = {r["filename"]: r for r in csv.DictReader(handle)}
+        for split, directory in spec["splits"].items():
+            image_dir = root / directory / "images"
+            images = sorted(
+                p for p in image_dir.rglob("*") if p.suffix.lower() in IMAGE_EXTENSIONS
+            )
+            if not images:
+                raise ValueError(f"No images: {image_dir}")
+            for image in images:
+                source_label = (
+                    root
+                    / directory
+                    / "labels"
+                    / image.relative_to(image_dir).with_suffix(".txt")
+                )
+                if not spec["background"] and not source_label.is_file():
+                    raise FileNotFoundError(source_label)
+                text, counts, fixes = map_label(
+                    None if spec["background"] else source_label,
+                    class_map,
+                    allow_repairs=True,
+                )
+                digest = sha256_file(image)
+                with Image.open(image) as opened:
+                    opened.load()
+                    width, height = opened.size
+                    phash = str(imagehash.phash(opened))
+                name = (
+                    f"{spec['name']}__{image.stem}__{digest[:12]}{image.suffix.lower()}"
+                )
+                target = output / "images" / split / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if args.link:
+                    os.link(image, target)
+                else:
+                    shutil.copy2(image, target)
+                label = output / "labels" / split / Path(name).with_suffix(".txt")
+                label.parent.mkdir(parents=True, exist_ok=True)
+                label.write_text(text, encoding="utf-8")
+                group, method = scene_group(spec["name"], image.stem)
+                extra = metadata.get(image.name, {})
+                rows.append(
+                    dict(
+                        source=spec["name"],
+                        split=split,
+                        source_image=str(image),
+                        source_label=str(source_label),
+                        target_image=str(target),
+                        target_label=str(label),
+                        sha256=digest,
+                        label_sha256=sha256_file(label),
+                        phash=phash,
+                        width=width,
+                        height=height,
+                        fire_objects=counts[0],
+                        smoke_objects=counts[1],
+                        group=extra.get("group", group),
+                        group_method=extra.get("group_method", method),
+                        source_url=extra.get("source_url", spec["url"]),
+                        license=extra.get("license", spec["license"]),
+                        selection=extra.get("selection", "official_dataset"),
+                    )
+                )
+                repairs.extend(
+                    dict(source=spec["name"], image=str(image), **fix) for fix in fixes
+                )
         print(
-            f"ERROR: output is not empty: {output}\n"
-            "Choose a new versioned output directory; this script never deletes old data.",
-            file=sys.stderr,
+            f"Collected {spec['name']}: {sum(r['source'] == spec['name'] for r in rows)}",
+            flush=True,
         )
-        return 2
-    output.mkdir(parents=True, exist_ok=True)
-
-    try:
-        dfire_root = find_dataset_root(
-            args.dfire_root, ("train", "training", "train_set")
+    with (output / "manifest.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    (output / "source_label_repairs.json").write_text(
+        json.dumps(repairs, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    shutil.copy2(args.sources, output / "sources.json")
+    print(
+        json.dumps(
+            {
+                "images": len(rows),
+                "repairs": len(repairs),
+                "manifest_sha256": sha256_file(output / "manifest.csv"),
+            }
         )
-        ifire_root = find_dataset_root(
-            args.ifiresmoke_root, ("train", "training", "train_set")
-        )
-        specs = [
-            SourceSpec(
-                name="dfire",
-                root=dfire_root,
-                split_aliases={
-                    "train": ("train", "training", "train_set"),
-                    "val": ("val", "valid", "validation", "validation_set"),
-                    "test": ("test", "testing", "test_set"),
-                },
-                expected_names=("smoke", "fire"),
-                class_map={0: 1, 1: 0},
-                expected_total_images=21_527,
-                expected_background_images=9_838,
-                allow_known_label_repairs=True,
-                max_label_repairs=450,
-            ),
-            SourceSpec(
-                name="ifiresmoke",
-                root=ifire_root,
-                split_aliases={
-                    "train": ("train", "training", "train_set"),
-                    "val": ("valid", "val", "validation", "validation_set"),
-                    "test": ("test", "testing", "test_set"),
-                },
-                expected_names=("fire", "smoke"),
-                class_map={0: 0, 1: 1},
-                expected_total_images=5_000,
-                expected_background_images=0,
-                allow_known_label_repairs=False,
-                max_label_repairs=0,
-            ),
-        ]
-        all_examples: list[Example] = []
-        by_source: dict[str, list[Example]] = {}
-        source_integrity: dict[str, dict[str, object]] = {}
-        source_label_repairs: list[dict[str, object]] = []
-        for spec in specs:
-            verify_declared_names(spec)
-            collected, integrity, repairs = collect_examples(spec)
-            by_source[spec.name] = collected
-            source_integrity[spec.name] = integrity
-            source_label_repairs.extend(repairs)
-            all_examples.extend(collected)
-        combined, duplicates, conflicts = choose_combined_examples(all_examples)
-        if conflicts:
-            conflict_path = output / "exact_duplicate_annotation_conflicts.json"
-            conflict_path.write_text(
-                json.dumps(conflicts, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            raise ValueError(
-                f"found {len(conflicts)} exact duplicate annotation conflict(s); "
-                f"inspect {conflict_path} and clean the source data"
-            )
-
-        manifest_rows: list[dict[str, object]] = []
-        split_images = Counter[str]()
-        split_objects: dict[str, Counter[int]] = defaultdict(Counter)
-        for example in combined:
-            image_target, label_target = materialize(example, output, link=args.link)
-            split_images[example.split] += 1
-            split_objects[example.split][0] += example.object_counts[0]
-            split_objects[example.split][1] += example.object_counts[1]
-            manifest_rows.append(
-                {
-                    "source": example.source,
-                    "split": example.split,
-                    "source_image": str(example.image_path),
-                    "source_label": str(example.label_path or ""),
-                    "target_image": str(image_target),
-                    "target_label": str(label_target),
-                    "sha256": example.image_sha256,
-                    "fire_objects": example.object_counts[0],
-                    "smoke_objects": example.object_counts[1],
-                }
-            )
-
-        write_data_yaml(output / "fire_smoke_v1.yaml", output)
-
-        eval_counts: dict[str, int] = {}
-        for source_name, source_examples in by_source.items():
-            eval_root = output / "eval" / source_name
-            test_examples = [item for item in source_examples if item.split == "test"]
-            for example in test_examples:
-                materialize(example, eval_root, link=args.link)
-            write_data_yaml(
-                output / f"{source_name}_test.yaml", eval_root, test_only=True
-            )
-            eval_counts[source_name] = len(test_examples)
-
-        manifest_path = output / "manifest.csv"
-        with manifest_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(manifest_rows[0]))
-            writer.writeheader()
-            writer.writerows(manifest_rows)
-        (output / "exact_duplicates_removed.json").write_text(
-            json.dumps(duplicates, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        (output / "source_label_repairs.json").write_text(
-            json.dumps(source_label_repairs, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        summary = {
-            "class_names": {"0": "fire", "1": "smoke"},
-            "source_roots": {spec.name: str(spec.root) for spec in specs},
-            "source_integrity": source_integrity,
-            "combined_images": dict(split_images),
-            "combined_objects": {
-                split: {
-                    "fire": split_objects[split][0],
-                    "smoke": split_objects[split][1],
-                }
-                for split in ("train", "val", "test")
-            },
-            "source_test_images": eval_counts,
-            "exact_duplicate_groups_removed": len(duplicates),
-            "source_label_repair_count": len(source_label_repairs),
-            "link_mode_requested": bool(args.link),
-        }
-        (output / "prepare_summary.json").write_text(
-            json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-    except Exception as exc:  # noqa: BLE001 - present a beginner-friendly stop message
-        print(f"ERROR: dataset preparation stopped: {exc}", file=sys.stderr)
-        return 1
-
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
-    print(f"Prepared dataset YAML: {output / 'fire_smoke_v1.yaml'}")
-    print("Next: run audit_yolo_dataset.py and preview_yolo_dataset.py before training.")
+    )
     return 0
 
 
