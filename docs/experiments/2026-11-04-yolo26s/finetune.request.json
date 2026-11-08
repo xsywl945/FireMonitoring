@@ -1,0 +1,10 @@
+{
+  "started_at_utc": "2026-11-04T01:24:00.083885+00:00",
+  "base_model": "/root/autodl-tmp/yolo26s-v3/runs/formal/weights/best.pt",
+  "data": "/root/autodl-tmp/yolo26s-v3/dataset/data.yaml",
+  "epochs": 40,
+  "optimizer": "SGD",
+  "lr0": 0.001,
+  "mosaic": 0.0,
+  "patience": 12
+}

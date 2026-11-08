@@ -1,5 +1,7 @@
 # YOLO26s v3 训练
 
+2026-11-08：正式训练与微调已完成，结果见 [训练交接](yolo26s-handoff-2026-11-08.md)。下文保留实际使用的训练流程。
+
 模型固定 YOLO26s，输入 640，类别 `0=fire, 1=smoke`。本轮只使用公开图片。
 
 ## 数据来源
@@ -83,7 +85,7 @@ scp -P 26369 root@connect.cqa1.seetacloud.com:/root/autodl-fs/fire-monitoring/20
 
 先用 `Get-FileHash -Algorithm SHA256` 对照下载的 `.sha256`，再解压。只将 `ARCHIVE-MANIFEST.json` 更新进 Git。权重、数据和图片保持忽略。
 
-AutoDL 尚未实测，不填写预计耗时。执行上限按本任务预算设置：上传/环境 2 小时，审计 0.5 小时，正式训练 14 小时，评测/导出/同步 2 小时，保留至少 4 小时余量。CPU 小样本用时不能推算 4090D 完整训练耗时。
+AutoDL 训练已完成。本次只核对本地交付文件和既有实验记录，未登录云端重跑训练或核验完整归档。
 
 ## 自测
 

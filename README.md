@@ -1,6 +1,8 @@
 # Fire Monitoring
 
-2026-10-18 当前联调模式：**本地 YOLO 火焰时序识别后喷水，大模型接口暂时关闭；BOOT 按住强制喷水、松开停止（最多 30 秒）**。支持单摄/双摄，当前本机按用户要求使用一只 USB 摄像头。配置和操作以 [本地识别与 BOOT 说明](docs/runbooks/local-yolo-boot.md) 为准；下文涉及大模型门控的内容描述可重新启用的云端模式。
+2026-11-08：YOLO26s 正式训练与微调已交付，仓库由 Codex 接管。当前状态见 [项目状态](docs/project/STATUS.md)，模型与校验值见 [训练交接](docs/training/yolo26s-handoff-2026-11-08.md)，四摄代码的实验范围见 [研究方案](docs/plans/后续四摄算法方案-YOLO26s.md)。新权重尚未接入推理服务。
+
+最后记录的 2026-10-18 联调模式：**本地 YOLO 火焰时序识别后喷水，大模型接口暂时关闭；BOOT 按住强制喷水、松开停止（最多 30 秒）**。支持单摄/双摄，当前本机按用户要求使用一只 USB 摄像头。配置和操作以 [本地识别与 BOOT 说明](docs/runbooks/local-yolo-boot.md) 为准；下文涉及大模型门控的内容描述可重新启用的云端模式。
 
 面向教室和实验室的智能火灾监控研究原型。当前基础功能支持两路 UVC 摄像头独立识别，由 YOLO 时序候选、千问多模态复核、站内预警和 ESP32 自动水泵控制组成。保留账号、教室与摄像头管理，人工审核和事件手动流转已移除。
 
@@ -28,7 +30,7 @@ docs/           Architecture, plans, runbooks, and test reports
 - Media and business events are separate: video uses MediaMTX; alerts use Spring WebSocket.
 - The browser never receives raw RTSP credentials or cloud API secrets.
 - The inference worker never writes the business database directly.
-- Live candidates require successful cloud multimodal verification before publishing confirmed alerts; pump commands independently require a recent positive verification.
+- 云端复核模式要求正向复核才发布确认预警及喷水指令；本地时序模式见上述运行说明。
 - Demo events must be visibly labeled as tests; never create real fire or smoke for a demonstration.
 
 ## Target demo environment
@@ -48,7 +50,7 @@ docs/           Architecture, plans, runbooks, and test reports
 单只泵按配置覆盖一个教室，正向 AI 复核后自动发串口指令，默认 5 秒、冷却 60 秒。
 页面显示控制器回执、持久化指令记录和紧急停止锁定；没有水流反馈，不能据此确认实际出水。
 新教室、已有教室、账号与历史预警继续保留；有历史预警的教室删除时仍只归档。
-默认管理员开发密码为 `123456`。模型权重和训练流程沿用现有版本。
+默认管理员开发密码为 `123456`。实际加载的权重取决于本地配置；新交付 YOLO26s 尚未部署。
 
 ## Current MVP
 

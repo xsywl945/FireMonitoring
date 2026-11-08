@@ -51,6 +51,7 @@ hs_err_pid*
 !/data/training-archive/2026-11-03-yolo26s-v3/ARCHIVE-MANIFEST.json
 datasets/
 weights/
+/models/
 runs/
 artifacts/
 *.safetensors
@@ -67,6 +68,7 @@ runtime/
 
 # Local tools and generated state
 .tools/
+.runtime/
 .wslconfig.local
 tmp/
 logs/
