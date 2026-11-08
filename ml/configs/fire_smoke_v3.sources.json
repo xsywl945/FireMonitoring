@@ -1,0 +1,57 @@
+[
+  {
+    "name": "dfire",
+    "root": "D:\\FireMonitoring-training-v3\\raw\\dfire",
+    "names": [
+      "smoke",
+      "fire"
+    ],
+    "yaml": "data.yaml",
+    "splits": {
+      "train": "data/train",
+      "val": "data/val",
+      "test": "data/test"
+    },
+    "background": false,
+    "url": "https://github.com/gaia-solutions-on-demand/DFireDataset",
+    "license": "CC0-1.0; third-party PublicDataset images retain original terms",
+    "raw_archive_sha256": "65d81b602991261b47ddc71281e99108362a30336a448e1f8d21352c825c6d83",
+    "raw_archive": "dfire-kaggle.zip"
+  },
+  {
+    "name": "ifiresmoke",
+    "root": "D:\\FireMonitoring-training-v3\\raw\\ifiresmoke\\Indoor FS",
+    "names": [
+      "fire",
+      "smoke"
+    ],
+    "yaml": "data.yaml",
+    "splits": {
+      "train": "train",
+      "val": "valid",
+      "test": "test"
+    },
+    "background": false,
+    "url": "https://huggingface.co/datasets/shahriar-5/IFireSmoke",
+    "license": "CC-BY-4.0",
+    "raw_archive_sha256": "7b138ad1f61883feba0de40624bdc0fa52bcf58238bde2d2627d3b6fc9160b5b",
+    "raw_archive": "Indoor-FS.zip"
+  },
+  {
+    "name": "negatives",
+    "root": "D:/FireMonitoring-training-v3/raw/negatives-reviewed",
+    "names": [],
+    "splits": {
+      "train": "train"
+    },
+    "background": true,
+    "metadata": "metadata.csv",
+    "url": "https://cocodataset.org/#download",
+    "license": "Per-image Creative Commons; see negatives_metadata.csv",
+    "annotations": "captions_train2017.json",
+    "seed": 42,
+    "annotations_sha256": "4b62086319480e0739ef390d04084515defb9c213ff13605a036061e33314317",
+    "exclusions": "ml/configs/coco_negative_exclusions.csv",
+    "visual_review": "2026-11-03: all 2354 candidates reviewed on contact sheets, 13 enlarged; five excluded"
+  }
+]

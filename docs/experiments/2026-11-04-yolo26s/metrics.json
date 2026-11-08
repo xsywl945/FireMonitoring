@@ -1,0 +1,811 @@
+{
+  "provenance": "Extracted from Grok handoff files on 2026-11-08; evaluations not rerun.",
+  "models": {
+    "yolo11s": {
+      "model_sha256": "3f3e8fec6276b37a5639ebd8a6675e0bfa44fb444ac1aceb9510df552ad4cfde",
+      "manifest_sha256": "efb96552f6af1f96d6b08c4cd13fdf8b21a84d539fcc604581fcefb22d8e43ee",
+      "imgsz": 640,
+      "threshold_selection": "per-class maximum F1 on val, IoU >= 0.5; ties choose higher confidence",
+      "thresholds": {
+        "fire": 0.35000000000000003,
+        "smoke": 0.3
+      },
+      "small_definition": "box area after letterbox scaling < 32^2 pixels",
+      "datasets": {
+        "data": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/data.yaml",
+          "data_sha256": "86158d1fa8d2f1ea746b3cb10dd603c985bb921b7bd0ce261830993278167571",
+          "map50": 0.7264085812739673,
+          "map50_95": 0.4255436201731476,
+          "per_class": {
+            "fire": {
+              "map50": 0.6546656424372312,
+              "map50_95": 0.3430078126777693
+            },
+            "smoke": {
+              "map50": 0.7981515201107034,
+              "map50_95": 0.5080794276685258
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "tp": 409,
+                "gt": 622,
+                "fn": 213,
+                "small_gt": 249,
+                "small_tp": 131,
+                "fp": 226,
+                "precision": 0.6440944881889764,
+                "recall": 0.657556270096463,
+                "small_recall_iou50": 0.5261044176706827
+              },
+              "smoke": {
+                "tp": 273,
+                "gt": 346,
+                "fn": 73,
+                "fp": 113,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.7072538860103627,
+                "recall": 0.7890173410404624,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 535,
+            "negative_fp_images": 40,
+            "negative_image_fpr": 0.07476635514018691,
+            "negative_fp_detections": 49
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "tp": 352,
+                "gt": 622,
+                "fn": 270,
+                "small_gt": 249,
+                "small_tp": 99,
+                "fp": 140,
+                "precision": 0.7154471544715447,
+                "recall": 0.5659163987138264,
+                "small_recall_iou50": 0.39759036144578314
+              },
+              "smoke": {
+                "tp": 271,
+                "gt": 346,
+                "fn": 75,
+                "fp": 102,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.7265415549597856,
+                "recall": 0.7832369942196532,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 535,
+            "negative_fp_images": 31,
+            "negative_image_fpr": 0.05794392523364486,
+            "negative_fp_detections": 38
+          }
+        },
+        "dfire_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/dfire_test.yaml",
+          "data_sha256": "58bea00162c0b59609e107732ec4193df9c88749169102050958e4d556115e2b",
+          "map50": 0.7449063739465484,
+          "map50_95": 0.43190884549366115,
+          "per_class": {
+            "fire": {
+              "map50": 0.6718690529228892,
+              "map50_95": 0.3479845012069086
+            },
+            "smoke": {
+              "map50": 0.8179436949702075,
+              "map50_95": 0.5158331897804137
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "tp": 403,
+                "gt": 615,
+                "fn": 212,
+                "small_gt": 249,
+                "small_tp": 131,
+                "fp": 198,
+                "precision": 0.670549084858569,
+                "recall": 0.6552845528455284,
+                "small_recall_iou50": 0.5261044176706827
+              },
+              "smoke": {
+                "tp": 273,
+                "gt": 346,
+                "fn": 73,
+                "fp": 90,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.7520661157024794,
+                "recall": 0.7890173410404624,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 201,
+            "negative_fp_images": 1,
+            "negative_image_fpr": 0.004975124378109453,
+            "negative_fp_detections": 1
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "tp": 346,
+                "gt": 615,
+                "fn": 269,
+                "small_gt": 249,
+                "small_tp": 99,
+                "fp": 120,
+                "precision": 0.7424892703862661,
+                "recall": 0.5626016260162602,
+                "small_recall_iou50": 0.39759036144578314
+              },
+              "smoke": {
+                "tp": 271,
+                "gt": 346,
+                "fn": 75,
+                "fp": 82,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.7677053824362606,
+                "recall": 0.7832369942196532,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 201,
+            "negative_fp_images": 1,
+            "negative_image_fpr": 0.004975124378109453,
+            "negative_fp_detections": 1
+          }
+        },
+        "ifiresmoke_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/ifiresmoke_test.yaml",
+          "data_sha256": "e8c3d85d2f3efa14ca9cd82fed69665e186527256314a48c82e522c16e7c56bf",
+          "map50": 0.855,
+          "map50_95": 0.5878333333333334,
+          "per_class": {
+            "fire": {
+              "map50": 0.855,
+              "map50_95": 0.5878333333333334
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "tp": 6,
+                "gt": 7,
+                "fn": 1,
+                "fp": 2,
+                "precision": 0.75,
+                "recall": 0.8571428571428571,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 1,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 0,
+            "negative_fp_images": 0,
+            "negative_image_fpr": null,
+            "negative_fp_detections": 0
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "tp": 6,
+                "gt": 7,
+                "fn": 1,
+                "fp": 2,
+                "precision": 0.75,
+                "recall": 0.8571428571428571,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 1,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 0,
+            "negative_fp_images": 0,
+            "negative_image_fpr": null,
+            "negative_fp_detections": 0
+          }
+        },
+        "negatives_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/negatives_test.yaml",
+          "data_sha256": "b65162ac80565c6e11e0c62ee3a0e4a3770a83b85e199ac4cc19ecc8dccb6100",
+          "map50": 0.0,
+          "map50_95": 0.0,
+          "per_class": {},
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "fp": 26,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 22,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 334,
+            "negative_fp_images": 39,
+            "negative_image_fpr": 0.11676646706586827,
+            "negative_fp_detections": 48
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "fp": 18,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 19,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 334,
+            "negative_fp_images": 30,
+            "negative_image_fpr": 0.08982035928143713,
+            "negative_fp_detections": 37
+          }
+        }
+      }
+    },
+    "formal": {
+      "model_sha256": "146ec675ae5b3b21533097e54e440f0a5c718a9099811876b316fc5d21b3dcfb",
+      "manifest_sha256": "efb96552f6af1f96d6b08c4cd13fdf8b21a84d539fcc604581fcefb22d8e43ee",
+      "imgsz": 640,
+      "threshold_selection": "per-class maximum F1 on val, IoU >= 0.5; ties choose higher confidence",
+      "thresholds": {
+        "fire": 0.35000000000000003,
+        "smoke": 0.4
+      },
+      "small_definition": "box area after letterbox scaling < 32^2 pixels",
+      "datasets": {
+        "data": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/data.yaml",
+          "data_sha256": "86158d1fa8d2f1ea746b3cb10dd603c985bb921b7bd0ce261830993278167571",
+          "map50": 0.7297234407457287,
+          "map50_95": 0.4276964969854104,
+          "per_class": {
+            "fire": {
+              "map50": 0.6851022311197447,
+              "map50_95": 0.3509192612562143
+            },
+            "smoke": {
+              "map50": 0.7743446503717126,
+              "map50_95": 0.5044737327146062
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "fp": 234,
+                "tp": 417,
+                "gt": 622,
+                "fn": 205,
+                "small_gt": 249,
+                "small_tp": 144,
+                "precision": 0.6405529953917051,
+                "recall": 0.6704180064308681,
+                "small_recall_iou50": 0.5783132530120482
+              },
+              "smoke": {
+                "fp": 153,
+                "tp": 280,
+                "gt": 346,
+                "fn": 66,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.6466512702078522,
+                "recall": 0.8092485549132948,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 535,
+            "negative_fp_images": 53,
+            "negative_image_fpr": 0.09906542056074766,
+            "negative_fp_detections": 60
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "fp": 144,
+                "tp": 381,
+                "gt": 622,
+                "fn": 241,
+                "small_gt": 249,
+                "small_tp": 123,
+                "precision": 0.7257142857142858,
+                "recall": 0.612540192926045,
+                "small_recall_iou50": 0.4939759036144578
+              },
+              "smoke": {
+                "fp": 96,
+                "tp": 272,
+                "gt": 346,
+                "fn": 74,
+                "small_gt": 4,
+                "small_tp": 0,
+                "precision": 0.7391304347826086,
+                "recall": 0.7861271676300579,
+                "small_recall_iou50": 0.0
+              }
+            },
+            "negative_images": 535,
+            "negative_fp_images": 35,
+            "negative_image_fpr": 0.06542056074766354,
+            "negative_fp_detections": 36
+          }
+        },
+        "dfire_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/dfire_test.yaml",
+          "data_sha256": "58bea00162c0b59609e107732ec4193df9c88749169102050958e4d556115e2b",
+          "map50": 0.7326901592000016,
+          "map50_95": 0.4280156511583904,
+          "per_class": {
+            "fire": {
+              "map50": 0.6862515644807792,
+              "map50_95": 0.34861194637144044
+            },
+            "smoke": {
+              "map50": 0.779128753919224,
+              "map50_95": 0.5074193559453404
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "fp": 228,
+                "tp": 411,
+                "gt": 615,
+                "fn": 204,
+                "small_gt": 249,
+                "small_tp": 144,
+                "precision": 0.6431924882629108,
+                "recall": 0.6682926829268293,
+                "small_recall_iou50": 0.5783132530120482
+              },
+              "smoke": {
+                "fp": 143,
+                "tp": 280,
+                "gt": 346,
+                "fn": 66,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.6619385342789598,
+                "recall": 0.8092485549132948,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 201,
+            "negative_fp_images": 43,
+            "negative_image_fpr": 0.21393034825870647,
+            "negative_fp_detections": 48
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "fp": 140,
+                "tp": 375,
+                "gt": 615,
+                "fn": 240,
+                "small_gt": 249,
+                "small_tp": 123,
+                "precision": 0.7281553398058253,
+                "recall": 0.6097560975609756,
+                "small_recall_iou50": 0.4939759036144578
+              },
+              "smoke": {
+                "fp": 88,
+                "tp": 272,
+                "gt": 346,
+                "fn": 74,
+                "small_gt": 4,
+                "small_tp": 0,
+                "precision": 0.7555555555555555,
+                "recall": 0.7861271676300579,
+                "small_recall_iou50": 0.0
+              }
+            },
+            "negative_images": 201,
+            "negative_fp_images": 26,
+            "negative_image_fpr": 0.12935323383084577,
+            "negative_fp_detections": 27
+          }
+        },
+        "ifiresmoke_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/ifiresmoke_test.yaml",
+          "data_sha256": "e8c3d85d2f3efa14ca9cd82fed69665e186527256314a48c82e522c16e7c56bf",
+          "map50": 0.855,
+          "map50_95": 0.6302833333333333,
+          "per_class": {
+            "fire": {
+              "map50": 0.855,
+              "map50_95": 0.6302833333333333
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "tp": 6,
+                "gt": 7,
+                "fn": 1,
+                "fp": 4,
+                "precision": 0.6,
+                "recall": 0.8571428571428571,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "precision": null,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 0,
+            "negative_fp_images": 0,
+            "negative_image_fpr": null,
+            "negative_fp_detections": 0
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "tp": 6,
+                "gt": 7,
+                "fn": 1,
+                "fp": 3,
+                "precision": 0.6666666666666666,
+                "recall": 0.8571428571428571,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "precision": null,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 0,
+            "negative_fp_images": 0,
+            "negative_image_fpr": null,
+            "negative_fp_detections": 0
+          }
+        },
+        "negatives_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/negatives_test.yaml",
+          "data_sha256": "b65162ac80565c6e11e0c62ee3a0e4a3770a83b85e199ac4cc19ecc8dccb6100",
+          "map50": 0.0,
+          "map50_95": 0.0,
+          "per_class": {},
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "fp": 2,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 10,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 334,
+            "negative_fp_images": 10,
+            "negative_image_fpr": 0.029940119760479042,
+            "negative_fp_detections": 12
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "fp": 1,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 8,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 334,
+            "negative_fp_images": 9,
+            "negative_image_fpr": 0.02694610778443114,
+            "negative_fp_detections": 9
+          }
+        }
+      }
+    },
+    "finetune": {
+      "model_sha256": "429f7107d8810d912ab919f85285525eb8d8b167c050eb7b8450ea8f0772d027",
+      "manifest_sha256": "efb96552f6af1f96d6b08c4cd13fdf8b21a84d539fcc604581fcefb22d8e43ee",
+      "imgsz": 640,
+      "threshold_selection": "per-class maximum F1 on val, IoU >= 0.5; ties choose higher confidence",
+      "thresholds": {
+        "fire": 0.3,
+        "smoke": 0.35000000000000003
+      },
+      "small_definition": "box area after letterbox scaling < 32^2 pixels",
+      "datasets": {
+        "data": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/data.yaml",
+          "data_sha256": "86158d1fa8d2f1ea746b3cb10dd603c985bb921b7bd0ce261830993278167571",
+          "map50": 0.726090367780746,
+          "map50_95": 0.4165868280456996,
+          "per_class": {
+            "fire": {
+              "map50": 0.6776729149574823,
+              "map50_95": 0.33893111937944337
+            },
+            "smoke": {
+              "map50": 0.7745078206040098,
+              "map50_95": 0.49424253671195595
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "tp": 409,
+                "gt": 622,
+                "fn": 213,
+                "small_gt": 249,
+                "small_tp": 138,
+                "fp": 213,
+                "precision": 0.657556270096463,
+                "recall": 0.657556270096463,
+                "small_recall_iou50": 0.5542168674698795
+              },
+              "smoke": {
+                "fp": 122,
+                "tp": 280,
+                "gt": 346,
+                "fn": 66,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.6965174129353234,
+                "recall": 0.8092485549132948,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 535,
+            "negative_fp_images": 37,
+            "negative_image_fpr": 0.0691588785046729,
+            "negative_fp_detections": 39
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "tp": 395,
+                "gt": 622,
+                "fn": 227,
+                "small_gt": 249,
+                "small_tp": 132,
+                "fp": 182,
+                "precision": 0.6845753899480069,
+                "recall": 0.635048231511254,
+                "small_recall_iou50": 0.5301204819277109
+              },
+              "smoke": {
+                "fp": 99,
+                "tp": 273,
+                "gt": 346,
+                "fn": 73,
+                "small_gt": 4,
+                "small_tp": 0,
+                "precision": 0.7338709677419355,
+                "recall": 0.7890173410404624,
+                "small_recall_iou50": 0.0
+              }
+            },
+            "negative_images": 535,
+            "negative_fp_images": 31,
+            "negative_image_fpr": 0.05794392523364486,
+            "negative_fp_detections": 31
+          }
+        },
+        "dfire_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/dfire_test.yaml",
+          "data_sha256": "58bea00162c0b59609e107732ec4193df9c88749169102050958e4d556115e2b",
+          "map50": 0.7313983200349761,
+          "map50_95": 0.4185435994549773,
+          "per_class": {
+            "fire": {
+              "map50": 0.6848922183669848,
+              "map50_95": 0.3394101544703533
+            },
+            "smoke": {
+              "map50": 0.7779044217029675,
+              "map50_95": 0.49767704443960115
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "tp": 403,
+                "gt": 615,
+                "fn": 212,
+                "small_gt": 249,
+                "small_tp": 138,
+                "fp": 209,
+                "precision": 0.6584967320261438,
+                "recall": 0.6552845528455284,
+                "small_recall_iou50": 0.5542168674698795
+              },
+              "smoke": {
+                "fp": 117,
+                "tp": 280,
+                "gt": 346,
+                "fn": 66,
+                "small_gt": 4,
+                "small_tp": 1,
+                "precision": 0.7052896725440806,
+                "recall": 0.8092485549132948,
+                "small_recall_iou50": 0.25
+              }
+            },
+            "negative_images": 201,
+            "negative_fp_images": 31,
+            "negative_image_fpr": 0.15422885572139303,
+            "negative_fp_detections": 33
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "tp": 389,
+                "gt": 615,
+                "fn": 226,
+                "small_gt": 249,
+                "small_tp": 132,
+                "fp": 178,
+                "precision": 0.6860670194003528,
+                "recall": 0.6325203252032521,
+                "small_recall_iou50": 0.5301204819277109
+              },
+              "smoke": {
+                "fp": 94,
+                "tp": 273,
+                "gt": 346,
+                "fn": 73,
+                "small_gt": 4,
+                "small_tp": 0,
+                "precision": 0.7438692098092643,
+                "recall": 0.7890173410404624,
+                "small_recall_iou50": 0.0
+              }
+            },
+            "negative_images": 201,
+            "negative_fp_images": 25,
+            "negative_image_fpr": 0.12437810945273632,
+            "negative_fp_detections": 25
+          }
+        },
+        "ifiresmoke_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/ifiresmoke_test.yaml",
+          "data_sha256": "e8c3d85d2f3efa14ca9cd82fed69665e186527256314a48c82e522c16e7c56bf",
+          "map50": 0.82,
+          "map50_95": 0.6068833333333333,
+          "per_class": {
+            "fire": {
+              "map50": 0.82,
+              "map50_95": 0.6068833333333333
+            }
+          },
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "tp": 6,
+                "gt": 7,
+                "fn": 1,
+                "fp": 3,
+                "precision": 0.6666666666666666,
+                "recall": 0.8571428571428571,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "precision": null,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 0,
+            "negative_fp_images": 0,
+            "negative_image_fpr": null,
+            "negative_fp_detections": 0
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "tp": 6,
+                "gt": 7,
+                "fn": 1,
+                "fp": 3,
+                "precision": 0.6666666666666666,
+                "recall": 0.8571428571428571,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "precision": null,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 0,
+            "negative_fp_images": 0,
+            "negative_image_fpr": null,
+            "negative_fp_detections": 0
+          }
+        },
+        "negatives_test": {
+          "data": "/root/autodl-tmp/yolo26s-v3/dataset/negatives_test.yaml",
+          "data_sha256": "b65162ac80565c6e11e0c62ee3a0e4a3770a83b85e199ac4cc19ecc8dccb6100",
+          "map50": 0.0,
+          "map50_95": 0.0,
+          "per_class": {},
+          "fixed_conf_025": {
+            "per_class": {
+              "fire": {
+                "fp": 1,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 5,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 334,
+            "negative_fp_images": 6,
+            "negative_image_fpr": 0.017964071856287425,
+            "negative_fp_detections": 6
+          },
+          "recommended": {
+            "per_class": {
+              "fire": {
+                "fp": 1,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              },
+              "smoke": {
+                "fp": 5,
+                "precision": 0.0,
+                "recall": null,
+                "small_recall_iou50": null
+              }
+            },
+            "negative_images": 334,
+            "negative_fp_images": 6,
+            "negative_image_fpr": 0.017964071856287425,
+            "negative_fp_detections": 6
+          }
+        }
+      }
+    }
+  }
+}

@@ -10,6 +10,8 @@ Thumbs.db
 .env.*
 !.env.example
 secrets/
+kaggle.json
+.kaggle/
 *.pem
 *.key
 
@@ -41,9 +43,15 @@ hs_err_pid*
 *.onnx
 *.engine
 *.plan
-data/
+/data/*
+!/data/training-archive/
+/data/training-archive/*
+!/data/training-archive/2026-11-03-yolo26s-v3/
+/data/training-archive/2026-11-03-yolo26s-v3/*
+!/data/training-archive/2026-11-03-yolo26s-v3/ARCHIVE-MANIFEST.json
 datasets/
 weights/
+/models/
 runs/
 artifacts/
 *.safetensors
@@ -51,6 +59,7 @@ artifacts/
 *.npz
 *.npy
 *.zip
+*.tar.gz
 recordings/
 runtime/
 *.mp4
@@ -59,6 +68,7 @@ runtime/
 
 # Local tools and generated state
 .tools/
+.runtime/
 .wslconfig.local
 tmp/
 logs/

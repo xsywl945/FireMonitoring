@@ -1,256 +1,233 @@
-#!/usr/bin/env python3
-"""Build the primary split while isolating IFireSmoke validation and test images.
-
-The combined manifest keeps both datasets' official splits for traceability. This
-script creates the split used for early stopping and primary reporting:
-
-* train: D-Fire train plus IFireSmoke train, excluding perceptual matches to
-  protected validation/test images;
-* val: IFireSmoke val, excluding perceptual matches to IFireSmoke test;
-* test: the unchanged IFireSmoke test split.
-
-Source data and the combined dataset are never modified.
-"""
-
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
+import os
+import random
 import shutil
-import sys
-from collections import Counter
-from dataclasses import dataclass
+from collections import Counter, defaultdict
 from pathlib import Path
 
-import imagehash
 import yaml
-from PIL import Image
+
+from audit_yolo_dataset import BKTree, ImageRecord
+from prepare_fire_smoke_v1 import sha256_file
 
 
-@dataclass(frozen=True)
-class Sample:
-    source: str
-    source_split: str
-    image: Path
-    label: Path
+def read_rows(path):
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+def main():
+    parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--baseline-manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--phash-threshold", type=int, default=4)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--background-fraction", type=float, default=0.125)
     parser.add_argument("--link", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not 0 <= args.phash_threshold <= 16 or not 0 < args.background_fraction < 1:
+        parser.error("invalid phash threshold or background fraction")
+    output = args.output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    rows = read_rows(args.manifest)
+    parents = list(range(len(rows)))
 
+    def find(index):
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
 
-def load_manifest(path: Path) -> list[Sample]:
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        rows = list(csv.DictReader(handle))
-    samples = [
-        Sample(
-            source=row["source"],
-            source_split=row["split"],
-            image=Path(row["target_image"]),
-            label=Path(row["target_label"]),
+    def union(left, right):
+        parents[find(right)] = find(left)
+
+    tree = BKTree()
+    duplicate_parent = list(range(len(rows)))
+    # Deduplication and scene grouping have different meanings: retain all distinct frames of a scene.
+    duplicate_edges = []
+    groups, exact = {}, {}
+    for i, row in enumerate(rows):
+        if row["group"] in groups:
+            union(i, groups[row["group"]])
+        groups[row["group"]] = i
+        value = int(row["phash"], 16)
+        matches = [
+            int(record.image.name)
+            for _, record in tree.search(value, args.phash_threshold)
+        ]
+        if row["sha256"] in exact:
+            matches.append(exact[row["sha256"]])
+        for j in matches:
+            union(i, j)
+            duplicate_edges.append((i, j))
+        tree.add(value, ImageRecord(row["split"], Path(str(i)), row["sha256"], value))
+        exact[row["sha256"]] = i
+    scene_ids = [find(i) for i in range(len(rows))]
+    parents = duplicate_parent
+    for i, j in duplicate_edges:
+        union(i, j)
+    duplicates = defaultdict(list)
+    for i in range(len(rows)):
+        duplicates[find(i)].append(i)
+    kept, removals = [], []
+    for indices in duplicates.values():
+        winner = min(
+            indices,
+            key=lambda i: (
+                -int(rows[i]["fire_objects"]) - int(rows[i]["smoke_objects"]),
+                rows[i]["sha256"],
+                rows[i]["source_image"],
+            ),
         )
-        for row in rows
+        kept.append(winner)
+        removals.extend(
+            dict(
+                image=rows[i]["source_image"],
+                kept=rows[winner]["source_image"],
+                reason="phash_component",
+            )
+            for i in indices
+            if i != winner
+        )
+    baseline = read_rows(args.baseline_manifest)
+    seen_hashes = {
+        Path(r["target_image"]).stem.rsplit("__", 1)[1]
+        for r in baseline
+        if r["target_split"] in {"train", "val"}
+    }
+    locked = {
+        scene_ids[i] for i, row in enumerate(rows) if row["sha256"][:10] in seen_hashes
+    }
+    components = defaultdict(list)
+    for i in kept:
+        components[scene_ids[i]].append(i)
+    assignment = {}
+    for component, indices in sorted(components.items()):
+        identity = min(rows[i]["sha256"] for i in indices)
+        draw = (
+            int(hashlib.sha256(f"{args.seed}:{identity}".encode()).hexdigest()[:8], 16)
+            / 2**32
+        )
+        assignment[component] = (
+            "train"
+            if component in locked or draw < 0.7
+            else "val"
+            if draw < 0.85
+            else "test"
+        )
+    train_positive = sum(
+        assignment[scene_ids[i]] == "train"
+        and int(rows[i]["fire_objects"]) + int(rows[i]["smoke_objects"]) > 0
+        for i in kept
+    )
+    backgrounds = [
+        i
+        for i in kept
+        if assignment[scene_ids[i]] == "train"
+        and int(rows[i]["fire_objects"]) + int(rows[i]["smoke_objects"]) == 0
     ]
-    for sample in samples:
-        if not sample.image.is_file() or not sample.label.is_file():
-            raise FileNotFoundError(f"manifest target is missing: {sample}")
-    return samples
-
-
-def perceptual_hash(path: Path) -> int:
-    with Image.open(path) as image:
-        return int(str(imagehash.phash(image)), 16)
-
-
-def nearest_match(
-    value: int,
-    protected: list[tuple[int, Sample]],
-    threshold: int,
-) -> tuple[int, Sample] | None:
-    best: tuple[int, Sample] | None = None
-    for other_value, other in protected:
-        distance = (value ^ other_value).bit_count()
-        if distance <= threshold and (best is None or distance < best[0]):
-            best = (distance, other)
-            if distance == 0:
-                break
-    return best
-
-
-def materialize(
-    sample: Sample, output: Path, split: str, *, link: bool
-) -> tuple[Path, Path]:
-    image_target = output / "images" / split / sample.image.name
-    label_target = output / "labels" / split / sample.label.name
-    image_target.parent.mkdir(parents=True, exist_ok=True)
-    label_target.parent.mkdir(parents=True, exist_ok=True)
-    if image_target.exists() or label_target.exists():
-        raise FileExistsError(f"refusing to overwrite generated sample: {image_target}")
-    for source, target in ((sample.image, image_target), (sample.label, label_target)):
-        if link:
-            try:
-                target.hardlink_to(source)
-                continue
-            except OSError:
-                pass
-        shutil.copy2(source, target)
-    return image_target, label_target
-
-
-def removal_record(
-    sample: Sample,
-    sample_hash: int,
-    match: tuple[int, Sample],
-) -> dict[str, object]:
-    distance, protected = match
-    return {
-        "source": sample.source,
-        "source_split": sample.source_split,
-        "image": str(sample.image),
-        "phash": f"{sample_hash:016x}",
-        "distance": distance,
-        "protected_source": protected.source,
-        "protected_split": protected.source_split,
-        "protected_image": str(protected.image),
-    }
-
-
-def main() -> int:
-    args = parse_args()
-    if not 0 <= args.phash_threshold <= 16:
-        print("ERROR: --phash-threshold must be between 0 and 16", file=sys.stderr)
-        return 2
-    manifest = args.manifest.expanduser().resolve()
-    output = args.output.expanduser().resolve()
-    if not manifest.is_file():
-        print(f"ERROR: manifest does not exist: {manifest}", file=sys.stderr)
-        return 2
-    if output.exists() and any(output.iterdir()):
-        print(f"ERROR: output is not empty: {output}", file=sys.stderr)
-        return 2
-    output.mkdir(parents=True, exist_ok=True)
-
-    samples = load_manifest(manifest)
-    train_candidates = sorted(
-        (sample for sample in samples if sample.source_split == "train"),
-        key=lambda sample: str(sample.image),
+    random.Random(args.seed).shuffle(backgrounds)
+    budget = int(
+        train_positive * args.background_fraction / (1 - args.background_fraction)
     )
-    val_candidates = sorted(
-        (
-            sample
-            for sample in samples
-            if sample.source == "ifiresmoke" and sample.source_split == "val"
-        ),
-        key=lambda sample: str(sample.image),
-    )
-    test_samples = sorted(
-        (
-            sample
-            for sample in samples
-            if sample.source == "ifiresmoke" and sample.source_split == "test"
-        ),
-        key=lambda sample: str(sample.image),
-    )
-    if len(test_samples) != 500 or len(val_candidates) != 500:
-        raise ValueError(
-            "expected 500 IFireSmoke validation and 500 test images before isolation"
+    hard = [i for i in backgrounds if rows[i]["source"] == "negatives"]
+    natural = [i for i in backgrounds if rows[i]["source"] != "negatives"]
+    selected_backgrounds = set(hard[:budget] + natural[: max(0, budget - len(hard))])
+    output_rows = []
+    for i in kept:
+        row = rows[i].copy()
+        split = assignment[scene_ids[i]]
+        if (
+            split == "train"
+            and not int(row["fire_objects"]) + int(row["smoke_objects"])
+            and i not in selected_backgrounds
+        ):
+            removals.append(dict(image=row["source_image"], reason="background_budget"))
+            continue
+        for key, directory in (("target_image", "images"), ("target_label", "labels")):
+            source = Path(row[key])
+            target = output / directory / split / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if args.link:
+                os.link(source, target)
+            else:
+                shutil.copy2(source, target)
+            row[key] = target.relative_to(output).as_posix()
+        row.update(
+            split=split,
+            source_group=row["group"],
+            group=f"scene-{scene_ids[i]}",
+            baseline_exposed=str(scene_ids[i] in locked).lower(),
         )
-
-    test_hashes = [(perceptual_hash(sample.image), sample) for sample in test_samples]
-    kept_val: list[Sample] = []
-    kept_val_hashes: list[tuple[int, Sample]] = []
-    removals: list[dict[str, object]] = []
-    for sample in val_candidates:
-        value = perceptual_hash(sample.image)
-        match = nearest_match(value, test_hashes, args.phash_threshold)
-        if match is None:
-            kept_val.append(sample)
-            kept_val_hashes.append((value, sample))
-        else:
-            removals.append(removal_record(sample, value, match))
-
-    protected = [*test_hashes, *kept_val_hashes]
-    kept_train: list[Sample] = []
-    for index, sample in enumerate(train_candidates, start=1):
-        value = perceptual_hash(sample.image)
-        match = nearest_match(value, protected, args.phash_threshold)
-        if match is None:
-            kept_train.append(sample)
-        else:
-            removals.append(removal_record(sample, value, match))
-        if index % 1000 == 0:
-            print(f"Checked {index:,}/{len(train_candidates):,} training images")
-
-    output_manifest: list[dict[str, str]] = []
-    for target_split, split_samples in (
-        ("train", kept_train),
-        ("val", kept_val),
-        ("test", test_samples),
-    ):
-        for sample in split_samples:
-            image_target, label_target = materialize(
-                sample, output, target_split, link=args.link
-            )
-            output_manifest.append(
-                {
-                    "source": sample.source,
-                    "source_split": sample.source_split,
-                    "target_split": target_split,
-                    "source_image": str(sample.image),
-                    "source_label": str(sample.label),
-                    "target_image": str(image_target),
-                    "target_label": str(label_target),
-                }
-            )
-
-    data = {
-        "path": output.as_posix(),
-        "train": "images/train",
-        "val": "images/val",
-        "test": "images/test",
-        "names": {0: "fire", 1: "smoke"},
-    }
-    (output / "primary_fire_smoke_v1.yaml").write_text(
-        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
-    )
-    (output / "leakage_removals.json").write_text(
-        json.dumps(removals, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    with (output / "manifest.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(output_manifest[0]))
+        output_rows.append(row)
+    with (output / "manifest.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(output_rows[0]))
         writer.writeheader()
-        writer.writerows(output_manifest)
-    kept_by_source = Counter(sample.source for sample in kept_train)
-    removed_by_source_split = Counter(
-        (str(item["source"]), str(item["source_split"])) for item in removals
+        writer.writerows(output_rows)
+    for source in sorted({r["source"] for r in output_rows}):
+        selected = [
+            r["target_image"]
+            for r in output_rows
+            if r["source"] == source and r["split"] == "test"
+        ]
+        if selected:
+            (output / f"{source}_test.txt").write_text(
+                "".join(f"./{p}\n" for p in selected), encoding="utf-8"
+            )
+    config = dict(
+        path=output.as_posix(),
+        train="images/train",
+        val="images/val",
+        test="images/test",
+        names={0: "fire", 1: "smoke"},
     )
-    summary = {
-        "phash_threshold": args.phash_threshold,
-        "train_images": len(kept_train),
-        "val_images": len(kept_val),
-        "test_images": len(test_samples),
-        "train_images_by_source": dict(kept_by_source),
-        "removed_images": len(removals),
-        "removed_images_by_source_split": {
-            f"{source}/{split}": count
-            for (source, split), count in sorted(removed_by_source_split.items())
-        },
-        "test_is_unchanged_ifiresmoke": True,
-        "dfire_val_test_used_in_primary": False,
-    }
-    (output / "primary_split_summary.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    (output / "data.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
     )
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
-    print(f"Primary data YAML: {output / 'primary_fire_smoke_v1.yaml'}")
+    for source in sorted({r["source"] for r in output_rows if r["split"] == "test"}):
+        (output / f"{source}_test.yaml").write_text(
+            yaml.safe_dump(dict(config, test=f"{source}_test.txt"), sort_keys=False),
+            encoding="utf-8",
+        )
+    summary = dict(
+        images=dict(Counter(r["split"] for r in output_rows)),
+        by_source=dict(Counter(f"{r['source']}/{r['split']}" for r in output_rows)),
+        removed=len(removals),
+        phash_threshold=args.phash_threshold,
+        baseline_manifest_sha256=sha256_file(args.baseline_manifest),
+        baseline_exposed_test=sum(
+            r["split"] == "test" and r["baseline_exposed"] == "true"
+            for r in output_rows
+        ),
+        train_background_fraction=len(selected_backgrounds)
+        / (train_positive + len(selected_backgrounds)),
+    )
+    (output / "split_summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
+    (output / "removals.json").write_text(
+        json.dumps(removals, indent=2), encoding="utf-8"
+    )
+    for name in (
+        "sources.json",
+        "source_label_repairs.json",
+        *[p.name for p in args.manifest.parent.glob("*_metadata.csv")],
+    ):
+        shutil.copy2(args.manifest.parent / name, output / name)
+    files = sorted(p for p in output.rglob("*") if p.is_file())
+    (output / "CHECKSUMS.sha256").write_text(
+        "".join(
+            f"{sha256_file(p)}  {p.relative_to(output).as_posix()}\n" for p in files
+        ),
+        encoding="utf-8",
+    )
+    print(json.dumps(summary, indent=2))
     return 0
 
 
