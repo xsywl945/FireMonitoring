@@ -1,11 +1,18 @@
 import json
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from multiview_geometry import calibrate, locate, project, triangulate
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps/inference/src"))
+from fire_monitoring_inference.multiview_geometry import (  # noqa: E402
+    calibrate,
+    locate,
+    project,
+    triangulate,
+)
 
 rng = np.random.default_rng(20261108)
 cv2.setRNGSeed(20261108)
@@ -55,8 +62,8 @@ for event in range(120):
         pixels[rng.integers(4)] += 80 * np.array([np.cos(angle), np.sin(angle)])
     if reference is None:
         reference = poses.copy()
-    estimates = {'stale_pose': triangulate(pixels, intrinsics, distortion, reference),
-                 'current_pose_linear': triangulate(pixels, intrinsics, distortion, estimated)}
+    estimates = {'stale_pose': triangulate(pixels, intrinsics, distortion, reference)[0],
+                 'current_pose_linear': triangulate(pixels, intrinsics, distortion, estimated)[0]}
     for name, camera_pose, pose_cov in [('current_pose_robust', estimated, covariance),
                                        ('oracle_pose', poses, np.zeros((4, 6, 6)))]:
         result = locate(pixels, intrinsics, distortion, camera_pose, pose_cov,
