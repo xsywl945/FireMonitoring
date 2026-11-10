@@ -13,7 +13,7 @@ from fire_monitoring.config import load_config
 from fire_monitoring.db import make_engine, make_session_factory
 from fire_monitoring.detection.ingest import FrameShot
 from fire_monitoring.evidence.store import MemoryStore
-from fire_monitoring.localization.observe import CameraPose, source_from_box
+from fire_monitoring.localization.observe import source_from_box
 from fire_monitoring.models import Alert, AlertFrame, Room, SmsDispatch
 from fire_monitoring.sms.aliyun import AliyunSmsSender
 from fire_monitoring.sms.service import SmsService
@@ -98,13 +98,21 @@ def _session(tmp_path: Path):
     return make_session_factory(engine)()
 
 
-def _pose() -> CameraPose:
-    return CameraPose(
-        intrinsics=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-        distortion=[0, 0, 0, 0, 0],
-        pose=[0, 0, 0, 0, 0, 1],
-        pose_covariance=[[0.0] * 6 for _ in range(6)],
-    )
+def _calibration() -> dict:
+    return {
+        "intrinsics": [[800, 0, 320], [0, 800, 240], [0, 0, 1]],
+        "distortion": [0, 0, 0, 0, 0],
+        "landmarks": [
+            {"world_m": [0, 0, 0], "pixel": [1, 1]},
+            {"world_m": [1, 0, 0], "pixel": [2, 1]},
+            {"world_m": [1, 1, 0], "pixel": [2, 2]},
+            {"world_m": [0, 1, 0], "pixel": [1, 2]},
+        ],
+    }
+
+
+def _calibrations() -> dict:
+    return {camera_id: _calibration() for camera_id in (1, 2, 3, 4)}
 
 
 def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Path) -> None:
@@ -149,12 +157,22 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
         transport=transport,
     )
 
-    def locate_fn(*_args, **_kwargs):
+    seen = {}
+
+    def localizer(manifest, model, device):
+        from fire_monitoring_inference.localization import FourViewInput
+
+        request = FourViewInput.model_validate_json(manifest.read_bytes())
+        seen["cameras"] = set(request.views)
+        seen["pixel"] = request.views[1].source.pixel
+        seen["model"] = model
+        seen["device"] = device
         return {
             "status": "ESTIMATED",
             "xyz": [1.5, 2.5, 0.2],
             "covariance": [[0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.1]],
-            "support": [True, True],
+            "condition_number": 8.0,
+            "support_camera_ids": [1, 2],
         }
 
     alert = confirm_alert(
@@ -163,7 +181,7 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
         alert_type="FIRE",
         started_at=now,
         sources=sources,
-        poses={1: _pose(), 2: _pose()},
+        calibrations=_calibrations(),
         frames=frames,
         pump_observations=[
             {
@@ -179,12 +197,17 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
         analyzer=analyzer,
         sms=sms,
         pump=pump,
-        locate_fn=locate_fn,
+        localizer=localizer,
     )
     stored = session.get(Alert, alert.id)
     position = json.loads(stored.position_json)
+    assert seen["cameras"] == {1, 2, 3, 4}
+    assert seen["pixel"] == sources[0].pixel
+    assert seen["model"].name == "best.pt"
+    assert seen["device"] == "0"
     assert position["status"] == "ESTIMATED"
     assert position["xyz"] == [1.5, 2.5, 0.2]
+    assert position["condition_number"] == 8.0
     assert position["support_camera_ids"] == [1, 2]
     assert session.query(AlertFrame).count() == 4
     assert len(evidence.objects) == 4
@@ -202,15 +225,15 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
         alert_type="FIRE",
         started_at=later,
         sources=sources,
-        poses={1: _pose(), 2: _pose()},
-        frames=frames[:1],
+        calibrations=_calibrations(),
+        frames=frames,
         pump_observations=[],
         config=_config(),
         evidence=evidence,
         analyzer=analyzer,
         sms=sms,
         pump=None,
-        locate_fn=locate_fn,
+        localizer=localizer,
     )
     assert len(sender.sent) == 1
     assert session.query(SmsDispatch).count() == 1
@@ -226,26 +249,31 @@ def test_disabled_sms_and_llm_are_not_called(tmp_path: Path) -> None:
     analyzer = FakeAnalyzer()
     sender = FakeSms()
     now = datetime.now(UTC)
+    frames = [
+        FrameShot(camera_id=camera_id, jpeg=b"jpg", captured_at=now, width=100, height=80)
+        for camera_id in (1, 2, 3, 4)
+    ]
     confirm_alert(
         session,
         room_id=room.id,
         alert_type="SMOKE",
         started_at=now,
         sources=[],
-        poses={},
-        frames=[],
+        calibrations=_calibrations(),
+        frames=frames,
         pump_observations=[],
         config=config,
         evidence=MemoryStore(),
         analyzer=analyzer,
         sms=SmsService(config, sender),
         pump=None,
-        locate_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("locate")),
+        localizer=lambda *_args, **_kwargs: {"status": "UNOBSERVABLE", "support_camera_ids": []},
     )
     assert analyzer.calls == []
     assert sender.sent == []
     position = json.loads(session.query(Alert).one().position_json)
-    assert position["status"] == "UNOBSERVABLE"
+    assert position == {"status": "UNOBSERVABLE", "support_camera_ids": []}
+    assert "xyz" not in position
 
 
 def test_aliyun_sender_posts_template_and_raises_on_failure() -> None:

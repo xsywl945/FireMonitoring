@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from ..config import AppConfig
-from ..localization.observe import SourceObservation, locate_observations
+from ..localization.observe import SourceObservation, locate_position
 from ..models import Alert, AlertFrame, Room
 from ..pump.bridge import trigger_pump
 from ..sms.service import SmsService
@@ -30,7 +30,7 @@ def confirm_alert(
     alert_type: str,
     started_at: datetime,
     sources: list[SourceObservation],
-    poses: dict,
+    calibrations: dict,
     frames: list,
     pump_observations: list[dict],
     config: AppConfig,
@@ -38,11 +38,11 @@ def confirm_alert(
     analyzer,
     sms: SmsService,
     pump,
-    locate_fn,
+    localizer=None,
 ) -> Alert:
     room = session.get(Room, room_id)
     room_name = room.name
-    position = locate_observations(sources, poses, locate_fn)
+    position = locate_position(config, frames, calibrations, sources, localizer=localizer)
     alert = Alert(
         room_id=room_id,
         alert_type=alert_type,

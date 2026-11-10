@@ -9,7 +9,6 @@ from sqlalchemy import select
 
 from ..alerts.service import confirm_alert
 from ..detection.ingest import DetectionHit, DetectionState, consume_frame
-from ..localization.observe import build_pose, geometry_locate
 from ..models import Camera, Room, RoomCamera
 
 
@@ -59,8 +58,6 @@ class DetectionWorker:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._caps: dict[int, object] = {}
-        self._poses: dict[int, object] = {}
-        self._pose_key: dict[int, str] = {}
         self._assignments: list[Assignment] = []
         self._loaded_at = 0.0
         self.detector = None
@@ -130,20 +127,7 @@ class DetectionWorker:
                         bound_camera_ids=bound_ids,
                     )
                 )
-                self._refresh_pose(camera.id, camera.calibration_json)
         self._assignments = assignments
-
-    def _refresh_pose(self, camera_id: int, raw: str | None) -> None:
-        if not raw:
-            self._poses.pop(camera_id, None)
-            self._pose_key.pop(camera_id, None)
-            return
-        if self._pose_key.get(camera_id) == raw:
-            return
-        self._poses[camera_id] = build_pose(
-            json.loads(raw), self.config.localization.landmark_sigma_px
-        )
-        self._pose_key[camera_id] = raw
 
     def _process(self, assignment: Assignment) -> None:
         import cv2
@@ -186,10 +170,10 @@ class DetectionWorker:
         self.live.update(assignment.camera_id, snapshot)
 
     def _on_alert(self, draft) -> None:
-        poses = {
-            item.camera_id: self._poses[item.camera_id]
-            for item in draft.sources
-            if item.camera_id in self._poses
+        calibrations = {
+            assignment.camera_id: json.loads(assignment.calibration_json)
+            for assignment in self._assignments
+            if assignment.room_id == draft.room_id and assignment.calibration_json
         }
         session = self.session_factory()
         try:
@@ -199,7 +183,7 @@ class DetectionWorker:
                 alert_type=draft.alert_type,
                 started_at=draft.started_at,
                 sources=draft.sources,
-                poses=poses,
+                calibrations=calibrations,
                 frames=draft.frames,
                 pump_observations=draft.pump_observations,
                 config=self.config,
@@ -207,7 +191,6 @@ class DetectionWorker:
                 analyzer=self.analyzer,
                 sms=self.sms,
                 pump=self.pump,
-                locate_fn=geometry_locate,
             )
         finally:
             session.close()

@@ -82,6 +82,7 @@ export interface Position {
   status: string
   xyz?: number[]
   covariance?: number[][]
+  condition_number?: number
   support_camera_ids: number[]
 }
 

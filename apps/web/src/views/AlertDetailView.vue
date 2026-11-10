@@ -62,8 +62,9 @@ onBeforeUnmount(() => {
     <div class="panel">
       <div>{{ detail.room_name }} / {{ alertLabels[detail.alert_type] || detail.alert_type }}</div>
       <div>{{ formatTime(detail.started_at) }}</div>
-      <div v-if="detail.position?.status === 'ESTIMATED'">
-        已定位 {{ detail.position.xyz?.map((item) => item.toFixed(2)).join(", ") }}
+      <div v-if="detail.position?.status === 'ESTIMATED' && detail.position.xyz">
+        已定位 {{ detail.position.xyz.map((item) => item.toFixed(2)).join(", ") }}
+        ，条件数 {{ detail.position.condition_number }}
         ，支撑摄像头 {{ detail.position.support_camera_ids.join("、") }}
       </div>
       <div v-else>无法定位</div>

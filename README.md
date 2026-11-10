@@ -42,7 +42,7 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\stop.ps1
 
 平面图要上传图片，并填写原点在图上的像素、原点的世界坐标 X/Y，以及每像素对应多少米。图上 Y 轴向上、像素 v 向下，火点纵向位置按 `origin_px[1] - (Y - origin_world_y) / meters_per_pixel` 画。
 
-检测框变成定位观测的规则：火用框底边中点，烟用框中心；协方差取框宽、框高的四分之一作为标准差；可靠度用置信度，并限制在 (0, 1)。时间窗内至少两路有效观测才调用 `locate()`。
+检测框变成定位观测的规则：火用框底边中点，烟用框中心；协方差取框宽、框高的四分之一作为标准差；可靠度用置信度，并限制在 (0, 1)。时间窗内的观测按 `localize_frames` 的 manifest 写入每路 `source`，再调用 `fire_monitoring_inference.localization.localize_frames`。返回 `UNOBSERVABLE` 时没有坐标，告警不写 `xyz`，平面图不标点。
 
 ## config.json
 
@@ -134,8 +134,7 @@ MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一�
 ```text
 apps/server    FastAPI：教室、摄像头、流、检测、定位、告警、分析、短信、证据、泵、登录、配置
 apps/web       Vue 3 前端
-apps/inference 被服务复用的检测、时序、千问和串口泵实现
-ml/scripts/multiview_geometry.py  原定位算法，服务内有一份相同实现
+apps/inference 检测、时序、千问、串口泵，以及四摄定位 localize_frames
 config.example.json
 scripts/windows
 ```

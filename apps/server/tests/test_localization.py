@@ -1,24 +1,23 @@
 from datetime import UTC, datetime, timedelta
 
 from fire_monitoring.config import load_config
-from fire_monitoring.detection.ingest import DetectionHit, DetectionState, consume_frame
-from fire_monitoring.localization.observe import (
-    CameraPose,
-    latest_in_window,
-    locate_observations,
-    source_from_box,
-)
+from fire_monitoring.detection.ingest import DetectionHit, DetectionState, FrameShot, consume_frame
+from fire_monitoring.localization.observe import latest_in_window, source_from_box, write_manifest
 
 EXAMPLE = __import__("pathlib").Path(__file__).resolve().parents[3] / "config.example.json"
 
 
-def _pose() -> CameraPose:
-    return CameraPose(
-        intrinsics=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-        distortion=[0, 0, 0, 0, 0],
-        pose=[0, 0, 0, 0, 0, 1],
-        pose_covariance=[[0.0] * 6 for _ in range(6)],
-    )
+def _calibration() -> dict:
+    return {
+        "intrinsics": [[800, 0, 320], [0, 800, 240], [0, 0, 1]],
+        "distortion": [0, 0, 0, 0, 0],
+        "landmarks": [
+            {"world_m": [0, 0, 0], "pixel": [10, 10]},
+            {"world_m": [1, 0, 0], "pixel": [100, 10]},
+            {"world_m": [1, 1, 0], "pixel": [100, 100]},
+            {"world_m": [0, 1, 0], "pixel": [10, 100]},
+        ],
+    }
 
 
 def test_source_pixel_covariance_and_reliability() -> None:
@@ -92,49 +91,37 @@ def test_window_keeps_latest_observation_per_camera() -> None:
     assert by_camera[1].reliability == 0.9
 
 
-def test_locate_maps_support_and_skips_single_view() -> None:
+def test_manifest_matches_localize_frames_input(tmp_path) -> None:
+    from fire_monitoring_inference.localization import FourViewInput
+
     now = datetime(2026, 11, 10, tzinfo=UTC)
-    first = source_from_box(
-        camera_id=2,
-        class_name="fire",
-        bbox_xyxy=(0, 0, 20, 20),
-        confidence=0.7,
-        image_width=64,
-        image_height=64,
-        captured_at=now,
-    )
-    second = source_from_box(
+    fire = source_from_box(
         camera_id=1,
         class_name="fire",
-        bbox_xyxy=(4, 4, 16, 16),
-        confidence=0.6,
-        image_width=64,
-        image_height=64,
+        bbox_xyxy=(10, 20, 50, 80),
+        confidence=0.8,
+        image_width=100,
+        image_height=100,
         captured_at=now,
     )
-    calls = []
-
-    def locate_fn(pixels, intrinsics, distortion, poses, pose_covariance, pixel_covariance, image_area, reliability):
-        calls.append(pixels.copy())
-        return {
-            "status": "ESTIMATED",
-            "xyz": [1.0, 2.0, 0.0],
-            "covariance": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            "support": [True, False],
-        }
-
-    poses = {1: _pose(), 2: _pose()}
-    position = locate_observations([first, second], poses, locate_fn)
-    assert calls[0][0].tolist() == list(second.pixel)
-    assert calls[0][1].tolist() == list(first.pixel)
-    assert position["status"] == "ESTIMATED"
-    assert position["xyz"] == [1.0, 2.0, 0.0]
-    assert position["support_camera_ids"] == [1]
-
-    calls.clear()
-    missing = locate_observations([second], poses, locate_fn)
-    assert missing == {"status": "UNOBSERVABLE", "support_camera_ids": []}
-    assert calls == []
+    frames = [
+        FrameShot(camera_id=camera_id, jpeg=b"jpg", captured_at=now, width=100, height=100)
+        for camera_id in (1, 2, 3, 4)
+    ]
+    path = write_manifest(
+        tmp_path,
+        2.0,
+        frames,
+        {camera_id: _calibration() for camera_id in (1, 2, 3, 4)},
+        [fire],
+    )
+    request = FourViewInput.model_validate_json(path.read_bytes())
+    assert request.landmark_sigma_px == 2.0
+    assert set(request.views) == {1, 2, 3, 4}
+    assert request.views[1].source.pixel == fire.pixel
+    assert request.views[1].source.reliability == fire.reliability
+    assert len(request.views[1].landmarks) == 4
+    assert request.views[2].source is None
 
 
 def test_confirmed_detection_collects_window_and_fire_pixel() -> None:
