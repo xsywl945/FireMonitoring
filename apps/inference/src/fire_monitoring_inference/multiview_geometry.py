@@ -44,7 +44,10 @@ def triangulate(pixels, intrinsics, distortion, poses):
         centers.append(-rotation.T @ pose[3:])
     directions, centers = np.array(directions), np.array(centers)
     a = np.eye(3) - directions[:, :, None] * directions[:, None, :]
-    return np.linalg.lstsq(a.sum(axis=0), np.einsum('vij,vj->i', a, centers), rcond=None)[0]
+    point, _, rank, _ = np.linalg.lstsq(
+        a.sum(axis=0), np.einsum('vij,vj->i', a, centers), rcond=1e-10,
+    )
+    return point, rank
 
 
 def locate(pixels, intrinsics, distortion, poses, pose_covariance, pixel_covariance,
@@ -60,11 +63,18 @@ def locate(pixels, intrinsics, distortion, poses, pose_covariance, pixel_covaria
         mixture = np.logaddexp(log_signal, np.log1p(-reliability))
         return mixture, np.exp(log_signal - mixture), inverse, source_j
 
+    depth_axes = np.array([cv2.Rodrigues(pose[:3])[0][2] for pose in poses])
     candidates = []
     for pair in combinations(range(len(pixels)), 2):
         selected = np.array(pair)
-        candidates.append(triangulate(pixels[selected], intrinsics[selected],
-                                      distortion[selected], poses[selected]))
+        point, rank = triangulate(
+            pixels[selected], intrinsics[selected], [distortion[i] for i in pair], poses[selected],
+        )
+        if rank == 3 and np.all(depth_axes[selected] @ point + poses[selected, 5] > 0):
+            candidates.append(point)
+    if not candidates:
+        return {'status': 'UNOBSERVABLE', 'support': [False] * len(pixels)}
+
     candidates.sort(key=lambda point: -evidence(point)[0].sum())
     solutions = [minimize(lambda point: -evidence(point)[0].sum(), initial,
                           method='Nelder-Mead', options={'maxiter': 800, 'xatol': 1e-7})
@@ -73,8 +83,7 @@ def locate(pixels, intrinsics, distortion, poses, pose_covariance, pixel_covaria
         if not solution.success:
             raise RuntimeError(solution.message)
     point = min(solutions, key=lambda solution: solution.fun).x
-    rotations = np.array([cv2.Rodrigues(pose[:3])[0] for pose in poses])
-    depth = np.einsum('vij,j->vi', rotations, point)[:, 2] + poses[:, 5]
+    depth = depth_axes @ point + poses[:, 5]
     _, responsibility, inverse, source_j = evidence(point)
     supported = (responsibility >= 0.5) & (depth > 0)
     information = np.einsum('v,vji,vjk,vkl->il', responsibility * supported,

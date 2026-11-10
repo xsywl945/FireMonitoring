@@ -20,6 +20,7 @@ dependencies = [
 yolo = [
   "minio==7.2.20",
   "opencv-python>=4.10,<5",
+  "scipy>=1.11,<2",
   "ultralytics==8.4.100",
 ]
 dev = [

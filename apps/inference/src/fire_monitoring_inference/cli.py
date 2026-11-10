@@ -8,6 +8,7 @@ import logging
 import sys
 import threading
 from collections.abc import Sequence
+from contextlib import redirect_stdout
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -84,6 +85,13 @@ def _parser() -> argparse.ArgumentParser:
     camera.add_argument("--camera-id", type=int, default=1)
     camera.add_argument("--publisher", choices=("memory", "stdout", "redis"), default="memory")
     camera.add_argument("--preview", action=argparse.BooleanOptionalAction, default=False)
+
+    localize = subparsers.add_parser(
+        "localize", help="run YOLO26s and locate a source from four annotated frames"
+    )
+    localize.add_argument("manifest", type=Path, help="JSON file with four current views")
+    localize.add_argument("--model", type=Path, required=True, help="local YOLO26s .pt weights")
+    localize.add_argument("--device", default="0")
 
     doctor = subparsers.add_parser("doctor", help="verify CUDA and the local YOLO model")
     doctor.add_argument("--model", type=Path, required=True)
@@ -259,6 +267,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     args = _parser().parse_args(argv)
+    if args.command == "localize":
+        from .localization import localize_frames
+
+        with redirect_stdout(sys.stderr):
+            result = localize_frames(args.manifest, args.model, args.device)
+        print(json.dumps(result, allow_nan=False))
+        return 0
+
     config = ServiceConfig.from_env()
 
     if args.command == "validate-event":
