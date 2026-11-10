@@ -59,7 +59,7 @@ fire-inference replay --input .\runtime\demo.jsonl
 fire-inference replay --publisher redis
 ```
 
-可用环境变量见 `.env.example`。`runtime/` 已由仓库 `.gitignore` 排除。
+在线服务不再读取这个包的环境变量，配置在仓库根目录 `config.json`。`runtime/` 已由仓库 `.gitignore` 排除。
 
 ## 管理 API
 

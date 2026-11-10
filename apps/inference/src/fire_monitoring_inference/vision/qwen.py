@@ -86,7 +86,7 @@ class QwenVisionReasoner:
         started = time.perf_counter()
         if not self.api_key:
             return self._failure(incident_id, "VLM_NOT_CONFIGURED", started)
-        if not image_data_urls or len(image_data_urls) > 3:
+        if not image_data_urls or len(image_data_urls) > 4:
             return self._failure(incident_id, "VLM_INVALID_IMAGE_COUNT", started)
         if any(not url.startswith("data:image/") for url in image_data_urls):
             return self._failure(incident_id, "VLM_UNSAFE_IMAGE_URL", started)

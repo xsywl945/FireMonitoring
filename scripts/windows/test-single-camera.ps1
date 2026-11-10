@@ -1,8 +1,8 @@
 param(
     [int]$CameraIndex = 0,
-    [string]$ModelPath = (Join-Path $PSScriptRoot '..\..\data\training-archive\2026-08-12-yolo11s-primary-v2\models\deployment\best.pt'),
+    [string]$ModelPath = (Join-Path $PSScriptRoot '..\..\models\yolo26s-ft-2026-11-04\best.pt'),
     [double]$TargetFps = 5,
-    [double]$Confidence = 0.25,
+    [double]$Confidence = 0.30,
     [int]$MaxFrames = 0,
     [switch]$NoPreview
 )

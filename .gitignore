@@ -9,6 +9,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+/config.json
 secrets/
 kaggle.json
 .kaggle/
@@ -32,6 +33,7 @@ hs_err_pid*
 # Python
 **/__pycache__/
 **/.pytest_cache/
+**/*.egg-info/
 **/.mypy_cache/
 **/.ruff_cache/
 **/.venv/

@@ -52,8 +52,8 @@ catch {
     $failures.Add('Docker Desktop engine is not running.')
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $WorkspaceRoot '.env'))) {
-    $warnings.Add('No .env file exists. Copy .env.example and replace all placeholder credentials.')
+if (-not (Test-Path -LiteralPath (Join-Path $WorkspaceRoot 'config.json'))) {
+    $warnings.Add('No config.json. Copy config.example.json and fill in this machine.')
 }
 
 foreach ($warning in $warnings) {

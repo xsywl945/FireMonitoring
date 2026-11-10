@@ -1,0 +1,105 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "cors_origins": ["http://127.0.0.1:5173", "http://localhost:5173"]
+  },
+  "database": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "name": "fire_monitoring",
+    "user": "fire_app",
+    "password": "change-me"
+  },
+  "minio": {
+    "endpoint": "127.0.0.1:9000",
+    "access_key": "fire_minio",
+    "secret_key": "change-minio-me",
+    "bucket": "fire-evidence",
+    "secure": false
+  },
+  "mediamtx": {
+    "rtsp_base": "rtsp://127.0.0.1:8554",
+    "whep_base": "http://127.0.0.1:8889",
+    "rtsp_address": ":8554",
+    "hls_address": ":8888",
+    "webrtc_address": ":8889",
+    "webrtc_udp_address": ":8189",
+    "api_address": ":9997",
+    "playback_address": ":9996",
+    "config_path": "runtime/mediamtx.yml",
+    "ffmpeg_path": "ffmpeg",
+    "mediamtx_path": "mediamtx"
+  },
+  "llm": {
+    "enabled": false,
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model": "qwen3.7-plus",
+    "api_key": ""
+  },
+  "sms": {
+    "enabled": false,
+    "access_key_id": "",
+    "access_key_secret": "",
+    "sign_name": "",
+    "template_code": "",
+    "recipients": [],
+    "cooldown_seconds": 300
+  },
+  "model": {
+    "path": "models/yolo26s-ft-2026-11-04/best.pt",
+    "version": "yolo26s-ft-2026-11-04",
+    "imgsz": 640,
+    "device": "0",
+    "thresholds": {
+      "fire": 0.3,
+      "smoke": 0.35
+    }
+  },
+  "temporal": {
+    "n": 3,
+    "m": 5,
+    "candidate_n": 1,
+    "clear_frames": 3,
+    "cooldown_ms": 10000
+  },
+  "localization": {
+    "landmark_sigma_px": 2.0,
+    "window_ms": 500
+  },
+  "pump": {
+    "enabled": false,
+    "serial_port": "",
+    "zone_id": null,
+    "duration_ms": 5000,
+    "cooldown_seconds": 60,
+    "min_confidence": 0.7,
+    "max_evidence_age_seconds": 30,
+    "require_vlm": false,
+    "local_min_confidence": 0.3,
+    "local_min_frames": 3,
+    "journal_path": "runtime/pump.sqlite3"
+  },
+  "auth": {
+    "jwt_secret": "change-this-jwt-secret-to-a-long-random-string",
+    "jwt_expiration_seconds": 28800,
+    "users": [
+      {
+        "username": "admin",
+        "password": "123456",
+        "display_name": "管理员",
+        "role": "admin"
+      },
+      {
+        "username": "duty",
+        "password": "123456",
+        "display_name": "值班员",
+        "role": "operator"
+      }
+    ]
+  },
+  "cameras": {
+    "default_fps": 15
+  },
+  "timezone": "Asia/Shanghai"
+}

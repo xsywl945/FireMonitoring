@@ -1,0 +1,278 @@
+import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import httpx
+import pytest
+from fire_monitoring_inference.contracts import utc_now
+from fire_monitoring_inference.pump import PumpConfig, PumpController
+
+from fire_monitoring.alerts.service import confirm_alert
+from fire_monitoring.config import load_config
+from fire_monitoring.db import make_engine, make_session_factory
+from fire_monitoring.detection.ingest import FrameShot
+from fire_monitoring.evidence.store import MemoryStore
+from fire_monitoring.localization.observe import CameraPose, source_from_box
+from fire_monitoring.models import Alert, AlertFrame, Room, SmsDispatch
+from fire_monitoring.sms.aliyun import AliyunSmsSender
+from fire_monitoring.sms.service import SmsService
+from fire_monitoring.config.model import SmsSettings
+
+EXAMPLE = Path(__file__).resolve().parents[3] / "config.example.json"
+
+
+class FakeAnalyzer:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def analyze(self, alert_id: int, jpegs: list[bytes]) -> dict:
+        self.calls.append((alert_id, list(jpegs)))
+        return {
+            "status": "SUCCEEDED",
+            "provider": "fake",
+            "model": "fake",
+            "prompt_version": "test",
+            "has_visible_fire": True,
+            "has_visible_smoke": False,
+            "source_nature": "open_flame",
+            "scene_type": "classroom",
+            "risk_level": "HIGH",
+            "reasoning_summary": "画面中有明火",
+            "recommended_actions": ["疏散"],
+            "confidence": 0.9,
+            "uncertainties": [],
+            "error_code": None,
+        }
+
+
+class FakeSms:
+    def __init__(self) -> None:
+        self.sent = []
+
+    def send(self, phone: str, template_param: dict[str, str]) -> None:
+        self.sent.append((phone, template_param))
+
+
+class FakeTransport:
+    def __init__(self) -> None:
+        self.commands = []
+
+    def prepare(self) -> None:
+        return None
+
+    def request(self, command: str) -> str:
+        self.commands.append(command)
+        if command.startswith("RUN "):
+            trace = command.split()[1]
+            return f"ACK {trace} ON"
+        if command == "STATUS":
+            return "STATE OFF NONE"
+        return "STOPPED"
+
+    def close(self) -> None:
+        return None
+
+
+def _config():
+    data = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    data["llm"]["enabled"] = True
+    data["sms"]["enabled"] = True
+    data["sms"]["recipients"] = ["13800000000"]
+    data["sms"]["cooldown_seconds"] = 300
+    return load_config_from(data)
+
+
+def load_config_from(data: dict):
+    from fire_monitoring.config import AppConfig
+
+    return AppConfig.model_validate(data)
+
+
+def _session(tmp_path: Path):
+    from fire_monitoring.db import Base
+    import fire_monitoring.models  # noqa: F401
+
+    engine = make_engine(f"sqlite:///{tmp_path / 'alerts.db'}")
+    Base.metadata.create_all(engine)
+    return make_session_factory(engine)()
+
+
+def _pose() -> CameraPose:
+    return CameraPose(
+        intrinsics=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        distortion=[0, 0, 0, 0, 0],
+        pose=[0, 0, 0, 0, 0, 1],
+        pose_covariance=[[0.0] * 6 for _ in range(6)],
+    )
+
+
+def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    session.add(Room(name="101", scene_type="classroom", created_at=utc_now()))
+    session.commit()
+    room = session.query(Room).one()
+    now = utc_now()
+    sources = [
+        source_from_box(
+            camera_id=camera_id,
+            class_name="fire",
+            bbox_xyxy=(10, 10, 40, 50),
+            confidence=0.8,
+            image_width=100,
+            image_height=80,
+            captured_at=now,
+        )
+        for camera_id in (1, 2)
+    ]
+    frames = [
+        FrameShot(camera_id=camera_id, jpeg=f"frame-{camera_id}".encode(), captured_at=now, width=100, height=80)
+        for camera_id in (1, 2, 3, 4)
+    ]
+    evidence = MemoryStore()
+    analyzer = FakeAnalyzer()
+    sender = FakeSms()
+    sms = SmsService(_config(), sender)
+    transport = FakeTransport()
+    pump = PumpController(
+        config=PumpConfig(
+            enabled=True,
+            port="COM3",
+            zone_id=room.id,
+            duration_ms=5000,
+            cooldown_seconds=0,
+            require_vlm=False,
+            local_min_confidence=0.3,
+            local_min_frames=1,
+        ),
+        journal_path=tmp_path / "pump.sqlite3",
+        transport=transport,
+    )
+
+    def locate_fn(*_args, **_kwargs):
+        return {
+            "status": "ESTIMATED",
+            "xyz": [1.5, 2.5, 0.2],
+            "covariance": [[0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.1]],
+            "support": [True, True],
+        }
+
+    alert = confirm_alert(
+        session,
+        room_id=room.id,
+        alert_type="FIRE",
+        started_at=now,
+        sources=sources,
+        poses={1: _pose(), 2: _pose()},
+        frames=frames,
+        pump_observations=[
+            {
+                "camera_id": 1,
+                "class_name": "fire",
+                "score": 0.8,
+                "effective_frames": 3,
+                "duration_ms": 400,
+            }
+        ],
+        config=_config(),
+        evidence=evidence,
+        analyzer=analyzer,
+        sms=sms,
+        pump=pump,
+        locate_fn=locate_fn,
+    )
+    stored = session.get(Alert, alert.id)
+    position = json.loads(stored.position_json)
+    assert position["status"] == "ESTIMATED"
+    assert position["xyz"] == [1.5, 2.5, 0.2]
+    assert position["support_camera_ids"] == [1, 2]
+    assert session.query(AlertFrame).count() == 4
+    assert len(evidence.objects) == 4
+    analysis = json.loads(stored.analysis_json)
+    assert analysis["reasoning_summary"] == "画面中有明火"
+    assert analyzer.calls[0][1] == [frame.jpeg for frame in frames]
+    expected_time = now.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
+    assert sender.sent == [("13800000000", {"room": "101", "type": "火焰", "time": expected_time})]
+    assert transport.commands[0].startswith("RUN ")
+
+    later = now + timedelta(seconds=10)
+    confirm_alert(
+        session,
+        room_id=room.id,
+        alert_type="FIRE",
+        started_at=later,
+        sources=sources,
+        poses={1: _pose(), 2: _pose()},
+        frames=frames[:1],
+        pump_observations=[],
+        config=_config(),
+        evidence=evidence,
+        analyzer=analyzer,
+        sms=sms,
+        pump=None,
+        locate_fn=locate_fn,
+    )
+    assert len(sender.sent) == 1
+    assert session.query(SmsDispatch).count() == 1
+    pump.close()
+
+
+def test_disabled_sms_and_llm_are_not_called(tmp_path: Path) -> None:
+    session = _session(tmp_path)
+    session.add(Room(name="102", scene_type="laboratory", created_at=utc_now()))
+    session.commit()
+    room = session.query(Room).one()
+    config = load_config(EXAMPLE)
+    analyzer = FakeAnalyzer()
+    sender = FakeSms()
+    now = datetime.now(UTC)
+    confirm_alert(
+        session,
+        room_id=room.id,
+        alert_type="SMOKE",
+        started_at=now,
+        sources=[],
+        poses={},
+        frames=[],
+        pump_observations=[],
+        config=config,
+        evidence=MemoryStore(),
+        analyzer=analyzer,
+        sms=SmsService(config, sender),
+        pump=None,
+        locate_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("locate")),
+    )
+    assert analyzer.calls == []
+    assert sender.sent == []
+    position = json.loads(session.query(Alert).one().position_json)
+    assert position["status"] == "UNOBSERVABLE"
+
+
+def test_aliyun_sender_posts_template_and_raises_on_failure() -> None:
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = request.content.decode()
+        return httpx.Response(200, json={"Code": "OK", "Message": "OK"})
+
+    settings = SmsSettings(
+        enabled=True,
+        access_key_id="key",
+        access_key_secret="secret",
+        sign_name="签名",
+        template_code="SMS_1",
+        recipients=["13800000000"],
+        cooldown_seconds=60,
+    )
+    sender = AliyunSmsSender(settings, client=httpx.Client(transport=httpx.MockTransport(handler)))
+    sender.send("13800000000", {"room": "101", "type": "火焰", "time": "2026-11-10 08:00:00"})
+    assert "Action=SendSms" in seen["body"]
+    assert "PhoneNumbers=13800000000" in seen["body"]
+    assert "TemplateCode=SMS_1" in seen["body"]
+
+    def failed(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"Code": "isv.BUSINESS_LIMIT_CONTROL", "Message": "限流"})
+
+    sender = AliyunSmsSender(settings, client=httpx.Client(transport=httpx.MockTransport(failed)))
+    with pytest.raises(RuntimeError, match="限流"):
+        sender.send("13800000000", {"room": "101", "type": "火焰", "time": "2026-11-10 08:00:00"})

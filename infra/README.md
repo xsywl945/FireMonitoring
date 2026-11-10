@@ -5,13 +5,9 @@ The supporting stack runs with Docker Compose while camera capture and GPU infer
 ## Services
 
 - MySQL: `127.0.0.1:3306`
-- Redis: `127.0.0.1:6379`
 - MinIO: `127.0.0.1:9000`, console `9001`
-- MediaMTX: RTSP `8554`, HLS `8888`, WHEP `8889`, playback `9996`, API `9997`
 
-All published ports bind to localhost. Persistent data defaults to `D:\FireMonitoringData`.
-
-Copy `.env.example` to `.env` and replace every `change-*` value before starting services.
+MediaMTX 由 `scripts/windows/start-streams.ps1` 在本机启动。端口和账号以 `config.json` 为准，Compose 里的默认值和 `config.example.json` 一致。数据目录默认是 `D:\FireMonitoringData`。
 
 ```powershell
 docker compose up -d

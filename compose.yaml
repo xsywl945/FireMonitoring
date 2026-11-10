@@ -26,24 +26,6 @@ services:
     mem_limit: 768m
     networks: [fire-net]
 
-  redis:
-    image: redis:7.4-alpine
-    restart: unless-stopped
-    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-redis-me}
-    ports:
-      - 127.0.0.1:6379:6379
-    volumes:
-      - ${FIRE_DATA_ROOT:-D:/FireMonitoringData}/redis:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    mem_limit: 256m
-    networks: [fire-net]
-
   minio:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
@@ -80,30 +62,6 @@ services:
         mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
         mc mb --ignore-existing "local/$${MINIO_BUCKET}" &&
         mc anonymous set none "local/$${MINIO_BUCKET}"
-    networks: [fire-net]
-
-  mediamtx:
-    image: bluenviron/mediamtx:1.19.2
-    restart: unless-stopped
-    ports:
-      - 127.0.0.1:8554:8554
-      - 127.0.0.1:8888:8888
-      - 127.0.0.1:8889:8889
-      - 127.0.0.1:9996:9996
-      - 127.0.0.1:9997:9997
-      - 127.0.0.1:9998:9998
-      - 127.0.0.1:8189:8189/udp
-    volumes:
-      - ./infra/mediamtx/mediamtx.yml:/mediamtx.yml:ro
-      - ${FIRE_DATA_ROOT:-D:/FireMonitoringData}/mediamtx/recordings:/recordings
-    healthcheck:
-      # MediaMTX uses a distroless image without wget/curl. A successful
-      # invocation also proves that Docker can exec into the running process.
-      test: ["CMD", "/mediamtx", "--version"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    mem_limit: 256m
     networks: [fire-net]
 
 networks:

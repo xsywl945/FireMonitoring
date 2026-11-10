@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fire-monitoring"
+version = "1.0.0"
+description = "Fire monitoring service"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "bcrypt>=4.2,<5",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "minio>=7.2,<8",
+  "numpy>=1.26,<3",
+  "pydantic>=2.10,<3",
+  "PyJWT>=2.10,<3",
+  "pymysql>=1.1,<2",
+  "python-multipart>=0.0.16",
+  "sqlalchemy>=2.0,<3",
+  "uvicorn>=0.32,<1",
+]
+
+[project.optional-dependencies]
+detect = [
+  "opencv-python>=4.10,<5",
+  "scipy>=1.11,<2",
+  "ultralytics==8.4.100",
+]
+dev = [
+  "pytest>=8.3,<9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fire_monitoring"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src", "../inference/src"]
