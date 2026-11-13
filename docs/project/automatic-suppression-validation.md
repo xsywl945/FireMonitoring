@@ -1,5 +1,7 @@
 # 自动喷水基础功能验证记录
 
+这是 2026-10-17 的验证记录。当时的 Java 测试和 Redis 事件已经不在当前程序里。当前启动见 [README](../../README.md)。
+
 日期：2026-10-17。实现分支：`feat/automatic-suppression`。
 需求：[基础功能规格](../plans/automatic-suppression.md)。
 

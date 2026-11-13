@@ -26,4 +26,4 @@ python ml/scripts/finetune_yolo26s.py /path/to/formal/best.pt /path/to/data.yaml
 
 ## 运行
 
-部署操作见 [项目 README](../../README.md) 与 [本地识别说明](../runbooks/local-yolo-boot.md)。克隆仓库不会下载模型，新权重尚未接入推理服务。修改训练工具不需要启动摄像头、数据库或水泵。
+部署操作见 [项目 README](../../README.md)。克隆仓库不会下载模型。在线服务使用的权重路径是 `models/yolo26s-ft-2026-11-04/best.pt`，阈值在 `config.json`。修改训练工具不需要启动摄像头、数据库或水泵。

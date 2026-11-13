@@ -4,7 +4,7 @@
 
 `Integrated Camera → DirectShow/OpenCV → best.pt → 单摄 N/M 时序 → 内存事件统计`
 
-这一步不启动 Docker，不写 Redis，不调用短信或多模态 API，也不代表已经完成网页实时画框。当前模型是研究原型，不能替代认证火灾报警器，也不能作为唯一生命安全链路。
+这一步只跑 `scripts/windows/test-single-camera.ps1`，不启动网页、数据库或短信。网页系统的启动见 [README](../../README.md)。这个命令不能替代认证火灾报警器。
 
 ## 已固定的环境
 
@@ -12,7 +12,7 @@
 - PyTorch：`2.8.0+cu128`；
 - TorchVision：`0.23.0+cu128`；
 - Ultralytics：`8.4.100`；
-- 模型：`data/training-archive/2026-08-12-yolo11s-primary-v2/models/deployment/best.pt`；
+- 模型：`models/yolo26s-ft-2026-11-04/best.pt`。文件不在 Git 仓库里；
 - 模型类别：`0=fire`、`1=smoke`；
 - 默认设备：本机 RTX 5060 Laptop GPU；
 - 默认摄像头：索引 `0`，即集成摄像头。
@@ -59,7 +59,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\test-singl
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\test-single-camera.ps1 -CameraIndex 1
 ```
 
-默认单帧检测门槛为 `0.25`，用于保留候选框；现有时序门槛为置信度 `0.45` 且 5 帧中至少 3 帧有效，用于确认事件。不要把这两个门槛混为一个参数。它们仍需在教室和实验室困难负样本集上重新标定。
+脚本默认把 `--confidence` 设为 0.30。这是这一条独立测试命令的参数，不是网页服务里按类别分开的火焰 0.30、烟雾 0.35。服务阈值在 `config.json`。
 
 ## 输出解释
 
@@ -84,4 +84,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\test-singl
 
 ## 当前边界
 
-当前命令已经验证本地摄像头、GPU、YOLO、单摄时序管线和事件契约。尚未完成的部分包括：网页叠加检测框、MediaMTX RTSP 实时 worker、事件截图/录像、双摄性能验收、短信和云端多模态端到端联调。
+这条命令只覆盖本机摄像头、GPU 和单路推理，结果留在内存里，不进入告警库。网页四路画面、MediaMTX、短信和千问见 [README](../../README.md)。

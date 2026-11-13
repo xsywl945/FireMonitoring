@@ -1,10 +1,10 @@
-# 双 UVC + ESP32 自动喷水
+# ESP32 自动喷水
 
-本版保留账号登录、权限、教室和摄像头管理。主流程：每路摄像头 YOLO 检测 → 3/5 帧时序候选 → 千问复核 → 覆盖教室内自动启动水泵。无需人工审核。
+账号、教室、摄像头和告警在 FastAPI 服务里。教室最多绑定 4 路，画面走 MediaMTX。泵仍由主机串口按原协议控制，参数在 `config.json` 的 `pump`。启动见 [README](../../README.md)。
 
 ## 硬件连接
 
-两只 MF-200 UVC 摄像头插入 Windows 主机 USB，分别选择实际设备编号。相同名称的 UVC 设备仍需分别确认编号，重新插拔可能改变顺序。主机请求 MJPEG 1920×1080、30 fps，实际分辨率和帧率取决于摄像头支持；识别默认每路 5 fps，不承诺两路 1080p 每帧都进行 AI 推理。
+USB 摄像头插入 Windows 主机。相同名称的设备要分别确认 DirectShow 名称，重新插拔后名称可能变化。推流帧率用摄像头自己的 `target_fps`，不承诺每一帧都做检测。
 
 ESP32 用 CH340 USB 数据线连接主机，摄像头不接 ESP32。普通 ESP32 不负责运行 YOLO 或大模型。板载 0.96 屏的控制芯片、I²C 引脚和地址尚未确认，基础固件不依赖该屏，状态显示在网页与串口。
 
@@ -54,45 +54,26 @@ ESP32 用 CH340 USB 数据线连接主机，摄像头不接 ESP32。普通 ESP32
 
 ## 主机配置和启动
 
-将以下配置放到仓库根 `.env`，串口号、教室 ID 必须替换为实际值；不要直接照抄示例 ID：
+串口、教室 id、时长和冷却写在 `config.json` 的 `pump`。`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是教室 id。示例里的泵默认关闭。改完配置后重启后端。
 
-```dotenv
-DASHSCOPE_API_KEY=填写你自己的密钥
-INFERENCE_VLM_GATE_ENABLED=true
-INFERENCE_VLM_GATE_FAIL_OPEN=false
-PUMP_ENABLED=true
-PUMP_SERIAL_PORT=COM7
-PUMP_ZONE_ID=1
-PUMP_DURATION_MS=5000
-PUMP_COOLDOWN_SECONDS=60
-```
-
-默认示例 `PUMP_ENABLED=false`。配置完成后会自动执行联动，不存在人工审核或手动启动按钮。修改配置后重启推理服务生效。大模型失败/否定/低置信度、超出 30 秒的证据、其他教室、已停止摄像头、冷却期内的事件不会启动。
-
-已有环境仅补串口依赖：
+列出本机串口：
 
 ```powershell
-.\apps\inference\.conda\python.exe -m pip install -r .\apps\inference\requirements.txt
-.\apps\inference\.conda\python.exe -m serial.tools.list_ports -v
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\start-demo.ps1 -LiveInference -SelectCameras
+python -m serial.tools.list_ports -v
 ```
 
-`-SelectCameras` 会保留现有教室和绑定，并等待网页选择两只 UVC，不会自动占用笔记本内置摄像头。此命令需要原有 MySQL/Redis/MinIO/Docker 环境及本地 `best.pt`。若没有启用推理，单独执行 `scripts/windows/start-inference.ps1`；不要重复启动已经运行的服务。新环境沿用 README 的 bootstrap/setup 步骤。Python 串口读写配置超时并校验回执，参见 [pySerial API](https://pyserial.readthedocs.io/en/stable/pyserial_api.html)。
+Python 串口读写的超时说明见 [pySerial API](https://pyserial.readthedocs.io/en/stable/pyserial_api.html)。
 
-在“教室与摄像头”添加两只 USB 摄像头并刷新设备。绑定到同一教室（最多两个），或分别绑定不同教室。在每只摄像头的“接入”窗口分别启动；停止一只不会停止另一只。监控页切换摄像头查看各自实时画面。两路是独立识别，任一路成功复核可触发覆盖教室的泵，本版没有要求两路同时确认或进行跨视角融合。
+在教室里绑定摄像头，最多 4 路。监控页是四宫格。登录后可以在实时监控页紧急停泵。`RUNNING` 或 `STOPPED` 只表示控制器回执，不表示实际出水。没有水流传感器。
 
-“自动喷水”页显示覆盖教室、串口状态、输出状态以及最近 100 条持久化指令。`RUNNING/STOPPED` 表示控制器确认输出开/关，**不表示实际出水/成功灭火**；没有水流传感器。证据和事件仍在“识别记录”中查看。
-
-指令发送前存入 `apps/inference/runtime/pump.sqlite3`（以启动脚本工作目录为准）。同一事件不会在进程重启后重发；运行中重启的旧记录标为 UNKNOWN，历史记录不能重放。保留此文件，不要在未查明设备状态时删除。回执丢失时不会重发启动指令；停止请求可重复发送。Python 被强制结束时，ESP32 依靠 3 秒心跳看门狗关闭，或达到最大运行时长关闭。
-
-账号角色：所有已登录用户可读状态，ADMIN/OPERATOR 才能紧急停止。紧急停止无确认弹窗，点击立即发送并锁定；停止确认失败时请检查现场、切断泵的 12V 电源，不能仅依赖页面。
+命令记录文件由 `pump.journal_path` 指定，示例是 `runtime/pump.sqlite3`。同一事件不会在进程重启后重发。回执丢失时不会重发启动指令。停止请求可以重复发送。Python 进程被强制结束后，ESP32 靠心跳超时或最大运行时长关闭输出。紧急停止失败时切断泵的 12V 电源，不能只看页面。
 
 ## 验收顺序
 
 1. 泵断电，烧录后确认 GPIO 上电关闭；串口 HELLO/STATUS 正确。
 2. 水泵与喷头离开电子设备，在受控容器中验证供水、负载极性、压力以及 5 秒关闭。避免空转；回流泵是否允许空转须按厂商说明。
 3. 用测试替身验证 AI 正向判断→单次指令，负向/超时/低置信度不启动。屏幕上的火焰图片可能被大模型正确判为屏幕内容而拒绝，不应为演示降低门控。
-4. 两只 UVC 同时运行，确认画面、教室、编号不串线；两个视角近同时确认时仅一条 RUN，另一条显示冷却期跳过。
+4. 多路摄像头同时运行时，确认画面和教室没有串线。冷却期内的另一次确认不会再发 RUN。
 5. 运行中停止摄像头，等待中的大模型结果不得新启动泵；已开启的泵按原定时间关闭，需立即关闭时使用紧急停止。
 6. 点击紧急停止，验证输出关闭且后续事件不启动；断开 USB，验证心跳超时关闭；确认现场后再重启服务恢复。
 
