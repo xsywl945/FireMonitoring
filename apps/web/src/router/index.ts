@@ -1,41 +1,38 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { createRouter, createWebHistory } from "vue-router"
+import { currentRole, signedIn } from "../api/client"
+import AppLayout from "../layouts/AppLayout.vue"
+import AlertDetailView from "../views/AlertDetailView.vue"
+import AlertsView from "../views/AlertsView.vue"
+import CamerasView from "../views/CamerasView.vue"
+import ConfigView from "../views/ConfigView.vue"
+import LoginView from "../views/LoginView.vue"
+import MonitorView from "../views/MonitorView.vue"
+import RoomDetailView from "../views/RoomDetailView.vue"
+import RoomsView from "../views/RoomsView.vue"
 
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  scrollBehavior: () => ({ top: 0 }),
+export const router = createRouter({
+  history: createWebHistory(),
   routes: [
-    { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true, title: '登录' } },
+    { path: "/login", component: LoginView },
     {
-      path: '/',
-      component: () => import('@/layouts/AppLayout.vue'),
+      path: "/",
+      component: AppLayout,
       children: [
-        { path: '', redirect: '/monitor' },
-        { path: 'rooms', name: 'rooms', component: () => import('@/views/RoomsView.vue'), meta: { title: '教室与摄像头' } },
-        { path: 'analysis', name: 'analysis', component: () => import('@/views/AnalysisView.vue'), meta: { title: '大模型研判' } },
-        { path: 'monitor', name: 'monitor', component: () => import('@/views/MonitorView.vue'), meta: { title: '火灾识别与预警' } },
-        { path: 'suppression', name: 'suppression', component: () => import('@/views/SuppressionView.vue'), meta: { title: '自动喷水' } },
-        { path: 'incidents', name: 'incidents', component: () => import('@/views/IncidentsView.vue'), meta: { title: '识别记录' } },
-        { path: 'incidents/:id', name: 'incident-detail', component: () => import('@/views/IncidentDetailView.vue'), meta: { title: '识别详情' } },
+        { path: "", redirect: "/rooms" },
+        { path: "rooms", component: RoomsView, meta: { title: "教室管理" } },
+        { path: "rooms/:id", component: RoomDetailView, meta: { title: "教室详情", parent: "教室管理" } },
+        { path: "cameras", component: CamerasView, meta: { title: "摄像头管理" } },
+        { path: "monitor", component: MonitorView, meta: { title: "实时监控" } },
+        { path: "alerts", component: AlertsView, meta: { title: "告警研判" } },
+        { path: "alerts/:id", component: AlertDetailView, meta: { title: "告警详情", parent: "告警研判" } },
+        { path: "config", component: ConfigView, meta: { title: "系统配置", admin: true } },
       ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/monitor' },
   ],
 })
 
-router.beforeEach(async (to) => {
-  const auth = useAuthStore()
-  if (to.meta.public) {
-    if (to.name === 'login' && auth.isAuthenticated) return '/monitor'
-    return true
-  }
-  if (!auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } }
-  await auth.restore()
-  return true
+router.beforeEach((to) => {
+  if (to.path !== "/login" && !signedIn()) return "/login"
+  if (to.path === "/login" && signedIn()) return "/rooms"
+  if (to.meta.admin && currentRole() !== "admin") return "/rooms"
 })
-
-router.afterEach((to) => {
-  document.title = `${String(to.meta.title || '控制台')} · 火灾监控科研原型`
-})
-
-export default router

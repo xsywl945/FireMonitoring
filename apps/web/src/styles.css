@@ -1,0 +1,204 @@
+:root {
+  --el-color-primary: #1e3a5f;
+  --el-border-radius-base: 2px;
+  color: #1f2933;
+  background: #f3f5f8;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+}
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sider {
+  width: 220px;
+  flex-shrink: 0;
+  background: #1e3a5f;
+  color: #fff;
+}
+
+.brand {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  font-weight: 600;
+}
+
+.sider .el-menu {
+  border-right: 0;
+  background: #1e3a5f;
+}
+
+.sider .el-menu-item {
+  color: #d5dde6;
+}
+
+.sider .el-menu-item.is-active {
+  color: #fff;
+  background: #17324f;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.top {
+  height: 56px;
+  background: #fff;
+  border-bottom: 1px solid #e6e8eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #344054;
+}
+
+.content {
+  padding: 20px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e6e8eb;
+  padding: 16px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  width: 360px;
+  background: #fff;
+  border: 1px solid #e6e8eb;
+  padding: 28px 24px;
+}
+
+.login-card h1 {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.monitor-grid,
+.frames {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cell {
+  background: #fff;
+  border: 1px solid #e6e8eb;
+}
+
+.stage,
+.empty {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #111;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #98a2b3;
+  background: #f8fafc;
+}
+
+.stage video,
+.stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.stage video {
+  object-fit: contain;
+}
+
+.stage canvas {
+  pointer-events: none;
+}
+
+.cell-meta,
+.frame-meta {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #344054;
+}
+
+.frames img {
+  width: 100%;
+  display: block;
+  background: #111;
+}
+
+.plan {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.plan img {
+  max-width: 100%;
+  display: block;
+}
+
+.mark {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #9f2d20;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+pre.config-value {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+}
