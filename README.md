@@ -1,30 +1,41 @@
 # 火情监控
 
-教室火情检测、四路定位和告警研判。后端是一个 FastAPI 服务，前端是 Vue 3。实时画面统一进 MediaMTX，浏览器用 WebRTC（WHEP）播放，检测从 MediaMTX 的 RTSP 读流。
+教室火情检测、四路定位和告警研判。后端是 `apps/server` 的 FastAPI 服务。前端是 `apps/web` 的 Vue 3、TypeScript、Vite 和 Element Plus。检测、时序确认、四摄定位、千问分析和 ESP32 串口泵在 `apps/inference`，由后端调用。
 
-接口契约是运行中的 OpenAPI：`http://127.0.0.1:8080/openapi.json`。前端类型写在 `apps/web/src/api/types.ts`。`docs/` 里的旧说明只作历史参考，启动以本文为准。
+实时画面进入 MediaMTX。浏览器使用 WebRTC（WHEP）播放。检测从 MediaMTX 的 RTSP 读流，不直接占用摄像头。USB 摄像头由 FFmpeg 推流，网络摄像头由 MediaMTX 拉 RTSP。
+
+接口契约是运行中的 OpenAPI：`http://127.0.0.1:8080/openapi.json`。前端类型在 `apps/web/src/api/types.ts`。
+
+仓库里没有 Java 后端，没有 Redis，也没有旧的前端环境变量。`docs/plans/` 和部分运行记录写的是更早的方案，启动以本文为准。
+
+## 权重
+
+模型权重不在 Git 仓库里。把微调权重放到 `models/yolo26s-ft-2026-11-04/best.pt`。`config.example.json` 的 `model.path` 指向这个文件。火焰阈值 0.30，烟雾阈值 0.35。低于对应阈值的框不进入时序，也不作为该类别的定位观测。
 
 ## Windows 启动
 
-准备：Python 3.11、Node.js、FFmpeg、[MediaMTX](https://github.com/bluenviron/mediamtx/releases) Windows 版、Docker Desktop。把 `ffmpeg.exe` 和 `mediamtx.exe` 放到 PATH，或在 `config.json` 里写绝对路径。
+需要 Python 3.11、Node.js、FFmpeg、MediaMTX 的 Windows 程序和 Docker Desktop。`ffmpeg` 与 `mediamtx` 要在 PATH 里，或者把绝对路径写进 `config.json`。
 
 ```powershell
 copy config.example.json config.json
-# 按本机修改 config.json。这个文件含密钥，不要提交。
+```
 
+按本机修改 `config.json`。这个文件含密钥，不要提交。
+
+```powershell
 docker compose up -d
 powershell -ExecutionPolicy Bypass -File scripts\windows\bootstrap.ps1
 powershell -ExecutionPolicy Bypass -File scripts\windows\start-server.ps1
 powershell -ExecutionPolicy Bypass -File scripts\windows\start-web.ps1
 ```
 
-浏览器打开 `http://127.0.0.1:5173`，用 `config.json` 里的账号登录。先建教室和摄像头，再启动推流：
+`docker compose` 只启动 MySQL 和 MinIO。浏览器打开 `http://127.0.0.1:5173`，用 `config.json` 里的账号登录。先建教室和摄像头，再启动推流：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\windows\start-streams.ps1
 ```
 
-`start-streams.ps1` 读取数据库里的摄像头，写出 `runtime/mediamtx.yml`，启动 MediaMTX，并对每路 USB 摄像头启动 FFmpeg 推到 `rtsp_base/{stream_key}`。网络摄像头由 MediaMTX 按 RTSP 地址拉流。改了摄像头之后重新运行这个脚本。
+这个脚本按数据库里的摄像头写出 `runtime/mediamtx.yml`，启动 MediaMTX，并对每路 USB 摄像头启动 FFmpeg，推到 `rtsp_base/{stream_key}`。改了摄像头之后重新运行它。
 
 停止脚本拉起的进程：
 
@@ -32,116 +43,53 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\start-streams.ps1
 powershell -ExecutionPolicy Bypass -File scripts\windows\stop.ps1
 ```
 
-`stop.ps1` 不停止 Docker。数据库和对象存储用 `docker compose stop`。
+它不停止 Docker。数据库和对象存储用 `docker compose stop`。
 
-开发时后端也可以在仓库根目录执行 `python -m fire_monitoring`。前端在 `apps/web` 执行 `npm run dev`。构建执行 `npm run build`，Vite 从仓库根的 `config.json` 读取服务地址做代理。
+开发时可以在仓库根目录执行 `python -m fire_monitoring`。前端在 `apps/web` 执行 `npm run dev`。`npm run build` 会先做类型检查再打包，Vite 从仓库根的 `config.json` 读取服务地址。
 
-## 现场需要做的事
+## 页面
 
-每路摄像头至少录入 4 个控制点：世界坐标 `world_m`（米）和对应像素 `pixel`。内参是 3×3，畸变按 OpenCV 的 `k1, k2, p1, p2, k3`。世界坐标原点由现场标定物决定，程序不假定教室某个角。
+登录。教室管理，含最多 4 路摄像头绑定、标定和平面图。摄像头管理。实时监控，选定教室后四宫格，显示检测框和状态。告警研判，含四路关键帧、大模型分析、平面图火点、处置记录和手动重跑分析。系统配置只读，密钥打码。角色只有管理员和值班员。
 
-平面图要上传图片，并填写原点在图上的像素、原点的世界坐标 X/Y，以及每像素对应多少米。图上 Y 轴向上、像素 v 向下，火点纵向位置按 `origin_px[1] - (Y - origin_world_y) / meters_per_pixel` 画。
+## 定位和告警
 
-检测框变成定位观测的规则：火用框底边中点，烟用框中心；协方差取框宽、框高的四分之一作为标准差；可靠度用置信度，并限制在 (0, 1)。时间窗内的观测按 `localize_frames` 的 manifest 写入每路 `source`，再调用 `fire_monitoring_inference.localization.localize_frames`。返回 `UNOBSERVABLE` 时没有坐标，告警不写 `xyz`，平面图不标点。
+每路标定包含 3×3 内参、畸变，以及至少 4 个控制点（`world_m` 和 `pixel`）。告警时按 `localize_frames` 的 manifest 组织这些数据和检测得到的 `source`（像素、协方差、可靠度），调用 `apps/inference` 里的 `localize_frames`。火用检测框底边中点，烟用框中心。返回 `ESTIMATED` 时告警写入 `xyz`、`covariance`、`condition_number` 和 `support_camera_ids`，平面图标出火点。返回 `UNOBSERVABLE` 时不写坐标，平面图不标点。
+
+千问在配置打开时分析告警关键帧。短信发给 `config.json` 里的固定名单，带教室名、类型和时间，有开关和冷却时间。喷水泵沿用原有串口行为，监控页可以紧急停泵。
+
+控制点和平面图比例需要在现场测量后录入。
 
 ## config.json
 
-复制 `config.example.json`。未知字段会被拒绝。密钥只留在本机文件里。
+复制 `config.example.json`。未知字段会被拒绝。
 
-### server
-
-| 字段 | 含义 |
+| 部分 | 内容 |
 |---|---|
-| `host` | 后端监听地址 |
-| `port` | 后端端口 |
-| `cors_origins` | 允许的前端来源 |
+| `server` | 监听地址、端口、允许的前端来源 |
+| `database` | MySQL。库名、用户和密码要与 `compose.yaml` 一致。表在后端启动时创建 |
+| `minio` | 证据图和平面图。`endpoint` 不带 `http://`。`secure` 为 false 时走 HTTP |
+| `mediamtx` | RTSP 根地址、WHEP 根地址、各监听端口、生成的配置路径、FFmpeg 和 MediaMTX 程序路径 |
+| `llm` | 千问兼容接口的开关、`base_url`、`model`、`api_key` |
+| `sms` | 阿里云短信的开关、访问密钥、签名、模板、固定收件人、冷却秒数。模板变量是 `room`、`type`、`time` |
+| `model` | 权重路径、版本名、边长、设备、火焰和烟雾阈值 |
+| `temporal` | 时序确认的 `n`、`m`、`candidate_n`、清空帧数和冷却毫秒。要求 `candidate_n <= n <= m` |
+| `localization` | 控制点像素噪声 `landmark_sigma_px`，多路观测时间窗 `window_ms` |
+| `pump` | 开关、串口、覆盖的教室 id、时长、冷却、本地确认门槛、是否要求千问、命令记录文件 |
+| `auth` | JWT 密钥、有效期、启动时写入的账号。角色只能是 `admin` 或 `operator` |
+| `cameras` | 新建摄像头未填帧率时使用的 `default_fps` |
+| `timezone` | 短信使用的时区，例如 `Asia/Shanghai` |
 
-### database
-
-MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一致。表在后端启动时创建。
-
-### minio
-
-证据图和平面图。`endpoint` 不带 `http://`，例如 `127.0.0.1:9000`。`secure` 为 `false` 时走 HTTP。`access_key` / `secret_key` 对应 MinIO 的 root 用户和密码。`bucket` 不存在时后端会创建。
-
-### mediamtx
-
-| 字段 | 含义 |
-|---|---|
-| `rtsp_base` | 推理和 FFmpeg 使用的 RTSP 根地址，路径是 `/{stream_key}` |
-| `whep_base` | 浏览器 WebRTC 根地址，播放地址是 `/{stream_key}/whep` |
-| `rtsp_address` / `hls_address` / `webrtc_address` / `webrtc_udp_address` / `api_address` / `playback_address` | 写进生成的 MediaMTX 配置的监听地址 |
-| `config_path` | 生成的 `mediamtx.yml` 路径 |
-| `ffmpeg_path` | FFmpeg 可执行文件 |
-| `mediamtx_path` | MediaMTX 可执行文件 |
-
-### llm
-
-千问兼容接口。`enabled` 为 true 时，告警确认后自动分析四路关键帧，研判页也可以手动重跑。`base_url`、`model`、`api_key` 是 DashScope 兼容模式的地址、模型名和密钥。
-
-### sms
-
-告警确认后发给 `recipients` 里的固定号码。模板变量是 `room`（教室名）、`type`（火焰 / 烟雾 / 火焰和烟雾）、`time`（`timezone` 下的本地时间）。`sign_name`、`template_code`、`access_key_id`、`access_key_secret` 是阿里云短信参数。`enabled` 为 false 或名单为空则不发送。`cooldown_seconds` 是同一教室两次短信的最短间隔。
-
-### model
-
-| 字段 | 含义 |
-|---|---|
-| `path` | 权重文件，当前为 `models/yolo26s-ft-2026-11-04/best.pt` |
-| `version` | 写入告警和泵事件的模型版本名 |
-| `imgsz` | 推理边长 |
-| `device` | `0` 表示第一块 GPU，`cpu` 表示 CPU |
-| `thresholds.fire` | 火焰置信度，当前 0.30。低于此值不进入时序，也不作为火的观测 |
-| `thresholds.smoke` | 烟雾置信度，当前 0.35 |
-
-检测器的初始过滤取两者中较低的那个，再按类别阈值丢掉不够的框。
-
-### temporal
-
-时序确认：最近 `m` 帧里有 `n` 帧达到该类别阈值则确认；`candidate_n` 帧进入疑似。`clear_frames` 帧没有目标后，已确认进入冷却，疑似回到正常。`cooldown_ms` 是冷却时长。要求 `candidate_n <= n <= m`。
-
-### localization
-
-| 字段 | 含义 |
-|---|---|
-| `landmark_sigma_px` | 控制点像素噪声，用于姿态协方差 |
-| `window_ms` | 多路观测凑齐的时间窗 |
-
-### pump
-
-保持原来的串口泵行为，不新增控制方式。`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是覆盖的教室 id。确认告警后，若本地火焰分数和帧数达到 `local_min_confidence`、`local_min_frames`，向 ESP32 发送原来的 `RUN` 指令，持续 `duration_ms`。`require_vlm` 为 true 时还要求千问确认，且置信度不低于 `min_confidence`。`max_evidence_age_seconds` 是证据允许的最大延迟。`cooldown_seconds` 是两次启动间隔。`journal_path` 是命令记录的 SQLite 文件。监控页可以紧急停泵。
-
-### auth
-
-| 字段 | 含义 |
-|---|---|
-| `jwt_secret` | 登录令牌签名密钥，至少 16 个字符 |
-| `jwt_expiration_seconds` | 令牌有效期 |
-| `users` | 启动时写入数据库的账号。`role` 只能是 `admin`（管理员）或 `operator`（值班员） |
-
-管理员可以改教室、摄像头、标定和平面图，并查看系统配置。值班员可以看监控、告警、记录处置和重跑分析。
-
-### cameras
-
-`default_fps`：新建摄像头时帧率留空使用的默认值。USB 推流和检测按摄像头自己的 `target_fps`。
-
-### timezone
-
-短信时间和界面以外的本地化时间，例如 `Asia/Shanghai`。
-
-## 目录
-
-```text
-apps/server    FastAPI：教室、摄像头、流、检测、定位、告警、分析、短信、证据、泵、登录、配置
-apps/web       Vue 3 前端
-apps/inference 检测、时序、千问、串口泵，以及四摄定位 localize_frames
-config.example.json
-scripts/windows
-```
-
-后端测试：
+## 测试
 
 ```powershell
 python -m pip install -e apps/inference -e apps/server[dev]
 python -m pytest apps/server/tests
 ```
+
+前端在 `apps/web`：
+
+```powershell
+npm run build
+```
+
+实机检测还要安装 `apps/server` 的 `detect` 可选依赖，`bootstrap.ps1` 会安装它。
