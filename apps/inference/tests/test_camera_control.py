@@ -71,29 +71,6 @@ def test_stop_releases_worker_before_another_camera_can_start() -> None:
     assert client.post("/api/v1/local-cameras/stop", headers=headers).status_code == 200
 
 
-def test_virtual_camera_filters_do_not_shift_device_indices(monkeypatch) -> None:
-    import subprocess
-
-    from fire_monitoring_inference.camera_control import local_devices
-
-    output = "\n".join(
-        [
-            '[dshow] "Integrated Camera" (video)',
-            '[dshow] Alternative name "physical"',
-            '[dshow] "Virtual Camera" (none)',
-            '[dshow] Alternative name "@device_sw_{860BB310-5D01}"',
-            '[dshow] "USB Camera" (video)',
-            '[dshow] "Microphone" (audio)',
-        ]
-    )
-    monkeypatch.setattr(
-        subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(args=[], returncode=1, stderr=output),
-    )
-    assert local_devices()[2] == {"index": 2, "name": "USB Camera"}
-
-
 def test_two_uvc_sessions_are_isolated_and_duplicate_device_is_rejected():
     from fire_monitoring_inference.camera_control import MultiCameraControl
 

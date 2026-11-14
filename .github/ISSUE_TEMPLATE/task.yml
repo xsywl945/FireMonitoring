@@ -1,0 +1,32 @@
+name: 任务
+description: 一块要做的工作，包含范围、验收和回滚
+labels: [needs-triage]
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: 改什么
+      description: 这次要动的模块和明确不做的事。
+    validations:
+      required: true
+  - type: textarea
+    id: accept
+    attributes:
+      label: 怎么算做完
+      description: 可核对的验收结果。
+    validations:
+      required: true
+  - type: textarea
+    id: test
+    attributes:
+      label: 怎么测
+      description: 要跑的命令，以及哪些情况必须失败。
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: 怎么回滚
+      description: 默认用 git revert 开回滚 PR，不强推 main。
+    validations:
+      required: true
