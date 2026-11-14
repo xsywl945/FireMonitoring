@@ -58,6 +58,14 @@ def create_app(
         pump = build_pump(config)
         pump.start()
         pump_started = True
+    panel = None
+    panel_started = False
+    if config.panel.enabled:
+        from fire_monitoring_inference.panel_v2 import PanelLink
+
+        panel = PanelLink(config.panel.serial_port)
+        panel.start()
+        panel_started = True
     live = LiveHub()
     events = EventHub()
 
@@ -69,6 +77,8 @@ def create_app(
             app.state.worker.stop()
         if app.state.pump is not None and app.state.pump_started:
             app.state.pump.close()
+        if app.state.panel is not None and app.state.panel_started:
+            app.state.panel.close()
 
     app = FastAPI(title="火情监控", version="1.0.0", lifespan=lifespan)
     app.add_middleware(
@@ -93,6 +103,8 @@ def create_app(
     app.state.sms = sms
     app.state.pump = pump
     app.state.pump_started = pump_started
+    app.state.panel = panel
+    app.state.panel_started = panel_started
     app.state.live = live
     app.state.events = events
     app.state.worker = None

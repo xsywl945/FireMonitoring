@@ -11,6 +11,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
+from .actuator_v2 import READY, run_line
 from .contracts import (
     EventEnvelope,
     EventType,
@@ -66,7 +67,7 @@ class SerialPumpTransport:
                 # Opening CH340 may reset the board. Never send RUN before the handshake.
                 time.sleep(2)
                 self._serial.reset_input_buffer()
-                if self._exchange("HELLO") != "READY FIRE_PUMP_V1":
+                if self._exchange("HELLO") != READY:
                     raise OSError("unexpected pump firmware")
         except Exception:
             self.close()
@@ -120,7 +121,6 @@ class PumpController:
         self._device_state = "UNKNOWN" if config.enabled else "DISABLED"
         self._error: str | None = None
         self._activation_source: str | None = None
-        self._manual_last_seen: datetime | None = None
         journal_path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(journal_path, check_same_thread=False)
         self._db.execute("CREATE TABLE IF NOT EXISTS commands (trace TEXT PRIMARY KEY, data TEXT)")
@@ -184,13 +184,6 @@ class PumpController:
                 reason = "VLM_NOT_CONFIRMED"
             elif not self.config.require_vlm and not self._local_fire_confirmed(event):
                 reason = "LOCAL_FIRE_NOT_CONFIRMED"
-            elif self._activation_source == "BOOT":
-                reason = "BOOT_ACTIVE"
-            elif (
-                self._manual_last_seen is not None
-                and (now - self._manual_last_seen).total_seconds() < self.config.cooldown_seconds
-            ):
-                reason = "COOLDOWN"
             elif any(
                 record.get("attemptedAt")
                 and (now - datetime.fromisoformat(record["attemptedAt"])).total_seconds()
@@ -222,8 +215,16 @@ class PumpController:
                     self._save(record)
                     return
                 reply = self.transport.request(
-                    f"RUN {event.trace_id.hex} {self.config.duration_ms}"
+                    run_line(event.trace_id.hex, self.config.duration_ms)
                 )
+                if reply.startswith("ERR "):
+                    record.update(status="SKIPPED", reason=reply.split()[1])
+                    record.pop("attemptedAt", None)
+                    self._connected = True
+                    self._device_state = "OFF"
+                    self._error = reply.split()[1]
+                    self._save(record)
+                    return
                 if reply != f"ACK {event.trace_id.hex} ON":
                     raise OSError("pump did not acknowledge this command")
                 record.update(status="RUNNING", reason=None)
@@ -259,34 +260,23 @@ class PumpController:
             try:
                 reply = self.transport.request("STATUS")
                 parts = reply.split()
-                if len(parts) != 3 or parts[0] != "STATE" or parts[1] not in {"ON", "OFF"}:
+                if len(parts) != 6 or parts[0] != "STATE" or parts[1] not in {"ON", "OFF"}:
                     raise OSError("invalid pump status")
                 if self._inhibited and parts[1] == "ON":
                     self.emergency_stop()
                     return
                 self._device_state = parts[1]
-                manual = parts[1] == "ON" and parts[2] == "BOOT"
-                self._activation_source = (
-                    "BOOT" if manual else ("AUTO" if parts[1] == "ON" else None)
-                )
-                if manual:
-                    self._manual_last_seen = self.clock()
+                self._activation_source = "AUTO" if parts[1] == "ON" else None
                 self._connected = True
                 self._error = None
                 for record in self._records():
-                    if record["status"] == "RUNNING":
-                        if manual:
-                            record.update(status="UNKNOWN", reason="BOOT_OVERRIDE")
-                            self._save(record)
-                        elif parts[1] == "OFF":
-                            record.update(
-                                status="STOPPED",
-                                reason="DEVICE_REPORTED_OFF",
-                                stoppedAt=self.clock().isoformat(),
-                            )
-                            self._save(record)
-                        elif parts[2] != record["traceId"].replace("-", ""):
-                            raise OSError("unexpected active pump command")
+                    if record["status"] == "RUNNING" and parts[1] == "OFF":
+                        record.update(
+                            status="STOPPED",
+                            reason="DEVICE_REPORTED_OFF",
+                            stoppedAt=self.clock().isoformat(),
+                        )
+                        self._save(record)
             except Exception:
                 self._connected = False
                 self._device_state = "UNKNOWN"

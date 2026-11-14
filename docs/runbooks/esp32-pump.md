@@ -1,6 +1,6 @@
 # ESP32 自动喷水
 
-账号、教室、摄像头和告警在 FastAPI 服务里。教室最多绑定 4 路，画面走 MediaMTX。泵仍由主机串口按原协议控制，参数在 `config.json` 的 `pump`。启动见 [README](../../README.md)。
+账号、教室、摄像头和告警在 FastAPI 服务里。教室最多绑定 4 路，画面走 MediaMTX。泵由执行节点按 `contracts/actuator-serial-v2.md` 控制，参数在 `config.json` 的 `pump`。接线见 [wiring.md](../hardware/wiring.md)。启动见 [README](../../README.md)。
 
 ## 硬件连接
 
@@ -27,8 +27,8 @@ ESP32 用 CH340 USB 数据线连接主机，摄像头不接 ESP32。普通 ESP32
 
 ### VS Code + PlatformIO IDE
 
-项目已包含 `firmware/esp32_pump/platformio.ini`，无需另建工程或复制代码。
-在 PlatformIO Home 选择 **Open Project**，打开 `firmware/esp32_pump` 文件夹。
+执行节点工程是 `firmware/esp32_actuator`，报警节点是 `firmware/esp32_panel`。
+在 PlatformIO Home 选择 **Open Project**，打开对应文件夹。
 配置为 Espressif ESP32 Dev Module (`esp32dev`) + Arduino，适用于经典 ESP32/ESP32-WROOM DevKitC。
 若模块标识含 C3/S3/S2，请先重新确认型号，不能直接使用该配置。
 参考 [PlatformIO 的 DevKitC 入门说明](https://docs.platformio.org/en/latest/tutorials/espressif32/arduino_debugging_unit_testing.html)。
@@ -36,11 +36,11 @@ ESP32 用 CH340 USB 数据线连接主机，摄像头不接 ESP32。普通 ESP32
 30P Expansion Board 是扩展底板，不作为 PlatformIO 的开发板型号；它是否适配 DevKitC 取决于实物两侧针数、针距与引脚顺序，不能仅凭商品名称保证。请确认后再插入。
 
 先不接 MOSFET 和水泵，只用 USB 数据线连接 ESP32。等待首次工具链安装完成，按 **Build** 编译，再按 **Upload** 烧录。多串口时，在 `platformio.ini` 增加 `upload_port = COM实际编号` 和 `monitor_port = COM实际编号`；COM 号需在设备管理器中确认。
-打开 **Serial Monitor**（115200），发送带换行的 `HELLO`，应收到 `READY FIRE_PUMP_V1`；发送 `STATUS` 应看到 `STATE OFF -`。完成后关闭监视器，再由 Python 服务独占串口。
+打开 **Serial Monitor**（115200），执行节点发送 `HELLO` 应收到 `READY FIRE_ACTUATOR_V2`，`STATUS` 里泵和激光为 `OFF`。报警节点应收到 `READY FIRE_PANEL_V2`。完成后关闭监视器，再由 Python 服务独占串口。
 
 ### Arduino IDE（备选）
 
-使用 Arduino IDE 的 Espressif ESP32 开发板支持，将 `firmware/esp32_pump/esp32_pump.ino` 烧录到**已确认是经典 ESP32、且引出 GPIO26**的开发板。CH340 是 USB 串口芯片，不代表 ESP32 的具体型号；若为 C3/S3 等板型，请先核实可用 GPIO，修改 `PUMP_PIN`，不要套用经典 ESP32 的引脚。默认高有效；低有效模块需同时修改 `PUMP_ON/PUMP_OFF` 并验证复位输出。
+两块板都是 ESP32-D0WDQ6 DevKitC。不要把这份固件烧到 C3/S3。引脚以 `docs/hardware/wiring.md` 为准。
 
 固件不依赖 ArduinoJson 或 OLED 库。使用 `pinMode/digitalWrite` 设置输出，参见 [Espressif GPIO 文档](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/gpio.html)。
 
@@ -50,7 +50,7 @@ ESP32 用 CH340 USB 数据线连接主机，摄像头不接 ESP32。普通 ESP32
 - 运行期间 3 秒未收到 STATUS 心跳自动关闭，主机每约 0.5 秒查询。
 - STOP 立即关闭。软件紧急停止还会锁定自动联动，直到推理服务重启。
 
-串口协议（115200、8N1、ASCII、换行分隔，详见 `contracts/pump-serial-v1.md`）可在不接泵时用串口监视器发送 `HELLO`，应返回 `READY FIRE_PUMP_V1`；`STATUS` 返回 `STATE OFF -`。关闭串口监视器，主机才能独占 COM 口。
+串口协议见 `contracts/actuator-serial-v2.md` 和 `contracts/panel-serial-v2.md`。BOOT 键不再强制喷水。关闭串口监视器后，主机才能独占 COM 口。
 
 ## 主机配置和启动
 

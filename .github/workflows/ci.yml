@@ -43,7 +43,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: g++ -std=c++17 -I firmware/tests -o /tmp/protocol_test firmware/tests/protocol_test.cpp && /tmp/protocol_test
+      - run: |
+          g++ -std=c++17 -I firmware/tests -I firmware/esp32_actuator/src -o /tmp/actuator_test firmware/esp32_actuator/src/actuator.cpp firmware/tests/actuator_protocol_test.cpp
+          /tmp/actuator_test
+          g++ -std=c++17 -I firmware/tests -I firmware/esp32_panel/src -o /tmp/panel_test firmware/esp32_panel/src/panel.cpp firmware/tests/display_stub.cpp firmware/tests/panel_protocol_test.cpp
+          /tmp/panel_test
+      - run: python -m pip install platformio
+      - run: |
+          python -m platformio run -d firmware/esp32_actuator
+          python -m platformio run -d firmware/esp32_panel
 
   ml:
     runs-on: ubuntu-latest
