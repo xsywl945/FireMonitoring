@@ -51,7 +51,7 @@ class BlockingAnalyzer:
         self.release = threading.Event()
         self.calls: list[int] = []
 
-    def analyze(self, alert_id: int, jpegs: list[bytes]) -> dict:
+    def analyze(self, alert_id: int, frames, before=None, after=None) -> dict:
         self.calls.append(alert_id)
         self.started.set()
         if not self.release.wait(30):
@@ -60,19 +60,22 @@ class BlockingAnalyzer:
             "status": "SUCCEEDED",
             "provider": "fake",
             "model": "fake",
-            "prompt_version": "test",
-            "has_visible_fire": True,
-            "has_visible_smoke": False,
-            "source_nature": "open_flame",
-            "scene_type": "classroom",
-            "risk_level": "HIGH",
-            "reasoning_summary": "画面中有明火",
-            "recommended_actions": ["疏散"],
-            "burning_objects": ["纸"],
-            "people_at_risk": False,
-            "confidence": 0.9,
-            "uncertainties": [],
+            "prompt_version": "fire-evidence-v4",
             "error_code": None,
+            "evidence": {
+                "burning_objects": [{"frame_index": 1, "name": "纸", "evidence": "画面1桌面"}],
+                "suspected_cause": "open_flame",
+                "energized_equipment": False,
+                "liquid": False,
+                "oil_pan": False,
+                "metal_powder": False,
+                "person_count": 0,
+                "person_location": "",
+                "scene_type": "classroom",
+                "smoke_color": "none",
+                "smoke_density": "none",
+                "uncertainties": [],
+            },
         }
 
 
@@ -248,11 +251,12 @@ def test_require_vlm_holds_the_pump_until_analysis(tmp_path: Path) -> None:
     )
     assert analyzer.started.wait(2)
     time.sleep(0.05)
-    assert sender.sent
+    assert sender.sent == []
     assert transport.commands == []
     analyzer.release.set()
     pipeline.wait()
-    assert transport.commands
+    assert sender.sent
+    assert transport.commands[0].startswith("RUN ")
     pipeline.stop()
     pump.close()
 
@@ -350,22 +354,23 @@ def test_synthetic_frames_publish_events_while_qwen_is_delayed(tmp_path: Path, c
             time.sleep(0.3)
             assert len(detector.batches) > produced
             assert any(size == 4 for size in detector.batches)
-            assert sender.sent
             assert transport.commands
+            assert sender.sent == []
             assert analyzer.release.is_set() is False
             analyzer.release.set()
             client.app.state.worker.pipeline.wait()
     assert fatals == []
-    assert seen == [{cameras[0].id, cameras[1].id, cameras[2].id}]
+    assert seen[0] == {cameras[0].id, cameras[1].id, cameras[2].id}
     fresh = factory()
     alert = fresh.query(Alert).one()
     assert json.loads(alert.position_json)["status"] == "ESTIMATED"
     analysis = json.loads(alert.analysis_json)
-    assert analysis["burning_objects"] == ["纸"]
-    assert analysis["people_at_risk"] is False
+    assert analysis["evidence"]["burning_objects"][0]["name"] == "纸"
+    assert analysis["evidence"]["person_count"] == 0
+    assert sender.sent
     kinds = [row.kind for row in fresh.query(AlertEvent).order_by(AlertEvent.id)]
     assert kinds[0] == "CONFIRMED"
-    assert kinds.index("SMS") < kinds.index("ANALYSIS")
+    assert kinds.index("ANALYSIS") < kinds.index("SMS")
     assert kinds.index("PUMP") < kinds.index("ANALYSIS")
     assert "LOCALIZED" in kinds
     assert any("popup" in record.message and "after confirmation" in record.message for record in caplog.records)

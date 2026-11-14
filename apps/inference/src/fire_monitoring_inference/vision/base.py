@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from ..contracts import VlmAnalysisPayload
-
 
 class VisionReasoner(Protocol):
-    def analyze(self, *, incident_id: int | None, image_data_urls: list[str]) -> VlmAnalysisPayload:
-        """Analyze one incident without changing whether the incident is confirmed."""
+    def analyze(self, *, incident_id: int | None, images: list):
+        """Return a validated evidence call. Do not choose an extinguishing action."""

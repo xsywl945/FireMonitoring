@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
+from fire_monitoring_inference.analysis.rules import SCENE_TYPES
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -14,10 +15,12 @@ from ..models import Camera, Room, RoomCamera, User
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 
+SCENE_PATTERN = "^(" + "|".join(SCENE_TYPES) + ")$"
+
 
 class RoomIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    scene_type: str = Field(pattern="^(classroom|laboratory|corridor|other)$")
+    scene_type: str = Field(pattern=SCENE_PATTERN)
 
 
 class BindingIn(BaseModel):
@@ -38,6 +41,7 @@ class FloorPlanOut(BaseModel):
     meters_per_pixel: float
     origin_world_m: list[float]
     content_type: str
+    combustibles: list[dict]
 
 
 class RoomOut(BaseModel):
@@ -57,6 +61,7 @@ def _floor_plan(raw: str | None) -> FloorPlanOut | None:
         meters_per_pixel=data["meters_per_pixel"],
         origin_world_m=data["origin_world_m"],
         content_type=data["content_type"],
+        combustibles=data.get("combustibles", []),
     )
 
 
@@ -218,6 +223,37 @@ def upload_floor_plan(
             "origin_world_m": [world_x, world_y],
         }
     )
+    session.commit()
+    return _room_out(session, room)
+
+
+class RegionIn(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    polygon: list[list[float]] = Field(min_length=3)
+
+
+class RegionsIn(BaseModel):
+    regions: list[RegionIn]
+
+
+@router.put("/{room_id}/combustibles", response_model=RoomOut)
+def replace_combustibles(
+    room_id: int,
+    body: RegionsIn,
+    session: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> RoomOut:
+    room = _get_room(session, room_id)
+    if not room.floor_plan_json:
+        raise HTTPException(status_code=400, detail="未上传平面图")
+    for region in body.regions:
+        if any(len(point) != 2 for point in region.polygon):
+            raise HTTPException(status_code=400, detail="区域顶点必须是平面坐标")
+    meta = json.loads(room.floor_plan_json)
+    meta["combustibles"] = [
+        {"name": region.name, "polygon": region.polygon} for region in body.regions
+    ]
+    room.floor_plan_json = json.dumps(meta)
     session.commit()
     return _room_out(session, room)
 

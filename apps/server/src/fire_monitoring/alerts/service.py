@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..config import AppConfig
 from ..localization.observe import SourceObservation, locate_position
-from ..models import Alert, AlertEvent, AlertFrame, Room
+from ..models import Alert, AlertEvent, AlertFrame, Camera, Room
 from ..pump.bridge import trigger_pump
 from ..sms.service import SmsService
 
@@ -129,14 +129,16 @@ def notify_room(
     alert_id: int,
     room_id: int,
     room_name: str,
-    alert_type: str,
+    level: str,
+    method: str,
     when: datetime,
 ) -> dict | None:
     sent = sms.notify(
         session,
         room_id=room_id,
         room_name=room_name,
-        alert_type=alert_type,
+        level=level,
+        method=method,
         when=when,
     )
     if not sent:
@@ -147,7 +149,7 @@ def notify_room(
         room_id=room_id,
         alert_id=alert_id,
         kind="SMS",
-        detail={"room_name": room_name, "alert_type": alert_type},
+        detail={"room_name": room_name, "level": level, "method": method},
     )
     session.commit()
     return payload
@@ -187,10 +189,62 @@ def actuate(
     return payload
 
 
-def rerun_analysis(session: Session, alert: Alert, evidence, analyzer) -> dict:
-    frames = session.query(AlertFrame).filter(AlertFrame.alert_id == alert.id).all()
-    jpegs = [evidence.get(frame.object_key)[0] for frame in frames]
-    analysis = analyzer.analyze(alert.id, jpegs)
-    alert.analysis_json = json.dumps(analysis, ensure_ascii=False)
+def rerun_analysis(session: Session, alert: Alert, evidence, analyzer, config, localizer=None) -> dict:
+    from ..analysis.compose import compose, samples_from_inputs
+    from ..detection.ingest import FrameShot
+
+    room = session.get(Room, alert.room_id)
+    if room is None:
+        raise RuntimeError(f"room {alert.room_id} does not exist")
+    stored = session.query(AlertFrame).filter(AlertFrame.alert_id == alert.id).all()
+    previous = json.loads(alert.analysis_json) if alert.analysis_json else {}
+    inputs = previous.get("inputs") or {}
+    boxes = {item["camera_id"]: tuple(item["bbox"]) for item in inputs.get("samples", [])}
+    sizes = {
+        item["camera_id"]: (item["width"], item["height"]) for item in inputs.get("samples", [])
+    }
+    frames = []
+    for frame in stored:
+        blob = evidence.get(frame.object_key)[0]
+        width, height = sizes.get(frame.camera_id, (0, 0))
+        frames.append(
+            FrameShot(
+                camera_id=frame.camera_id,
+                jpeg=blob,
+                captured_at=frame.captured_at,
+                width=width,
+                height=height,
+                fire_box=boxes.get(frame.camera_id),
+            )
+        )
+    before = evidence.get(inputs["before_key"])[0] if inputs.get("before_key") else None
+    after = evidence.get(inputs["after_key"])[0] if inputs.get("after_key") else None
+    call = analyzer.analyze(alert.id, frames, before, after)
+    position = json.loads(alert.position_json) if alert.position_json else None
+    calibrations = {}
+    for frame in stored:
+        camera = session.get(Camera, frame.camera_id)
+        if camera is not None and camera.calibration_json:
+            calibrations[camera.id] = json.loads(camera.calibration_json)
+    combustibles = []
+    if room.floor_plan_json:
+        combustibles = json.loads(room.floor_plan_json).get("combustibles", [])
+    document = compose(
+        config,
+        call=call,
+        room_name=room.name,
+        configured_scene=room.scene_type,
+        position=position,
+        samples=samples_from_inputs(inputs.get("samples", [])),
+        frames=frames,
+        calibrations=calibrations,
+        combustibles=combustibles,
+        localizer=localizer,
+    )
+    if inputs.get("before_key"):
+        document["inputs"]["before_key"] = inputs["before_key"]
+    if inputs.get("after_key"):
+        document["inputs"]["after_key"] = inputs["after_key"]
+    alert.analysis_json = json.dumps(document, ensure_ascii=False)
     session.commit()
-    return analysis
+    return document

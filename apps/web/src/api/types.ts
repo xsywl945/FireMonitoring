@@ -24,6 +24,7 @@ export interface FloorPlan {
   meters_per_pixel: number
   origin_world_m: number[]
   content_type: string
+  combustibles: { name: string; polygon: number[][] }[]
 }
 
 export interface Room {
@@ -94,20 +95,78 @@ export interface AlertSummary {
   started_at: string
   position: Position | null
   analysis_status: string | null
+  level: string | null
+}
+
+export interface BurningObject {
+  frame_index: number
+  name: string
+  evidence: string
 }
 
 export interface Analysis {
   status: string
-  reasoning_summary: string | null
-  risk_level: string | null
-  recommended_actions: string[]
-  burning_objects: string[]
-  people_at_risk: boolean | null
-  uncertainties: string[]
-  confidence: number | null
+  evidence: {
+    burning_objects: BurningObject[]
+    suspected_cause: string
+    person_count: number
+    person_location: string
+    smoke_color: string
+    smoke_density: string
+    uncertainties: string[]
+    scene_type: string
+  } | null
+  rules: {
+    classes: string[]
+    details: { id: string; name: string; reason: string }[]
+    recommended: string[]
+    forbidden: string[]
+    actions: string[]
+    water_prohibited: boolean
+    basis: string[]
+  }
+  scene: {
+    configured: string
+    configured_label: string
+    observed: string | null
+    observed_label: string | null
+    mismatch: boolean
+  }
+  size: {
+    height_m: number
+    diameter_m: number
+    q_kw: number
+    estimated: boolean
+  } | null
+  growth: {
+    mode: string
+    bin?: string
+    alpha?: number
+    seconds_to_100kw?: number
+    seconds_to_500kw?: number
+    doubling_time_s?: number
+    area_rate_px2_per_s?: number
+    samples?: { t: number; q?: number; area?: number }[]
+    curve?: { t: number; q: number }[]
+    reason: string
+  }
+  level: { grade: string; score: number; reasons: string[] }
+  spread: {
+    status: string
+    now?: number[][]
+    horizon_30s?: number[][]
+    horizon_60s?: number[][]
+    speed_m_s?: number
+    direction_deg?: number
+    hits?: { name: string; horizon_s: number }[]
+  }
+  texts: {
+    oled: string
+    sms_location: string
+    sms_level: string
+    sms_method: string
+  }
   error_code: string | null
-  has_visible_fire: boolean | null
-  has_visible_smoke: boolean | null
 }
 
 export interface FrameInfo {

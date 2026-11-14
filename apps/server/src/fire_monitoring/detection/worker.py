@@ -236,6 +236,9 @@ class DetectionWorker:
                 frames=draft.frames,
                 pump_observations=draft.pump_observations,
                 confirmed_monotonic=time.perf_counter(),
+                before_jpeg=draft.before_jpeg,
+                after_jpeg=draft.after_jpeg,
+                samples=draft.samples,
             )
         )
 

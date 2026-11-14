@@ -42,6 +42,7 @@ class AlertSummary(BaseModel):
     started_at: str
     position: dict | None
     analysis_status: str | None
+    level: str | None
 
 
 class AlertDetail(BaseModel):
@@ -92,6 +93,7 @@ def list_alerts(
                 started_at=iso(alert.started_at),
                 position=_position(alert.position_json),
                 analysis_status=None if analysis is None else analysis.get("status"),
+                level=None if analysis is None or not analysis.get("level") else analysis["level"].get("grade"),
             )
         )
     return result
@@ -197,4 +199,11 @@ def rerun(
     analyzer = request.app.state.analyzer
     if analyzer is None:
         raise HTTPException(status_code=400, detail="大模型未启用")
-    return rerun_analysis(session, alert, request.app.state.evidence, analyzer)
+    return rerun_analysis(
+        session,
+        alert,
+        request.app.state.evidence,
+        analyzer,
+        request.app.state.config,
+        localizer=getattr(request.app.state, "localizer", None),
+    )

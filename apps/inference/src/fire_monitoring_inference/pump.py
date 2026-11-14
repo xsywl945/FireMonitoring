@@ -21,6 +21,14 @@ from .contracts import (
 )
 
 
+def _vlm_confirms(judgement: VlmAnalysisPayload | None) -> bool:
+    return (
+        judgement is not None
+        and judgement.status == "SUCCEEDED"
+        and bool(judgement.has_visible_fire or judgement.has_visible_smoke)
+    )
+
+
 class PumpConfig(BaseModel):
     enabled: bool = False
     port: str = ""
@@ -174,13 +182,9 @@ class PumpController:
                 reason = "PUMP_DISABLED"
             elif event.zone_id != self.config.zone_id:
                 reason = "ZONE_NOT_COVERED"
-            elif self.config.require_vlm and not (
-                judgement is not None
-                and judgement.status == "SUCCEEDED"
-                and (judgement.has_visible_fire or judgement.has_visible_smoke)
-                and judgement.confidence is not None
-                and judgement.confidence >= self.config.min_confidence
-            ):
+            elif judgement is not None and judgement.water_prohibited:
+                reason = "WATER_PROHIBITED"
+            elif self.config.require_vlm and not _vlm_confirms(judgement):
                 reason = "VLM_NOT_CONFIRMED"
             elif not self.config.require_vlm and not self._local_fire_confirmed(event):
                 reason = "LOCAL_FIRE_NOT_CONFIRMED"
