@@ -129,9 +129,13 @@ MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一�
 | `landmark_sigma_px` | 控制点像素噪声，大于 0，用于姿态协方差 |
 | `window_ms` | 多路观测凑齐的时间窗，单位毫秒 |
 
+### panel
+
+报警节点串口。`enabled` 为 true 时必须填写 `serial_port`。连接后主机发送 `MODE GREEN`，并每 0.5 秒发送 `PING`。3 秒没有主机报文时，固件自己变成黄红交替。协议见 `contracts/panel-serial-v2.md`。
+
 ### pump
 
-保持原来的串口泵行为。`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是覆盖的教室 id，不是摄像头 id。确认告警后向 ESP32 发送原来的 `RUN` 指令，持续 `duration_ms` 毫秒。
+`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是覆盖的教室 id，不是摄像头 id。确认告警后向执行节点发送 `FIRE_ACTUATOR_V2` 的 `RUN` 指令，持续 `duration_ms` 毫秒。BOOT 强制喷水已删除。接线见 `docs/hardware/wiring.md`。
 
 `require_vlm` 为 false 时，用本地火焰确认：分数不低于 `local_min_confidence`，有效帧数不少于 `local_min_frames`。为 true 时还要求千问分析成功，并且看见火或烟，置信度不低于 `min_confidence`。`max_evidence_age_seconds` 是从取证到发指令允许的最大延迟，超出则不启动。`cooldown_seconds` 是两次启动的最短间隔。`journal_path` 是命令记录的 SQLite 文件。监控页可以紧急停泵。
 

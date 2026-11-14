@@ -23,7 +23,10 @@ class Device:
         if command == "STOP":
             self.active = "-"
             return "STOPPED"
-        return f"STATE {'ON' if self.active != '-' else 'OFF'} {self.active}"
+        if command == "STATUS" or command == "HELLO":
+            pump = "ON" if self.active != "-" else "OFF"
+            return f"STATE {pump} OFF CLEAR 0 0" if command == "STATUS" else "READY FIRE_ACTUATOR_V2"
+        return "ERR COMMAND"
 
     def close(self):
         pass
@@ -133,30 +136,6 @@ def test_smoke_only_event_does_not_start_local_pump(tmp_path):
     pump.trigger(local_fire_event("SMOKE"), None, captured_at=utc_now())
     assert device.commands == []
     assert pump.snapshot()["records"][0]["reason"] == "LOCAL_FIRE_NOT_CONFIRMED"
-
-
-def test_boot_override_is_reported_and_blocks_automatic_restart(tmp_path):
-    device = Device()
-    pump = PumpController(
-        config=PumpConfig(
-            enabled=True, port="COM14", zone_id=2, require_vlm=False, cooldown_seconds=60
-        ),
-        transport=device,
-        journal_path=tmp_path / "pump.sqlite3",
-    )
-    pump.trigger(local_fire_event(), None, captured_at=utc_now())
-    device.active = "BOOT"
-    pump.refresh()
-    assert pump.snapshot()["activationSource"] == "BOOT"
-    assert pump.snapshot()["lastError"] is None
-    assert pump.snapshot()["records"][0]["reason"] == "BOOT_OVERRIDE"
-    pump.trigger(local_fire_event(), None, captured_at=utc_now())
-    assert pump.snapshot()["records"][0]["reason"] == "BOOT_ACTIVE"
-    device.active = "-"
-    pump.refresh()
-    pump.trigger(local_fire_event(), None, captured_at=utc_now())
-    assert pump.snapshot()["records"][0]["reason"] == "COOLDOWN"
-    assert len([cmd for cmd in device.commands if cmd.startswith("RUN ")]) == 1
 
 
 def test_positive_live_judgement_runs_once_and_persists_before_restart(tmp_path):

@@ -95,6 +95,17 @@ class LocalizationSettings(_Strict):
     window_ms: int = Field(ge=0)
 
 
+class PanelSettings(_Strict):
+    enabled: bool
+    serial_port: str
+
+    @model_validator(mode="after")
+    def ready(self) -> Self:
+        if self.enabled and not self.serial_port.strip():
+            raise ValueError("panel.enabled requires serial_port")
+        return self
+
+
 class PumpSettings(_Strict):
     enabled: bool
     serial_port: str
@@ -142,6 +153,7 @@ class AppConfig(_Strict):
     model: ModelSettings
     temporal: TemporalSettings
     localization: LocalizationSettings
+    panel: PanelSettings
     pump: PumpSettings
     auth: AuthSettings
     cameras: CameraDefaults

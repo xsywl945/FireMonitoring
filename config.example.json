@@ -67,6 +67,10 @@
     "landmark_sigma_px": 2.0,
     "window_ms": 500
   },
+  "panel": {
+    "enabled": false,
+    "serial_port": ""
+  },
   "pump": {
     "enabled": false,
     "serial_port": "",
