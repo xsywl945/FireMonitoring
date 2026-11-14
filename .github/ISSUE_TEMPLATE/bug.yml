@@ -1,0 +1,25 @@
+name: 缺陷
+description: 报告一个可复现的问题
+labels: [bug, needs-triage]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 实际行为和期望行为。
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 怎么复现
+      description: 从干净状态开始的步骤，以及实际看到的报错。
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: 系统、分支、相关模块。不要粘贴密钥、config.json 或 .env。
+    validations:
+      required: false
