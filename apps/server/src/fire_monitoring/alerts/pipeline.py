@@ -7,7 +7,10 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from ..analysis.compose import compose
+from ..analysis.qwen import disabled_call
 from ..localization.observe import locate_position
+from ..models import Room
 from .service import actuate, notify_room, record_alert, write_analysis, write_position
 
 logger = logging.getLogger("fire_monitoring.alerts")
@@ -27,6 +30,11 @@ class ConfirmedJob:
     room_name: str = ""
     analysis: dict | None = None
     analysis_ready: threading.Event = field(default_factory=threading.Event)
+    before_jpeg: bytes | None = None
+    after_jpeg: bytes | None = None
+    samples: list = field(default_factory=list)
+    position: dict | None = None
+    position_ready: threading.Event = field(default_factory=threading.Event)
 
 
 class AlertPipeline:
@@ -139,35 +147,76 @@ class AlertPipeline:
         self._pump.put(job)
 
     def _localize_job(self, job: ConfirmedJob) -> None:
-        position = locate_position(
-            self.config,
-            job.frames,
-            job.calibrations,
-            job.sources,
-            localizer=self.localizer,
-        )
-        session = self.session_factory()
         try:
-            payload = write_position(session, job.alert_id, position)
+            position = locate_position(
+                self.config,
+                job.frames,
+                job.calibrations,
+                job.sources,
+                localizer=self.localizer,
+            )
+            job.position = position
+            session = self.session_factory()
+            try:
+                payload = write_position(session, job.alert_id, position)
+            finally:
+                session.close()
+            self.events.publish(payload)
         finally:
-            session.close()
-        self.events.publish(payload)
+            job.position_ready.set()
 
     def _analyze_job(self, job: ConfirmedJob) -> None:
         try:
-            jpegs = [frame.jpeg for frame in job.frames]
-            if self.config.llm.enabled and self.analyzer is not None and jpegs:
-                job.analysis = self.analyzer.analyze(job.alert_id, jpegs)
-                session = self.session_factory()
-                try:
-                    payload = write_analysis(session, job.alert_id, job.analysis)
-                finally:
-                    session.close()
-                self.events.publish(payload)
+            if not job.position_ready.wait(30):
+                raise TimeoutError("localization did not finish within 30s")
+            call = None
+            if self.config.llm.enabled and self.analyzer is not None and job.frames:
+                call = self.analyzer.analyze(
+                    job.alert_id,
+                    job.frames,
+                    job.before_jpeg,
+                    job.after_jpeg,
+                )
+            else:
+                call = disabled_call(self.config.llm.model)
+            session = self.session_factory()
+            try:
+                room = session.get(Room, job.room_id)
+                if room is None:
+                    raise RuntimeError(f"room {job.room_id} does not exist")
+                job.analysis = compose(
+                    self.config,
+                    call=call,
+                    room_name=room.name,
+                    configured_scene=room.scene_type,
+                    position=job.position,
+                    samples=job.samples,
+                    frames=job.frames,
+                    calibrations=job.calibrations,
+                    combustibles=_combustibles(room),
+                    localizer=self.localizer,
+                )
+                if job.before_jpeg is not None:
+                    before_key = f"alerts/{job.alert_id}/before.jpg"
+                    self.evidence.put(before_key, job.before_jpeg, "image/jpeg")
+                    job.analysis["inputs"]["before_key"] = before_key
+                if job.after_jpeg is not None:
+                    after_key = f"alerts/{job.alert_id}/after.jpg"
+                    self.evidence.put(after_key, job.after_jpeg, "image/jpeg")
+                    job.analysis["inputs"]["after_key"] = after_key
+                payload = write_analysis(session, job.alert_id, job.analysis)
+            finally:
+                session.close()
+            self.events.publish(payload)
         finally:
             job.analysis_ready.set()
 
     def _sms_job(self, job: ConfirmedJob) -> None:
+        if not job.analysis_ready.wait(30):
+            raise TimeoutError("analysis did not finish within 30s")
+        if job.analysis is None:
+            raise RuntimeError("analysis is missing")
+        texts = job.analysis["texts"]
         session = self.session_factory()
         try:
             payload = notify_room(
@@ -175,8 +224,9 @@ class AlertPipeline:
                 self.sms,
                 alert_id=job.alert_id,
                 room_id=job.room_id,
-                room_name=job.room_name,
-                alert_type=job.alert_type,
+                room_name=texts["sms_location"],
+                level=texts["sms_level"],
+                method=texts["sms_method"],
                 when=job.started_at,
             )
         finally:
@@ -207,6 +257,14 @@ class AlertPipeline:
             session.close()
         if payload is not None:
             self.events.publish(payload)
+
+
+def _combustibles(room: Room) -> list:
+    if not room.floor_plan_json:
+        return []
+    import json
+
+    return json.loads(room.floor_plan_json).get("combustibles", [])
 
 
 def _exit_process() -> None:

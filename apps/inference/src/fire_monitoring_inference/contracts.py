@@ -104,33 +104,13 @@ class IncidentEvidenceReadyPayload(StrictModel):
 
 class VlmAnalysisPayload(StrictModel):
     incident_id: int | None = Field(default=None, alias="incidentId", ge=1)
-    status: Literal["SUCCEEDED", "FAILED", "DEMO_FALLBACK"]
+    status: Literal["SUCCEEDED", "FAILED"]
     provider: str
     model: str
     prompt_version: str = Field(alias="promptVersion")
     has_visible_fire: bool | None = Field(default=None, alias="hasVisibleFire")
     has_visible_smoke: bool | None = Field(default=None, alias="hasVisibleSmoke")
-    source_nature: Literal["electrical", "open_flame", "chemical", "cooking", "unknown"] | None = (
-        Field(default=None, alias="sourceNature")
-    )
-    scene_type: Literal["classroom", "laboratory", "corridor", "other"] | None = Field(
-        default=None, alias="sceneType"
-    )
-    burning_objects: list[Annotated[str, Field(max_length=100)]] = Field(
-        default_factory=list, alias="burningObjects", max_length=10
-    )
-    people_at_risk: bool | None = Field(default=None, alias="peopleAtRisk")
-    risk_level: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] | None = Field(
-        default=None, alias="riskLevel"
-    )
-    reasoning_summary: str | None = Field(default=None, alias="reasoningSummary", max_length=1000)
-    recommended_actions: list[Annotated[str, Field(max_length=100)]] = Field(
-        default_factory=list, alias="recommendedActions", max_length=10
-    )
-    confidence: float | None = Field(default=None, ge=0, le=1)
-    uncertainties: list[Annotated[str, Field(max_length=200)]] = Field(
-        default_factory=list, max_length=10
-    )
+    water_prohibited: bool = Field(default=False, alias="waterProhibited")
     error_code: str | None = Field(default=None, alias="errorCode")
     latency_ms: float | None = Field(default=None, alias="latencyMs", ge=0)
 

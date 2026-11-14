@@ -76,5 +76,16 @@ def trigger_pump(
         camera_id=chosen[0]["camera_id"],
         model_version=model_version,
     )
-    judgement = VlmAnalysisPayload.model_validate(analysis) if analysis else None
+    judgement = None
+    if analysis is not None:
+        judgement = VlmAnalysisPayload(
+            status=analysis["status"],
+            provider=analysis["provider"],
+            model=analysis["model"],
+            promptVersion=analysis["prompt_version"],
+            hasVisibleFire=analysis["has_visible_fire"],
+            hasVisibleSmoke=analysis["has_visible_smoke"],
+            waterProhibited=analysis["water_prohibited"],
+            errorCode=analysis.get("error_code"),
+        )
     controller.trigger(event, judgement, captured_at=captured_at)

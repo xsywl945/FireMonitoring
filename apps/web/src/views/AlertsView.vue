@@ -39,6 +39,7 @@ function positionText(row: AlertSummary) {
       <el-table-column label="分析" width="120">
         <template #default="{ row }">{{ row.analysis_status || "未分析" }}</template>
       </el-table-column>
+      <el-table-column prop="level" label="等级" width="80" />
     </el-table>
   </div>
 </template>
