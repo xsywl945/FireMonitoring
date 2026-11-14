@@ -10,7 +10,7 @@ flowchart LR
     MTX -->|WHEP| WEB[Vue 3 页面]
     MTX -->|RTSP| API[FastAPI apps/server]
     API --> YOLO[YOLO26s 与时序确认]
-    YOLO --> LOC[四摄 localize_frames]
+    YOLO --> LOC[2 到 4 路 localize]
     API --> DB[MySQL]
     API --> OBJ[MinIO 关键帧与平面图]
     API --> SMS[阿里云短信]
@@ -21,4 +21,4 @@ flowchart LR
 
 画面只走 MediaMTX。检测不直接打开摄像头。告警、账号、教室和标定写在 MySQL。没有 Redis，也没有单独的 Java 进程。
 
-教室最多绑定 4 路。定位需要每路内参、畸变和至少 4 个米制控制点。泵的串口参数在 `config.json`。接线和固件见 [ESP32 水泵](../runbooks/esp32-pump.md)。
+教室最多绑定 4 路。定位需要参与计算的每一路都有内参、畸变和至少 4 个米制控制点，至少 2 路才有坐标。泵的串口参数在 `config.json`。接线和固件见 [ESP32 水泵](../runbooks/esp32-pump.md)。

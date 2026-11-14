@@ -8,6 +8,10 @@ export function currentRole() {
   return localStorage.getItem(ROLE)
 }
 
+export function currentToken() {
+  return localStorage.getItem(TOKEN)
+}
+
 export function currentName() {
   return localStorage.getItem(NAME)
 }

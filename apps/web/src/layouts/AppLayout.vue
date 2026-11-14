@@ -1,11 +1,63 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onBeforeUnmount, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { clearSession, currentName, currentRole } from "../api/client"
-import { roleLabels } from "../labels"
+import { ElNotification } from "element-plus"
+import { clearSession, currentName, currentRole, currentToken } from "../api/client"
+import { alertLabels, roleLabels } from "../labels"
 
 const route = useRoute()
 const router = useRouter()
+let socket: WebSocket | null = null
+let closed = false
+
+function beep() {
+  const audio = new AudioContext()
+  const oscillator = audio.createOscillator()
+  const gain = audio.createGain()
+  oscillator.frequency.value = 880
+  oscillator.connect(gain)
+  gain.connect(audio.destination)
+  gain.gain.setValueAtTime(0.2, audio.currentTime)
+  gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.4)
+  oscillator.start()
+  oscillator.stop(audio.currentTime + 0.4)
+}
+
+function connect() {
+  const token = currentToken()
+  if (closed || !token) return
+  const protocol = location.protocol === "https:" ? "wss" : "ws"
+  socket = new WebSocket(`${protocol}//${location.host}/api/v1/events?token=${encodeURIComponent(token)}`)
+  socket.onmessage = (event) => {
+    const payload = JSON.parse(event.data) as {
+      kind: string
+      alert_id: number
+      room_name: string
+      alert_type: string
+    }
+    window.dispatchEvent(new CustomEvent("fire-event", { detail: payload }))
+    if (payload.kind !== "CONFIRMED") return
+    const label = alertLabels[payload.alert_type] || payload.alert_type
+    ElNotification({
+      title: "火情告警",
+      message: `${payload.room_name} ${label}`,
+      type: "error",
+      duration: 0,
+      onClick: () => router.push(`/alerts/${payload.alert_id}`),
+    })
+    beep()
+  }
+  socket.onclose = (event) => {
+    if (!closed && event.code !== 1008) window.setTimeout(connect, 1000)
+  }
+}
+
+onMounted(connect)
+onBeforeUnmount(() => {
+  closed = true
+  socket?.close()
+})
+
 const role = currentRole()
 const name = currentName()
 

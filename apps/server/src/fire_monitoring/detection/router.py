@@ -11,6 +11,14 @@ from ..models import Camera, Room, RoomCamera, User
 router = APIRouter(tags=["detection"])
 
 
+@router.get("/health")
+def health(request: Request) -> dict:
+    worker = request.app.state.worker
+    if worker is not None and worker.failed:
+        raise HTTPException(status_code=503, detail="detection stopped")
+    return {"detection": "running" if worker is not None and worker.alive else "off"}
+
+
 class DetectionBox(BaseModel):
     class_name: str
     confidence: float

@@ -102,20 +102,28 @@ def write_manifest(
     return path
 
 
-def call_localize_frames(manifest: Path, model: Path, device: str) -> dict:
-    from fire_monitoring_inference.localization import localize_frames
+def localize_manifest(manifest: Path) -> dict:
+    from fire_monitoring_inference.localization import localize
 
-    return localize_frames(manifest, model, device)["position"]
+    return localize(manifest)
 
 
 def locate_position(config, frames, calibrations, sources, localizer=None) -> dict:
-    run = localizer or call_localize_frames
+    ready = {
+        camera_id: calibration
+        for camera_id, calibration in calibrations.items()
+        if any(frame.camera_id == camera_id for frame in frames)
+    }
+    observed = [item for item in sources if item.camera_id in ready]
+    if len(ready) < 2 or len({item.camera_id for item in observed}) < 2:
+        return {"status": "UNOBSERVABLE", "support_camera_ids": []}
+    run = localizer or localize_manifest
     with tempfile.TemporaryDirectory() as directory:
         manifest = write_manifest(
             Path(directory),
             config.localization.landmark_sigma_px,
             frames,
-            calibrations,
+            ready,
             sources,
         )
-        return run(manifest, Path(config.model.path), config.model.device)
+        return run(manifest)
