@@ -84,7 +84,10 @@ def write_manifest(
             "image": image_name,
             "intrinsics": calibration["intrinsics"],
             "distortion": list(calibration["distortion"]),
-            "landmarks": calibration["landmarks"],
+            "landmarks": [
+                {"world_m": item["world_m"], "pixel": item["pixel"]}
+                for item in calibration["landmarks"]
+            ],
         }
         source = sources_by_id.get(camera_id)
         if source is not None:
@@ -113,6 +116,7 @@ def locate_position(config, frames, calibrations, sources, localizer=None) -> di
         camera_id: calibration
         for camera_id, calibration in calibrations.items()
         if any(frame.camera_id == camera_id for frame in frames)
+        and len(calibration["landmarks"]) >= 4
     }
     observed = [item for item in sources if item.camera_id in ready]
     if len(ready) < 2 or len({item.camera_id for item in observed}) < 2:

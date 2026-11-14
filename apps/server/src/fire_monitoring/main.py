@@ -10,6 +10,7 @@ from .alerts.router import router as alerts_router
 from .analysis.qwen import QwenAnalyzer
 from .auth.router import router as auth_router
 from .auth.security import seed_users
+from .calibration.router import router as calibration_router
 from .cameras.router import router as cameras_router
 from .config import AppConfig
 from .config.router import router as config_router
@@ -91,6 +92,7 @@ def create_app(
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(rooms_router, prefix="/api/v1")
     app.include_router(cameras_router, prefix="/api/v1")
+    app.include_router(calibration_router, prefix="/api/v1")
     app.include_router(detection_router, prefix="/api/v1")
     app.include_router(alerts_router, prefix="/api/v1")
     app.include_router(config_router, prefix="/api/v1")
