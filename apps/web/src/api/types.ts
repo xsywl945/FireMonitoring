@@ -37,12 +37,17 @@ export interface Room {
 export interface Landmark {
   world_m: number[]
   pixel: number[]
+  marker_id?: number
 }
 
 export interface Calibration {
   intrinsics: number[][]
   distortion: number[]
   landmarks: Landmark[]
+  intrinsics_reprojection_error_px?: number | null
+  extrinsics_reprojection_error_px?: number | null
+  image_size?: number[] | null
+  board?: string | null
 }
 
 export interface Camera {
@@ -71,6 +76,7 @@ export interface LiveCamera {
   height: number
   states: { fire: string; smoke: string }
   detections: DetectionBox[]
+  health: string
 }
 
 export interface LiveState {

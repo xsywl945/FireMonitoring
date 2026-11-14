@@ -32,7 +32,7 @@ export function signedIn() {
   return Boolean(localStorage.getItem(TOKEN))
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function authorized(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers)
   const token = localStorage.getItem(TOKEN)
   if (token) headers.set("Authorization", `Bearer ${token}`)
@@ -56,9 +56,29 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     throw new Error(message)
   }
+  return response
+}
+
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await authorized(path, init)
   const type = response.headers.get("content-type") || ""
   if (!type.includes("application/json")) return undefined as T
   return response.json() as Promise<T>
+}
+
+export async function fetchAuthorized(path: string): Promise<Blob> {
+  const response = await authorized(path)
+  return response.blob()
+}
+
+export async function download(path: string, filename: string) {
+  const blob = await fetchAuthorized(path)
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 export async function fetchBlob(path: string): Promise<string> {

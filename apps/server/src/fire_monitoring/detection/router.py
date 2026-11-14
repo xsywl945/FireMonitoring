@@ -35,6 +35,7 @@ class LiveCamera(BaseModel):
     height: int
     states: dict[str, str]
     detections: list[DetectionBox]
+    health: str
 
 
 class LiveOut(BaseModel):
@@ -73,6 +74,7 @@ def live(
                 height=snap["height"],
                 states=snap["states"],
                 detections=[DetectionBox(**item) for item in snap["detections"]],
+                health=snap["health"],
             )
         )
     return LiveOut(room_id=room_id, cameras=cameras)

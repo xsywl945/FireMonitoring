@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..auth.deps import get_current_user, get_db, require_admin
+from ..calibration.service import ready
 from ..models import Camera, Room, RoomCamera, User
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
@@ -76,7 +77,7 @@ def _room_out(session: Session, room: Room) -> RoomOut:
                 name=camera.name,
                 stream_key=camera.stream_key,
                 source_type=camera.source_type,
-                calibrated=camera.calibration_json is not None,
+                calibrated=ready(camera.calibration_json),
             )
         )
     return RoomOut(

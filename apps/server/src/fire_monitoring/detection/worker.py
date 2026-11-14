@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from ..alerts.pipeline import AlertPipeline, ConfirmedJob
+from ..calibration.health import assess_frame
 from ..detection.capture import CameraCapture
 from ..detection.ingest import DetectionHit, DetectionState, consume_frame
 from ..models import Camera, Room, RoomCamera
@@ -45,6 +46,7 @@ class LiveHub:
                     "height": 0,
                     "states": {"fire": "NORMAL", "smoke": "NORMAL"},
                     "detections": [],
+                    "health": "offline",
                 }
             return dict(current)
 
@@ -93,6 +95,7 @@ class DetectionWorker:
         self._thread: threading.Thread | None = None
         self._assignments: list[Assignment] = []
         self._captures: dict[int, CameraCapture] = {}
+        self._previous_gray: dict[int, object] = {}
         self._next_due: dict[int, float] = {}
         self._loaded_at = 0.0
 
@@ -176,6 +179,12 @@ class DetectionWorker:
                         config=self.config,
                         on_alert=self._on_alert,
                     )
+                    status, gray = assess_frame(
+                        self._previous_gray.get(assignment.camera_id),
+                        frame.image,
+                    )
+                    self._previous_gray[assignment.camera_id] = gray
+                    snapshot["health"] = status
                     self.live.update(assignment.camera_id, snapshot)
             else:
                 self._stop.wait(0.01)
@@ -214,6 +223,7 @@ class DetectionWorker:
         for camera_id in list(self._captures):
             if camera_id not in wanted:
                 self._captures.pop(camera_id).stop()
+                self._previous_gray.pop(camera_id, None)
         for camera_id, assignment in wanted.items():
             if camera_id not in self._captures:
                 capture = CameraCapture(assignment, self._open_capture, self._fatal)
@@ -239,9 +249,24 @@ class DetectionWorker:
             )
         )
 
+    def latest_png(self, camera_id: int) -> bytes:
+        import cv2
+
+        capture = self._captures.get(camera_id)
+        if capture is None:
+            raise RuntimeError("摄像头未在采集")
+        frame = capture.buffer.snapshot()
+        if frame is None:
+            raise RuntimeError("没有画面")
+        ok, encoded = cv2.imencode(".png", frame.image)
+        if not ok:
+            raise RuntimeError("png encode failed")
+        return encoded.tobytes()
+
     def _mark_offline(self, camera_id: int) -> None:
         current = self.live.get(camera_id)
         current["online"] = False
+        current["health"] = "offline"
         self.live.update(camera_id, current)
 
     def _open_rtsp(self, assignment: Assignment):
