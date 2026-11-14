@@ -99,11 +99,11 @@ MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一�
 
 ### llm
 
-千问兼容接口。`enabled` 为 true 时，告警确认后在独立线程里分析关键帧，研判页也可以手动重跑。分析不挡住检测、短信和水泵。`pump.require_vlm` 为 true 时，水泵等到千问结果再决定是否喷水。返回里的 `burning_objects` 和 `people_at_risk` 会写入告警并显示在研判页。`base_url`、`model`、`api_key` 是 DashScope 兼容模式的地址、模型名和密钥。超时 25 秒。
+千问兼容接口。`enabled` 为 true 时，告警确认后在独立线程里把四路关键帧、火焰框放大图以及事件前后画面交给千问。提示词版本是 `fire-evidence-v4`。模型只返回燃烧物、疑似原因、带电设备、液体、油锅、金属粉末、人员、场景、烟和不确定项，不选择灭火剂。返回字段由本地模型校验，不合法就记为失败。研判页可以手动重跑。`pump.require_vlm` 为 true 时，水泵等到研判结果：看见火或烟才允许喷水，规则表禁止用水时拒绝喷水。`base_url`、`model`、`api_key` 是 DashScope 兼容模式的地址、模型名和密钥。超时 25 秒。规则表在 `config/fire_rules.json`。
 
 ### sms
 
-告警确认后发给 `recipients` 里的固定号码。模板变量是 `room`（教室名）、`type`（火焰、烟雾、火焰和烟雾）、`time`（`timezone` 下的本地时间，格式 `YYYY-MM-DD HH:MM:SS`）。`sign_name`、`template_code`、`access_key_id`、`access_key_secret` 是阿里云短信参数。`enabled` 为 false 或名单为空则不发送。`cooldown_seconds` 是同一教室两次短信的最短间隔。
+告警研判完成后发给 `recipients` 里的固定号码。模板变量是 `location`（教室名）、`level`（Ⅰ级到Ⅳ级）、`method`（建议灭火方式）。三个变量都不超过 35 个字符。正文草稿见 [短信模板 v2](docs/sms/aliyun-template-v2.md)。`sign_name`、`template_code`、`access_key_id`、`access_key_secret` 是阿里云短信参数。`enabled` 为 false 或名单为空则不发送。`cooldown_seconds` 是同一教室两次短信的最短间隔。
 
 ### model
 
@@ -129,11 +129,15 @@ MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一�
 | `landmark_sigma_px` | 控制点像素噪声，大于 0，用于姿态协方差 |
 | `window_ms` | 多路观测凑齐的时间窗，单位毫秒 |
 
+### panel
+
+报警节点串口。`enabled` 为 true 时必须填写 `serial_port`。连接后主机发送 `MODE GREEN`，并每 0.5 秒发送 `PING`。3 秒没有主机报文时，固件自己变成黄红交替。协议见 `contracts/panel-serial-v2.md`。
+
 ### pump
 
-保持原来的串口泵行为。`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是覆盖的教室 id，不是摄像头 id。确认告警后向 ESP32 发送原来的 `RUN` 指令，持续 `duration_ms` 毫秒。
+`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是覆盖的教室 id，不是摄像头 id。确认告警后向执行节点发送 `FIRE_ACTUATOR_V2` 的 `RUN` 指令，持续 `duration_ms` 毫秒。BOOT 强制喷水已删除。接线见 `docs/hardware/wiring.md`。
 
-`require_vlm` 为 false 时，用本地火焰确认：分数不低于 `local_min_confidence`，有效帧数不少于 `local_min_frames`。为 true 时还要求千问分析成功，并且看见火或烟，置信度不低于 `min_confidence`。`max_evidence_age_seconds` 是从取证到发指令允许的最大延迟，超出则不启动。`cooldown_seconds` 是两次启动的最短间隔。`journal_path` 是命令记录的 SQLite 文件。监控页可以紧急停泵。
+`require_vlm` 为 false 时，用本地火焰确认：分数不低于 `local_min_confidence`，有效帧数不少于 `local_min_frames`。为 true 时还要求千问证据校验通过，并且看见火或烟；规则表禁止用水时不发 `RUN`。`max_evidence_age_seconds` 是从取证到发指令允许的最大延迟，超出则不启动。`cooldown_seconds` 是两次启动的最短间隔。`journal_path` 是命令记录的 SQLite 文件。监控页可以紧急停泵。
 
 ### auth
 

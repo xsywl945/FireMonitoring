@@ -2,7 +2,6 @@ import json
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -28,25 +27,28 @@ class FakeAnalyzer:
     def __init__(self) -> None:
         self.calls = []
 
-    def analyze(self, alert_id: int, jpegs: list[bytes]) -> dict:
-        self.calls.append((alert_id, list(jpegs)))
+    def analyze(self, alert_id: int, frames, before=None, after=None) -> dict:
+        self.calls.append((alert_id, [frame.jpeg for frame in frames], before, after))
         return {
             "status": "SUCCEEDED",
             "provider": "fake",
             "model": "fake",
-            "prompt_version": "test",
-            "has_visible_fire": True,
-            "has_visible_smoke": False,
-            "source_nature": "open_flame",
-            "scene_type": "classroom",
-            "risk_level": "HIGH",
-            "reasoning_summary": "画面中有明火",
-            "recommended_actions": ["疏散"],
-            "burning_objects": ["纸"],
-            "people_at_risk": True,
-            "confidence": 0.9,
-            "uncertainties": [],
+            "prompt_version": "fire-evidence-v4",
             "error_code": None,
+            "evidence": {
+                "burning_objects": [{"frame_index": 1, "name": "纸", "evidence": "画面1桌面"}],
+                "suspected_cause": "open_flame",
+                "energized_equipment": False,
+                "liquid": False,
+                "oil_pan": False,
+                "metal_powder": False,
+                "person_count": 1,
+                "person_location": "门口",
+                "scene_type": "classroom",
+                "smoke_color": "none",
+                "smoke_density": "none",
+                "uncertainties": [],
+            },
         }
 
 
@@ -228,12 +230,22 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
     assert session.query(AlertFrame).count() == 4
     assert len(evidence.objects) == 4
     analysis = json.loads(stored.analysis_json)
-    assert analysis["reasoning_summary"] == "画面中有明火"
-    assert analysis["burning_objects"] == ["纸"]
-    assert analysis["people_at_risk"] is True
+    assert analysis["evidence"]["burning_objects"][0]["name"] == "纸"
+    assert analysis["evidence"]["person_count"] == 1
+    assert analysis["rules"]["classes"] == ["A"]
+    assert analysis["rules"]["water_prohibited"] is False
+    assert analysis["texts"]["sms_level"] == "Ⅰ级"
     assert analyzer.calls[0][1] == [frame.jpeg for frame in frames]
-    expected_time = now.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
-    assert sender.sent == [("13800000000", {"room": "101", "type": "火焰", "time": expected_time})]
+    assert sender.sent == [
+        (
+            "13800000000",
+            {
+                "location": "101",
+                "level": "Ⅰ级",
+                "method": "用水、泡沫或ABC干粉",
+            },
+        )
+    ]
     assert transport.commands[0].startswith("RUN ")
 
     later = now + timedelta(seconds=10)
@@ -249,6 +261,83 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
     )
     assert len(sender.sent) == 1
     assert session.query(SmsDispatch).count() == 1
+    pipeline.stop()
+    pump.close()
+
+
+def test_qwen_class_e_makes_the_pump_refuse_water(tmp_path: Path) -> None:
+    class ElectricalAnalyzer(FakeAnalyzer):
+        def analyze(self, alert_id: int, frames, before=None, after=None) -> dict:
+            result = super().analyze(alert_id, frames, before, after)
+            result["evidence"]["energized_equipment"] = True
+            result["evidence"]["suspected_cause"] = "electrical_short"
+            result["evidence"]["burning_objects"] = [
+                {"frame_index": 1, "name": "配电箱", "evidence": "画面1箱体冒烟起火"}
+            ]
+            return result
+
+    factory = _factory(tmp_path)
+    session = factory()
+    session.add(Room(name="配电", scene_type="electrical_room", created_at=utc_now()))
+    session.commit()
+    room = session.query(Room).one()
+    now = utc_now()
+    frames = [
+        FrameShot(camera_id=1, jpeg=b"a", captured_at=now, width=8, height=8),
+        FrameShot(camera_id=2, jpeg=b"b", captured_at=now, width=8, height=8),
+    ]
+    transport = FakeTransport()
+    pump = PumpController(
+        config=PumpConfig(
+            enabled=True,
+            port="COM3",
+            zone_id=room.id,
+            duration_ms=5000,
+            cooldown_seconds=0,
+            require_vlm=True,
+            local_min_confidence=0.3,
+            local_min_frames=1,
+        ),
+        journal_path=tmp_path / "pump.sqlite3",
+        transport=transport,
+    )
+    config = _config()
+    config.pump.require_vlm = True
+    pipeline = AlertPipeline(
+        config,
+        factory,
+        MemoryStore(),
+        ElectricalAnalyzer(),
+        SmsService(config, FakeSms()),
+        pump,
+        EventHub(),
+        localizer=lambda _manifest: {"status": "UNOBSERVABLE", "support_camera_ids": []},
+        on_fatal=lambda: None,
+    )
+    pipeline.start()
+    _submit(
+        pipeline,
+        room_id=room.id,
+        alert_type="FIRE",
+        started_at=now,
+        sources=[],
+        calibrations={},
+        frames=frames,
+        pump_observations=[
+            {
+                "camera_id": 1,
+                "class_name": "fire",
+                "score": 0.9,
+                "effective_frames": 3,
+                "duration_ms": 400,
+            }
+        ],
+    )
+    analysis = json.loads(session.query(Alert).one().analysis_json)
+    assert "E" in analysis["rules"]["classes"]
+    assert analysis["rules"]["water_prohibited"] is True
+    assert pump.snapshot()["records"][0]["reason"] == "WATER_PROHIBITED"
+    assert transport.commands == []
     pipeline.stop()
     pump.close()
 

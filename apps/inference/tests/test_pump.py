@@ -23,7 +23,10 @@ class Device:
         if command == "STOP":
             self.active = "-"
             return "STOPPED"
-        return f"STATE {'ON' if self.active != '-' else 'OFF'} {self.active}"
+        if command == "STATUS" or command == "HELLO":
+            pump = "ON" if self.active != "-" else "OFF"
+            return f"STATE {pump} OFF CLEAR 0 0" if command == "STATUS" else "READY FIRE_ACTUATOR_V2"
+        return "ERR COMMAND"
 
     def close(self):
         pass
@@ -68,16 +71,10 @@ class FakeReasoner:
             status="SUCCEEDED",
             provider="dashscope",
             model="qwen3.7-plus",
-            promptVersion="fire-risk-v3",
+            promptVersion="fire-evidence-v4",
             hasVisibleFire=True,
             hasVisibleSmoke=False,
-            sourceNature="open_flame",
-            sceneType="classroom",
-            riskLevel="HIGH",
-            reasoningSummary="Visible flame.",
-            recommendedActions=["Verify the scene"],
-            confidence=0.8,
-            uncertainties=[],
+            waterProhibited=False,
         )
 
 
@@ -135,30 +132,6 @@ def test_smoke_only_event_does_not_start_local_pump(tmp_path):
     assert pump.snapshot()["records"][0]["reason"] == "LOCAL_FIRE_NOT_CONFIRMED"
 
 
-def test_boot_override_is_reported_and_blocks_automatic_restart(tmp_path):
-    device = Device()
-    pump = PumpController(
-        config=PumpConfig(
-            enabled=True, port="COM14", zone_id=2, require_vlm=False, cooldown_seconds=60
-        ),
-        transport=device,
-        journal_path=tmp_path / "pump.sqlite3",
-    )
-    pump.trigger(local_fire_event(), None, captured_at=utc_now())
-    device.active = "BOOT"
-    pump.refresh()
-    assert pump.snapshot()["activationSource"] == "BOOT"
-    assert pump.snapshot()["lastError"] is None
-    assert pump.snapshot()["records"][0]["reason"] == "BOOT_OVERRIDE"
-    pump.trigger(local_fire_event(), None, captured_at=utc_now())
-    assert pump.snapshot()["records"][0]["reason"] == "BOOT_ACTIVE"
-    device.active = "-"
-    pump.refresh()
-    pump.trigger(local_fire_event(), None, captured_at=utc_now())
-    assert pump.snapshot()["records"][0]["reason"] == "COOLDOWN"
-    assert len([cmd for cmd in device.commands if cmd.startswith("RUN ")]) == 1
-
-
 def test_positive_live_judgement_runs_once_and_persists_before_restart(tmp_path):
     device = Device()
     config = PumpConfig(enabled=True, port="COM4", zone_id=2)
@@ -204,7 +177,6 @@ def test_pump_rejects_stale_or_negative_judgement(tmp_path):
         ("disabled", "PUMP_DISABLED"),
         ("other_room", "ZONE_NOT_COVERED"),
         ("failed_vlm", "VLM_NOT_CONFIRMED"),
-        ("low_confidence", "VLM_NOT_CONFIRMED"),
         ("cancelled", "CAMERA_STOPPED"),
         ("emergency", "EMERGENCY_STOP_LATCHED"),
     ],
@@ -223,8 +195,6 @@ def test_unqualified_events_never_run_pump(tmp_path, case, reason):
     )
     if case == "failed_vlm":
         judgement = judgement.model_copy(update={"status": "FAILED"})
-    if case == "low_confidence":
-        judgement = judgement.model_copy(update={"confidence": 0.5})
     cancelled = threading.Event()
     if case == "cancelled":
         cancelled.set()
@@ -232,6 +202,54 @@ def test_unqualified_events_never_run_pump(tmp_path, case, reason):
         pump.emergency_stop()
     pump.trigger(_gate_job().confirmed, judgement, captured_at=utc_now(), cancelled=cancelled)
     assert pump.snapshot()["records"][0]["reason"] == reason
+    assert not any(x.startswith("RUN ") for x in device.commands)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"energized_equipment": True, "suspected_cause": "electrical_short"},
+        {"liquid": True, "burning_objects": []},
+        {"metal_powder": True, "burning_objects": []},
+        {"oil_pan": True, "suspected_cause": "cooking_oil", "burning_objects": []},
+    ],
+)
+def test_water_prohibited_classes_never_start_the_pump(tmp_path, overrides):
+    from fire_monitoring_inference.analysis.rules import classify
+
+    evidence = {
+        "burning_objects": [{"frame_index": 1, "name": "纸", "evidence": "画面1"}],
+        "suspected_cause": "open_flame",
+        "energized_equipment": False,
+        "liquid": False,
+        "oil_pan": False,
+        "metal_powder": False,
+        "person_count": 0,
+        "person_location": "",
+        "scene_type": "classroom",
+        "smoke_color": "none",
+        "smoke_density": "none",
+        "uncertainties": [],
+    }
+    evidence.update(overrides)
+    resolved = classify(evidence, "classroom")
+    assert resolved["water_prohibited"] is True
+    device = Device()
+    pump = PumpController(
+        config=PumpConfig(enabled=True, port="COM4", zone_id=2),
+        transport=device,
+        journal_path=tmp_path / "pump.sqlite3",
+    )
+    judgement = FakeReasoner().analyze(
+        incident_id=None, image_data_urls=["data:image/jpeg;base64,a"]
+    ).model_copy(
+        update={
+            "water_prohibited": resolved["water_prohibited"],
+            "has_visible_fire": True,
+        }
+    )
+    pump.trigger(_gate_job().confirmed, judgement, captured_at=utc_now())
+    assert pump.snapshot()["records"][0]["reason"] == "WATER_PROHIBITED"
     assert not any(x.startswith("RUN ") for x in device.commands)
 
 

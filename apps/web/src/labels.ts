@@ -3,8 +3,42 @@ import type { Calibration } from "./api/types"
 export const sceneLabels: Record<string, string> = {
   classroom: "教室",
   laboratory: "实验室",
+  electrical_room: "配电间",
+  dormitory: "宿舍",
+  kitchen: "食堂后厨",
+  warehouse: "仓库",
   corridor: "走廊",
-  other: "其他",
+}
+
+export const causeLabels: Record<string, string> = {
+  electrical_short: "电气短路",
+  open_flame: "明火引燃",
+  lab_reagent: "实验试剂",
+  cooking_oil: "烹饪油脂",
+  smoking: "吸烟",
+  unknown: "未知",
+}
+
+export const smokeColorLabels: Record<string, string> = {
+  none: "无",
+  white: "白",
+  gray: "灰",
+  black: "黑",
+  unknown: "未知",
+}
+
+export const smokeDensityLabels: Record<string, string> = {
+  none: "无",
+  light: "淡",
+  dense: "浓",
+  unknown: "未知",
+}
+
+export const growthLabels: Record<string, string> = {
+  slow: "慢速",
+  medium: "中速",
+  fast: "快速",
+  ultrafast: "超快速",
 }
 
 export const alertLabels: Record<string, string> = {

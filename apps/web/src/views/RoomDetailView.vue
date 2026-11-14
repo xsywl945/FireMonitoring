@@ -4,7 +4,7 @@ import { useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import FloorPlan from "../components/FloorPlan.vue"
 import { api, currentRole, download, fetchAuthorized } from "../api/client"
-import type { Calibration, Camera, LiveState, Room } from "../api/types"
+import type { BoundCamera, Calibration, Camera, LiveState, Room } from "../api/types"
 import { calibrationStatus, healthLabels, messageOf, px } from "../labels"
 
 interface HeldFrame {
@@ -38,6 +38,19 @@ const health = ref<Record<number, string>>({})
 const plan = reactive({ originX: 0, originY: 0, meters: 0.01, worldX: 0, worldY: 0 })
 const file = ref<File | null>(null)
 let timer = 0
+const drafting = ref(false)
+const draftName = ref("课桌区")
+const draftPoints = ref<number[][]>([])
+
+const regionShapes = computed(() => {
+  const saved = (room.value?.floor_plan?.combustibles ?? []).map((item) => ({
+    points: item.polygon,
+    stroke: "#1e3a5f",
+    fill: "rgba(30, 58, 95, 0.12)",
+  }))
+  if (draftPoints.value.length < 2) return saved
+  return [...saved, { points: draftPoints.value, stroke: "#9f2d20", fill: "rgba(159, 45, 32, 0.2)" }]
+})
 
 const options = computed(() => {
   const used = new Set<number>()
@@ -250,7 +263,48 @@ async function savePlan() {
   }
 }
 
-function rowClass({ row }: { row: { calibrated: boolean } }) {
+function onPick(point: number[]) {
+  if (!drafting.value) return
+  draftPoints.value = [...draftPoints.value, point]
+}
+
+async function saveRegion() {
+  if (!draftName.value.trim()) {
+    ElMessage.error("填写区域名称")
+    return
+  }
+  if (draftPoints.value.length < 3) {
+    ElMessage.error("至少三个顶点")
+    return
+  }
+  const current = room.value?.floor_plan?.combustibles ?? []
+  const regions = [...current, { name: draftName.value.trim(), polygon: draftPoints.value }]
+  try {
+    room.value = await api<Room>(`/rooms/${id.value}/combustibles`, {
+      method: "PUT",
+      body: JSON.stringify({ regions }),
+    })
+    draftPoints.value = []
+    drafting.value = false
+  } catch (error) {
+    ElMessage.error(messageOf(error))
+  }
+}
+
+async function removeRegion(index: number) {
+  const current = room.value?.floor_plan?.combustibles ?? []
+  const regions = current.filter((_, item) => item !== index)
+  try {
+    room.value = await api<Room>(`/rooms/${id.value}/combustibles`, {
+      method: "PUT",
+      body: JSON.stringify({ regions }),
+    })
+  } catch (error) {
+    ElMessage.error(messageOf(error))
+  }
+}
+
+function rowClass({ row }: { row: BoundCamera }) {
   return row.calibrated ? "" : "row-uncalibrated"
 }
 
@@ -369,7 +423,15 @@ onBeforeUnmount(() => {
     </div>
     <div class="panel">
       <div class="toolbar"><strong>平面图</strong></div>
-      <FloorPlan v-if="room.floor_plan" :room-id="room.id" :plan="room.floor_plan" :position="null" />
+      <FloorPlan
+        v-if="room.floor_plan"
+        :room-id="room.id"
+        :plan="room.floor_plan"
+        :position="null"
+        :shapes="regionShapes"
+        :picking="drafting"
+        @pick="onPick"
+      />
       <div v-if="admin" class="form-grid" style="margin-top: 12px">
         <el-form-item label="原点像素 X"><el-input-number v-model="plan.originX" :controls="false" /></el-form-item>
         <el-form-item label="原点像素 Y"><el-input-number v-model="plan.originY" :controls="false" /></el-form-item>
@@ -379,6 +441,26 @@ onBeforeUnmount(() => {
         <el-form-item label="图片"><input type="file" accept="image/*" @change="onFile" /></el-form-item>
       </div>
       <el-button v-if="admin" type="primary" @click="savePlan">保存平面图</el-button>
+      <div v-if="admin && room.floor_plan" style="margin-top: 16px">
+        <div class="toolbar"><strong>可燃物区域</strong></div>
+        <el-table :data="room.floor_plan.combustibles" border>
+          <el-table-column prop="name" label="名称" />
+          <el-table-column label="顶点数" width="100">
+            <template #default="{ row }">{{ row.polygon.length }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="100">
+            <template #default="{ $index }">
+              <el-button link type="danger" @click="removeRegion($index)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div style="display: flex; gap: 8px; margin-top: 12px">
+          <el-input v-model="draftName" placeholder="课桌区、试剂柜" style="max-width: 200px" />
+          <el-button @click="drafting = !drafting">{{ drafting ? "结束圈选" : "在图上圈选" }}</el-button>
+          <el-button type="primary" @click="saveRegion">保存区域</el-button>
+          <span v-if="draftPoints.length">已点 {{ draftPoints.length }} 个顶点</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>

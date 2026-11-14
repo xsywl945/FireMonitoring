@@ -1,0 +1,103 @@
+{
+  "classes": {
+    "A": {
+      "name": "固体",
+      "recommended": ["水", "泡沫", "ABC干粉"],
+      "forbidden": [],
+      "actions": [],
+      "water_prohibited": false,
+      "sms": "用水、泡沫或ABC干粉"
+    },
+    "B": {
+      "name": "液体或可熔固体",
+      "recommended": ["泡沫", "抗溶泡沫", "干粉", "二氧化碳"],
+      "forbidden": ["直流水"],
+      "actions": [],
+      "water_prohibited": true,
+      "sms": "用泡沫、干粉或二氧化碳，禁直流水"
+    },
+    "C": {
+      "name": "气体",
+      "recommended": ["干粉", "二氧化碳"],
+      "forbidden": [],
+      "actions": ["先关气源"],
+      "water_prohibited": false,
+      "sms": "先关气源，干粉或二氧化碳"
+    },
+    "D": {
+      "name": "金属",
+      "recommended": ["D类干粉", "干沙"],
+      "forbidden": ["水", "二氧化碳"],
+      "actions": [],
+      "water_prohibited": true,
+      "sms": "D类干粉或干沙，禁水和二氧化碳"
+    },
+    "E": {
+      "name": "带电",
+      "recommended": ["二氧化碳", "干粉"],
+      "forbidden": ["水"],
+      "actions": ["先断电"],
+      "water_prohibited": true,
+      "sms": "先断电，干粉或二氧化碳，禁水"
+    },
+    "F": {
+      "name": "烹饪油脂",
+      "recommended": ["锅盖或灭火毯", "F类灭火器"],
+      "forbidden": ["水"],
+      "actions": [],
+      "water_prohibited": true,
+      "sms": "盖锅盖或灭火毯，禁水"
+    }
+  },
+  "strictness": ["D", "E", "F", "B", "C", "A"],
+  "scenes": {
+    "classroom": {"label": "教室", "risk": 0, "priors": []},
+    "laboratory": {
+      "label": "实验室",
+      "risk": 2,
+      "priors": [
+        {"class": "B", "causes": ["lab_reagent", "unknown"], "flags": ["liquid"]},
+        {"class": "D", "causes": ["unknown"], "flags": ["metal_powder"]}
+      ]
+    },
+    "electrical_room": {
+      "label": "配电间",
+      "risk": 3,
+      "priors": [{"class": "E", "always": true}]
+    },
+    "dormitory": {"label": "宿舍", "risk": 1, "priors": []},
+    "kitchen": {"label": "食堂后厨", "risk": 2, "priors": []},
+    "warehouse": {"label": "仓库", "risk": 1, "priors": []},
+    "corridor": {"label": "走廊", "risk": 1, "priors": []}
+  },
+  "growth_bins": {
+    "slow": 0.00293,
+    "medium": 0.01172,
+    "fast": 0.0469,
+    "ultrafast": 0.1876
+  },
+  "severity": {
+    "q_bands": [
+      {"min": 500, "score": 4, "reason": "估计热释放速率达到 500 kW"},
+      {"min": 100, "score": 3, "reason": "估计热释放速率达到 100 kW"},
+      {"min": 10, "score": 2, "reason": "估计热释放速率达到 10 kW"}
+    ],
+    "growth_scores": {"ultrafast": 4, "fast": 3, "medium": 2, "slow": 1},
+    "growth_reasons": {
+      "ultrafast": "增长接近超快",
+      "fast": "增长接近快速",
+      "medium": "增长接近中速",
+      "slow": "增长接近慢速"
+    },
+    "dense_smoke": {"score": 2, "reason": "烟为浓烟"},
+    "people": {"score": 2, "reason": "现场有人"},
+    "grades": [
+      {"grade": "Ⅳ", "min_score": 9},
+      {"grade": "Ⅲ", "min_score": 6},
+      {"grade": "Ⅱ", "min_score": 3},
+      {"grade": "Ⅰ", "min_score": 0}
+    ]
+  },
+  "sms_limit": 35,
+  "empty_sms": "现场确认后再灭火"
+}

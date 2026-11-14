@@ -23,6 +23,16 @@ class FrameShot:
     captured_at: datetime
     width: int
     height: int
+    fire_box: tuple[float, float, float, float] | None = None
+
+
+@dataclass(frozen=True)
+class FireSample:
+    captured_at: datetime
+    camera_id: int
+    bbox: tuple[float, float, float, float]
+    width: int
+    height: int
 
 
 @dataclass
@@ -33,6 +43,9 @@ class AlertDraft:
     sources: list[SourceObservation]
     frames: list[FrameShot]
     pump_observations: list[dict]
+    before_jpeg: bytes | None = None
+    after_jpeg: bytes | None = None
+    samples: list[FireSample] = field(default_factory=list)
 
 
 @dataclass
@@ -42,6 +55,8 @@ class DetectionState:
     frames: dict[int, FrameShot] = field(default_factory=dict)
     episode_open: dict[int, bool] = field(default_factory=dict)
     latest: dict[tuple[int, int, str], object] = field(default_factory=dict)
+    samples: dict[int, list[FireSample]] = field(default_factory=dict)
+    quiet_jpeg: dict[int, bytes] = field(default_factory=dict)
 
 
 def temporal_config_for(config: AppConfig, class_name: str) -> TemporalConfig:
@@ -73,13 +88,29 @@ def consume_frame(
 ) -> dict:
     limits = {"fire": config.model.thresholds.fire, "smoke": config.model.thresholds.smoke}
     kept = [item for item in detections if item.confidence >= limits[item.class_name]]
+    fire_boxes = [item for item in kept if item.class_name == "fire"]
+    fire = max(fire_boxes, key=lambda item: item.confidence, default=None)
     state.frames[camera_id] = FrameShot(
         camera_id=camera_id,
         jpeg=jpeg,
         captured_at=timestamp,
         width=width,
         height=height,
+        fire_box=None if fire is None else fire.bbox_xyxy,
     )
+    if fire is not None:
+        history = state.samples.setdefault(room_id, [])
+        history.append(
+            FireSample(
+                captured_at=timestamp,
+                camera_id=camera_id,
+                bbox=fire.bbox_xyxy,
+                width=width,
+                height=height,
+            )
+        )
+        cutoff = timestamp - timedelta(seconds=30)
+        state.samples[room_id] = [item for item in history if item.captured_at >= cutoff]
     just_confirmed = False
     confirmed_evidence = {}
     for class_name in ("fire", "smoke"):
@@ -132,6 +163,8 @@ def consume_frame(
     if not just_confirmed:
         if state.episode_open.get(room_id) and not _room_active(state, room_id):
             state.episode_open[room_id] = False
+        if not state.episode_open.get(room_id):
+            state.quiet_jpeg[room_id] = jpeg
     elif not state.episode_open.get(room_id):
         fire_on = _class_confirmed(state, room_id, "fire")
         smoke_on = _class_confirmed(state, room_id, "smoke")
@@ -173,6 +206,9 @@ def consume_frame(
                 sources=sources,
                 frames=frames,
                 pump_observations=pump_observations,
+                before_jpeg=state.quiet_jpeg.get(room_id),
+                after_jpeg=jpeg,
+                samples=list(state.samples.get(room_id, [])),
             )
         )
         state.episode_open[room_id] = True
