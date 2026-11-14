@@ -5,32 +5,26 @@ build-backend = "hatchling.build"
 [project]
 name = "fire-monitoring-inference"
 version = "0.1.0"
-description = "Native Windows inference worker for the Fire Monitoring research prototype"
+description = "Localization, temporal confirmation, pump protocol and Qwen client"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "Flask>=3.1,<4",
   "httpx>=0.28,<1",
+  "numpy>=1.26,<3",
+  "opencv-python>=4.10,<5",
   "pydantic>=2.10,<3",
-  "redis>=5.2,<7",
   "pyserial>=3.5,<4",
+  "scipy>=1.11,<2",
 ]
 
 [project.optional-dependencies]
 yolo = [
-  "minio==7.2.20",
-  "opencv-python>=4.10,<5",
-  "scipy>=1.11,<2",
   "ultralytics==8.4.100",
 ]
 dev = [
-  "jsonschema[format]>=4.23,<5",
   "pytest>=8.3,<9",
   "ruff>=0.9,<1",
 ]
-
-[project.scripts]
-fire-inference = "fire_monitoring_inference.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fire_monitoring_inference"]

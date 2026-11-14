@@ -4,7 +4,7 @@ import { useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import FloorPlan from "../components/FloorPlan.vue"
 import { api, currentRole } from "../api/client"
-import type { Camera, Room } from "../api/types"
+import type { BoundCamera, Camera, Room } from "../api/types"
 import { messageOf } from "../labels"
 
 interface LandmarkForm {
@@ -164,6 +164,10 @@ async function savePlan() {
   }
 }
 
+function rowClass({ row }: { row: BoundCamera }) {
+  return row.calibrated ? "" : "row-uncalibrated"
+}
+
 watch(id, load, { immediate: true })
 </script>
 
@@ -180,7 +184,7 @@ watch(id, load, { immediate: true })
     </div>
     <div class="panel">
       <div class="toolbar"><strong>标定</strong></div>
-      <el-table :data="room.cameras" border>
+      <el-table :data="room.cameras" :row-class-name="rowClass" border>
         <el-table-column prop="slot" label="路" width="80" />
         <el-table-column prop="name" label="摄像头" />
         <el-table-column label="状态" width="100">
@@ -235,3 +239,10 @@ watch(id, load, { immediate: true })
     </div>
   </div>
 </template>
+
+<style scoped>
+:deep(.row-uncalibrated) {
+  --el-table-tr-bg-color: #fde8e8;
+  color: #b42318;
+}
+</style>

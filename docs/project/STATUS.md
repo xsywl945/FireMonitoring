@@ -10,7 +10,7 @@
 
 实时画面走 MediaMTX。浏览器用 WebRTC（WHEP）播放。USB 由 `scripts/windows/start-streams.ps1` 调 FFmpeg 推流，网络摄像头拉 RTSP。检测读 MediaMTX 的 RTSP。
 
-四摄定位在 `apps/inference/src/fire_monitoring_inference/localization.py` 的 `localize_frames`，几何计算在同目录的 `multiview_geometry.py`。标定使用 `solvePnPRansac` 和 `solvePnPRefineLM`，定位使用 Nelder-Mead 和离群混合模型。告警确认时按它的 manifest 组织每路内参、畸变、至少 4 个控制点，以及检测框得到的 `source`。`ESTIMATED` 写入坐标、协方差、条件数和支持摄像头。`UNOBSERVABLE` 不写坐标，平面图不标点。
+定位在 `apps/inference/src/fire_monitoring_inference/localization.py` 的 `localize`，几何计算在同目录的 `multiview_geometry.py`。标定使用 `solvePnPRansac` 和 `solvePnPRefineLM`，定位使用 Nelder-Mead 和离群混合模型。告警确认后用检测框已经得到的观测做几何，不再重新检测。2 到 4 路有标定和观测即可。`ESTIMATED` 写入坐标、协方差、条件数和支持摄像头。不足 2 路时为 `UNOBSERVABLE`，不写坐标，平面图不标点，告警照常生成。
 
 检测权重不在仓库中。配置示例指向 `models/yolo26s-ft-2026-11-04/best.pt`。火焰阈值 0.30，烟雾阈值 0.35，写在 `config.json`，不在代码里写死。
 

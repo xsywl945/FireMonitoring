@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
+import time
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from ..alerts.service import confirm_alert
+from ..alerts.pipeline import AlertPipeline, ConfirmedJob
+from ..detection.capture import CameraCapture
 from ..detection.ingest import DetectionHit, DetectionState, consume_frame
 from ..models import Camera, Room, RoomCamera
+
+logger = logging.getLogger("fire_monitoring.detection")
 
 
 @dataclass
@@ -45,58 +49,136 @@ class LiveHub:
             return dict(current)
 
 
+def due_cameras(assignments: list[Assignment], now: float, next_due: dict[int, float]) -> list[Assignment]:
+    return [item for item in assignments if now >= next_due.get(item.camera_id, 0)]
+
+
 class DetectionWorker:
-    def __init__(self, config, session_factory, evidence, analyzer, sms, pump, live: LiveHub) -> None:
+    def __init__(
+        self,
+        config,
+        session_factory,
+        evidence,
+        analyzer,
+        sms,
+        pump,
+        live: LiveHub,
+        events,
+        *,
+        detector=None,
+        open_capture=None,
+        localizer=None,
+        on_fatal=None,
+    ) -> None:
         self.config = config
         self.session_factory = session_factory
-        self.evidence = evidence
-        self.analyzer = analyzer
-        self.sms = sms
-        self.pump = pump
         self.live = live
+        self.detector = detector
+        self._open_capture = open_capture or self._open_rtsp
+        self.on_fatal = on_fatal or _exit_process
+        self.failed = False
         self.state = DetectionState()
+        self.pipeline = AlertPipeline(
+            config,
+            session_factory,
+            evidence,
+            analyzer,
+            sms,
+            pump,
+            events,
+            localizer=localizer,
+            on_fatal=self._fatal,
+        )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        self._caps: dict[int, object] = {}
         self._assignments: list[Assignment] = []
+        self._captures: dict[int, CameraCapture] = {}
+        self._next_due: dict[int, float] = {}
         self._loaded_at = 0.0
-        self.detector = None
 
     def start(self) -> None:
-        from fire_monitoring_inference.detectors.ultralytics_adapter import UltralyticsDetector
+        if self.detector is None:
+            from fire_monitoring_inference.detectors.ultralytics_adapter import UltralyticsDetector
 
-        device = self.config.model.device
-        resolved = int(device) if device.isdigit() else device
-        self.detector = UltralyticsDetector(
-            self.config.model.path,
-            model_version=self.config.model.version,
-            imgsz=self.config.model.imgsz,
-            confidence=min(self.config.model.thresholds.fire, self.config.model.thresholds.smoke),
-            device=resolved,
-            half=resolved != "cpu",
-        )
-        self._thread = threading.Thread(target=self._loop, name="detection", daemon=True)
+            device = self.config.model.device
+            resolved = int(device) if device.isdigit() else device
+            self.detector = UltralyticsDetector(
+                self.config.model.path,
+                model_version=self.config.model.version,
+                imgsz=self.config.model.imgsz,
+                confidence=min(self.config.model.thresholds.fire, self.config.model.thresholds.smoke),
+                device=resolved,
+                half=resolved != "cpu",
+            )
+        self.pipeline.start()
+        self._thread = threading.Thread(target=self._guard, name="detection", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=5)
-        for cap in self._caps.values():
-            cap.release()
-        self._caps.clear()
+            if self._thread.is_alive():
+                raise RuntimeError("detection thread did not stop")
+        for capture in self._captures.values():
+            capture.stop()
+        self._captures.clear()
+        self.pipeline.stop()
+
+    @property
+    def alive(self) -> bool:
+        return self._thread is not None and self._thread.is_alive() and not self.failed
+
+    def _fatal(self) -> None:
+        self.failed = True
+        self.on_fatal()
+
+    def _guard(self) -> None:
+        try:
+            self._loop()
+        except Exception:
+            logger.exception("detection thread failed")
+            self._fatal()
 
     def _loop(self) -> None:
-        import time
-
         while not self._stop.is_set():
             now = time.monotonic()
             if now - self._loaded_at >= 2:
                 self._reload()
                 self._loaded_at = now
-            for assignment in self._assignments:
-                self._process(assignment)
-            self._stop.wait(0.01)
+            due = []
+            for assignment in due_cameras(self._assignments, now, self._next_due):
+                capture = self._captures.get(assignment.camera_id)
+                frame = None if capture is None else capture.buffer.snapshot()
+                if frame is None:
+                    self._mark_offline(assignment.camera_id)
+                    self._next_due[assignment.camera_id] = now + min(0.2, 1 / assignment.target_fps)
+                    continue
+                due.append((assignment, frame))
+                self._next_due[assignment.camera_id] = now + 1 / assignment.target_fps
+            if due:
+                batches = self.detector.detect([frame.image for _assignment, frame in due])
+                for (assignment, frame), detections in zip(due, batches, strict=True):
+                    hits = [
+                        DetectionHit(item.class_name, item.confidence, tuple(item.bbox_xyxy))
+                        for item in detections
+                    ]
+                    snapshot = consume_frame(
+                        room_id=assignment.room_id,
+                        camera_id=assignment.camera_id,
+                        bound_camera_ids=assignment.bound_camera_ids,
+                        detections=hits,
+                        jpeg=frame.jpeg,
+                        width=frame.width,
+                        height=frame.height,
+                        timestamp=frame.captured_at,
+                        state=self.state,
+                        config=self.config,
+                        on_alert=self._on_alert,
+                    )
+                    self.live.update(assignment.camera_id, snapshot)
+            else:
+                self._stop.wait(0.01)
 
     def _reload(self) -> None:
         session = self.session_factory()
@@ -128,46 +210,15 @@ class DetectionWorker:
                     )
                 )
         self._assignments = assignments
-
-    def _process(self, assignment: Assignment) -> None:
-        import cv2
-
-        url = f"{self.config.mediamtx.rtsp_base}/{assignment.stream_key}"
-        cap = self._caps.get(assignment.camera_id)
-        if cap is None or not cap.isOpened():
-            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-            self._caps[assignment.camera_id] = cap
-        ok, frame = cap.read()
-        if not ok:
-            cap.release()
-            self._caps.pop(assignment.camera_id, None)
-            current = self.live.get(assignment.camera_id)
-            current["online"] = False
-            self.live.update(assignment.camera_id, current)
-            return
-        height, width = frame.shape[:2]
-        detections = self.detector.detect([frame])[0]
-        hits = [
-            DetectionHit(item.class_name, item.confidence, tuple(item.bbox_xyxy))
-            for item in detections
-        ]
-        encoded, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        jpeg = buffer.tobytes() if encoded else b""
-        timestamp = datetime.now(UTC)
-        snapshot = consume_frame(
-            room_id=assignment.room_id,
-            camera_id=assignment.camera_id,
-            bound_camera_ids=assignment.bound_camera_ids,
-            detections=hits,
-            jpeg=jpeg,
-            width=width,
-            height=height,
-            timestamp=timestamp,
-            state=self.state,
-            config=self.config,
-            on_alert=self._on_alert,
-        )
-        self.live.update(assignment.camera_id, snapshot)
+        wanted = {item.camera_id: item for item in assignments}
+        for camera_id in list(self._captures):
+            if camera_id not in wanted:
+                self._captures.pop(camera_id).stop()
+        for camera_id, assignment in wanted.items():
+            if camera_id not in self._captures:
+                capture = CameraCapture(assignment, self._open_capture, self._fatal)
+                capture.start()
+                self._captures[camera_id] = capture
 
     def _on_alert(self, draft) -> None:
         calibrations = {
@@ -175,10 +226,8 @@ class DetectionWorker:
             for assignment in self._assignments
             if assignment.room_id == draft.room_id and assignment.calibration_json
         }
-        session = self.session_factory()
-        try:
-            confirm_alert(
-                session,
+        self.pipeline.submit(
+            ConfirmedJob(
                 room_id=draft.room_id,
                 alert_type=draft.alert_type,
                 started_at=draft.started_at,
@@ -186,11 +235,23 @@ class DetectionWorker:
                 calibrations=calibrations,
                 frames=draft.frames,
                 pump_observations=draft.pump_observations,
-                config=self.config,
-                evidence=self.evidence,
-                analyzer=self.analyzer,
-                sms=self.sms,
-                pump=self.pump,
+                confirmed_monotonic=time.perf_counter(),
             )
-        finally:
-            session.close()
+        )
+
+    def _mark_offline(self, camera_id: int) -> None:
+        current = self.live.get(camera_id)
+        current["online"] = False
+        self.live.update(camera_id, current)
+
+    def _open_rtsp(self, assignment: Assignment):
+        import cv2
+
+        url = f"{self.config.mediamtx.rtsp_base}/{assignment.stream_key}"
+        return cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+
+
+def _exit_process() -> None:
+    import os
+
+    os._exit(1)

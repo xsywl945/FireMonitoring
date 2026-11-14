@@ -2,9 +2,8 @@ import threading
 from datetime import timedelta
 
 import pytest
-from test_enrichment import FakeReasoner, _gate_job
 
-from fire_monitoring_inference.contracts import EventEnvelope, EventType, utc_now
+from fire_monitoring_inference.contracts import EventEnvelope, EventType, VlmAnalysisPayload, utc_now
 from fire_monitoring_inference.pump import PumpConfig, PumpController
 
 
@@ -59,6 +58,36 @@ def local_fire_event(primary_type="FIRE"):
             ],
         },
     )
+
+
+class FakeReasoner:
+    def analyze(self, *, incident_id: int | None, image_data_urls: list[str]) -> VlmAnalysisPayload:
+        assert incident_id is None
+        assert image_data_urls[0].startswith("data:image/jpeg;base64,")
+        return VlmAnalysisPayload(
+            status="SUCCEEDED",
+            provider="dashscope",
+            model="qwen3.7-plus",
+            promptVersion="fire-risk-v3",
+            hasVisibleFire=True,
+            hasVisibleSmoke=False,
+            sourceNature="open_flame",
+            sceneType="classroom",
+            riskLevel="HIGH",
+            reasoningSummary="Visible flame.",
+            recommendedActions=["Verify the scene"],
+            confidence=0.8,
+            uncertainties=[],
+        )
+
+
+class _Gate:
+    def __init__(self, confirmed: EventEnvelope) -> None:
+        self.confirmed = confirmed
+
+
+def _gate_job() -> _Gate:
+    return _Gate(local_fire_event())
 
 
 def test_local_confirmed_fire_runs_without_cloud_judgement(tmp_path):
@@ -245,20 +274,6 @@ def test_uncertain_ack_is_recorded_and_not_retried(tmp_path):
     pump.trigger(job.confirmed, judgement, captured_at=utc_now())
     assert pump.snapshot()["records"][0]["status"] == "UNKNOWN"
     assert len(device.commands) == 1
-
-
-def test_pump_http_status_and_emergency_stop_require_control_token(tmp_path):
-    from fire_monitoring_inference.api import create_app
-
-    pump = PumpController(
-        config=PumpConfig(), transport=Device(), journal_path=tmp_path / "pump.sqlite3"
-    )
-    client = create_app(pump=pump).test_client()
-    assert client.get("/api/v1/pump").status_code == 403
-    assert client.post("/api/v1/pump/stop").status_code == 403
-    headers = {"X-Control-Token": "local-camera-control"}
-    assert client.get("/api/v1/pump", headers=headers).json["enabled"] is False
-    assert client.post("/api/v1/pump/stop", headers=headers).json["inhibited"] is True
 
 
 def test_emergency_stop_keeps_retrying_safe_stop_until_device_confirms_off(tmp_path):

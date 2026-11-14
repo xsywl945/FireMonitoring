@@ -56,6 +56,8 @@ def test_qwen_adapter_uses_non_thinking_strict_json_schema_with_local_validation
     result = reasoner.analyze(incident_id=None, image_data_urls=["data:image/jpeg;base64,AA=="])
 
     assert result.status == "SUCCEEDED"
+    assert result.burning_objects == ["paper"]
+    assert result.people_at_risk is False
     assert result.incident_id is None
     assert result.model == "qwen3.7-plus"
     assert client.request is not None

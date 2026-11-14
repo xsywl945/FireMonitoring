@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -15,6 +16,8 @@ from .config.router import router as config_router
 from .db import make_engine, make_session_factory, mysql_url
 from .detection.router import router as detection_router
 from .detection.worker import DetectionWorker, LiveHub
+from .events.hub import EventHub
+from .events.router import router as events_router
 from .evidence.store import MinioStore
 from .pump.bridge import build_pump
 from .pump.router import router as pump_router
@@ -32,6 +35,10 @@ def create_app(
     sms_sender=None,
     pump=None,
     start_worker: bool = True,
+    detector=None,
+    open_capture=None,
+    localizer=None,
+    on_fatal=None,
 ) -> FastAPI:
     from . import models
 
@@ -52,9 +59,11 @@ def create_app(
         pump.start()
         pump_started = True
     live = LiveHub()
+    events = EventHub()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        app.state.events.bind(asyncio.get_running_loop())
         yield
         if app.state.worker is not None:
             app.state.worker.stop()
@@ -76,6 +85,7 @@ def create_app(
     app.include_router(alerts_router, prefix="/api/v1")
     app.include_router(config_router, prefix="/api/v1")
     app.include_router(pump_router, prefix="/api/v1")
+    app.include_router(events_router, prefix="/api/v1")
     app.state.config = config
     app.state.session_factory = session_factory
     app.state.evidence = evidence
@@ -84,9 +94,23 @@ def create_app(
     app.state.pump = pump
     app.state.pump_started = pump_started
     app.state.live = live
+    app.state.events = events
     app.state.worker = None
     if start_worker:
-        worker = DetectionWorker(config, session_factory, evidence, analyzer, sms, pump, live)
-        worker.start()
+        worker = DetectionWorker(
+            config,
+            session_factory,
+            evidence,
+            analyzer,
+            sms,
+            pump,
+            live,
+            events,
+            detector=detector,
+            open_capture=open_capture,
+            localizer=localizer,
+            on_fatal=on_fatal,
+        )
         app.state.worker = worker
+        worker.start()
     return app

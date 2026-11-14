@@ -135,6 +135,8 @@ class QwenVisionReasoner:
             hasVisibleSmoke=judgement.has_visible_smoke,
             sourceNature=judgement.source_nature,
             sceneType=judgement.scene_type,
+            burningObjects=judgement.burning_objects,
+            peopleAtRisk=judgement.people_at_risk,
             riskLevel=judgement.risk_level,
             reasoningSummary=judgement.reasoning_summary,
             recommendedActions=judgement.recommended_actions,

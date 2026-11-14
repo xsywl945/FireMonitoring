@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -8,10 +9,11 @@ import pytest
 from fire_monitoring_inference.contracts import utc_now
 from fire_monitoring_inference.pump import PumpConfig, PumpController
 
-from fire_monitoring.alerts.service import confirm_alert
+from fire_monitoring.alerts.pipeline import AlertPipeline, ConfirmedJob
 from fire_monitoring.config import load_config
 from fire_monitoring.db import make_engine, make_session_factory
 from fire_monitoring.detection.ingest import FrameShot
+from fire_monitoring.events.hub import EventHub
 from fire_monitoring.evidence.store import MemoryStore
 from fire_monitoring.localization.observe import source_from_box
 from fire_monitoring.models import Alert, AlertFrame, Room, SmsDispatch
@@ -40,6 +42,8 @@ class FakeAnalyzer:
             "risk_level": "HIGH",
             "reasoning_summary": "画面中有明火",
             "recommended_actions": ["疏散"],
+            "burning_objects": ["纸"],
+            "people_at_risk": True,
             "confidence": 0.9,
             "uncertainties": [],
             "error_code": None,
@@ -89,13 +93,20 @@ def load_config_from(data: dict):
     return AppConfig.model_validate(data)
 
 
-def _session(tmp_path: Path):
+def _factory(tmp_path: Path):
     from fire_monitoring.db import Base
     import fire_monitoring.models  # noqa: F401
 
     engine = make_engine(f"sqlite:///{tmp_path / 'alerts.db'}")
     Base.metadata.create_all(engine)
-    return make_session_factory(engine)()
+    return make_session_factory(engine)
+
+
+def _submit(pipeline: AlertPipeline, **kwargs) -> None:
+    pipeline.submit(
+        ConfirmedJob(confirmed_monotonic=time.perf_counter(), **kwargs)
+    )
+    pipeline.wait()
 
 
 def _calibration() -> dict:
@@ -116,7 +127,8 @@ def _calibrations() -> dict:
 
 
 def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Path) -> None:
-    session = _session(tmp_path)
+    factory = _factory(tmp_path)
+    session = factory()
     session.add(Room(name="101", scene_type="classroom", created_at=utc_now()))
     session.commit()
     room = session.query(Room).one()
@@ -159,14 +171,12 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
 
     seen = {}
 
-    def localizer(manifest, model, device):
-        from fire_monitoring_inference.localization import FourViewInput
+    def localizer(manifest):
+        from fire_monitoring_inference.localization import LocalizationInput
 
-        request = FourViewInput.model_validate_json(manifest.read_bytes())
+        request = LocalizationInput.model_validate_json(manifest.read_bytes())
         seen["cameras"] = set(request.views)
         seen["pixel"] = request.views[1].source.pixel
-        seen["model"] = model
-        seen["device"] = device
         return {
             "status": "ESTIMATED",
             "xyz": [1.5, 2.5, 0.2],
@@ -175,36 +185,42 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
             "support_camera_ids": [1, 2],
         }
 
-    alert = confirm_alert(
-        session,
+    config = _config()
+    pipeline = AlertPipeline(
+        config,
+        factory,
+        evidence,
+        analyzer,
+        sms,
+        pump,
+        EventHub(),
+        localizer=localizer,
+        on_fatal=lambda: None,
+    )
+    pipeline.start()
+    observations = [
+        {
+            "camera_id": 1,
+            "class_name": "fire",
+            "score": 0.8,
+            "effective_frames": 3,
+            "duration_ms": 400,
+        }
+    ]
+    _submit(
+        pipeline,
         room_id=room.id,
         alert_type="FIRE",
         started_at=now,
         sources=sources,
         calibrations=_calibrations(),
         frames=frames,
-        pump_observations=[
-            {
-                "camera_id": 1,
-                "class_name": "fire",
-                "score": 0.8,
-                "effective_frames": 3,
-                "duration_ms": 400,
-            }
-        ],
-        config=_config(),
-        evidence=evidence,
-        analyzer=analyzer,
-        sms=sms,
-        pump=pump,
-        localizer=localizer,
+        pump_observations=observations,
     )
-    stored = session.get(Alert, alert.id)
+    stored = session.query(Alert).one()
     position = json.loads(stored.position_json)
     assert seen["cameras"] == {1, 2, 3, 4}
     assert seen["pixel"] == sources[0].pixel
-    assert seen["model"].name == "best.pt"
-    assert seen["device"] == "0"
     assert position["status"] == "ESTIMATED"
     assert position["xyz"] == [1.5, 2.5, 0.2]
     assert position["condition_number"] == 8.0
@@ -213,14 +229,16 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
     assert len(evidence.objects) == 4
     analysis = json.loads(stored.analysis_json)
     assert analysis["reasoning_summary"] == "画面中有明火"
+    assert analysis["burning_objects"] == ["纸"]
+    assert analysis["people_at_risk"] is True
     assert analyzer.calls[0][1] == [frame.jpeg for frame in frames]
     expected_time = now.astimezone(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
     assert sender.sent == [("13800000000", {"room": "101", "type": "火焰", "time": expected_time})]
     assert transport.commands[0].startswith("RUN ")
 
     later = now + timedelta(seconds=10)
-    confirm_alert(
-        session,
+    _submit(
+        pipeline,
         room_id=room.id,
         alert_type="FIRE",
         started_at=later,
@@ -228,20 +246,16 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
         calibrations=_calibrations(),
         frames=frames,
         pump_observations=[],
-        config=_config(),
-        evidence=evidence,
-        analyzer=analyzer,
-        sms=sms,
-        pump=None,
-        localizer=localizer,
     )
     assert len(sender.sent) == 1
     assert session.query(SmsDispatch).count() == 1
+    pipeline.stop()
     pump.close()
 
 
 def test_disabled_sms_and_llm_are_not_called(tmp_path: Path) -> None:
-    session = _session(tmp_path)
+    factory = _factory(tmp_path)
+    session = factory()
     session.add(Room(name="102", scene_type="laboratory", created_at=utc_now()))
     session.commit()
     room = session.query(Room).one()
@@ -253,8 +267,21 @@ def test_disabled_sms_and_llm_are_not_called(tmp_path: Path) -> None:
         FrameShot(camera_id=camera_id, jpeg=b"jpg", captured_at=now, width=100, height=80)
         for camera_id in (1, 2, 3, 4)
     ]
-    confirm_alert(
-        session,
+    called = []
+    pipeline = AlertPipeline(
+        config,
+        factory,
+        MemoryStore(),
+        analyzer,
+        SmsService(config, sender),
+        None,
+        EventHub(),
+        localizer=lambda _manifest: called.append(True),
+        on_fatal=lambda: None,
+    )
+    pipeline.start()
+    _submit(
+        pipeline,
         room_id=room.id,
         alert_type="SMOKE",
         started_at=now,
@@ -262,13 +289,9 @@ def test_disabled_sms_and_llm_are_not_called(tmp_path: Path) -> None:
         calibrations=_calibrations(),
         frames=frames,
         pump_observations=[],
-        config=config,
-        evidence=MemoryStore(),
-        analyzer=analyzer,
-        sms=SmsService(config, sender),
-        pump=None,
-        localizer=lambda *_args, **_kwargs: {"status": "UNOBSERVABLE", "support_camera_ids": []},
     )
+    pipeline.stop()
+    assert called == []
     assert analyzer.calls == []
     assert sender.sent == []
     position = json.loads(session.query(Alert).one().position_json)

@@ -6,7 +6,6 @@ import numpy as np
 from pydantic import Field, FiniteFloat, PositiveInt
 
 from .contracts import StrictModel
-from .detectors.ultralytics_adapter import UltralyticsDetector
 from .multiview_geometry import calibrate, locate
 
 Pixel = tuple[FiniteFloat, FiniteFloat]
@@ -32,16 +31,13 @@ class View(StrictModel):
     source: SourceObservation | None = None
 
 
-class FourViewInput(StrictModel):
+class LocalizationInput(StrictModel):
     landmark_sigma_px: Annotated[FiniteFloat, Field(gt=0)]
-    views: dict[PositiveInt, View] = Field(min_length=4, max_length=4)
+    views: dict[PositiveInt, View] = Field(min_length=2, max_length=4)
 
 
-def localize_frames(manifest: Path, model: Path, device: str) -> dict:
-    request = FourViewInput.model_validate_json(manifest.read_bytes())
-    if model.suffix.lower() != ".pt" or not model.is_file():
-        raise ValueError(f"Expected a local YOLO26s .pt model: {model}")
-
+def localize(manifest: Path) -> dict:
+    request = LocalizationInput.model_validate_json(manifest.read_bytes())
     frames = []
     for camera_id, view in request.views.items():
         (fx, skew, _), (cross, fy, _), last_row = view.intrinsics
@@ -94,24 +90,4 @@ def localize_frames(manifest: Path, model: Path, device: str) -> dict:
         for i, supported in zip(indices, position.pop("support"), strict=True)
         if supported
     ]
-
-    thresholds = {"fire": 0.30, "smoke": 0.35}
-    detector = UltralyticsDetector(
-        str(model),
-        model_version="yolo26s",
-        confidence=min(thresholds.values()),
-        device=device,
-        half=device.lower() != "cpu",
-    )
-    detections = detector.detect(frames)
-    return {
-        "position": position,
-        "detections": {
-            camera_id: [
-                detection.model_dump(mode="json", by_alias=True)
-                for detection in batch
-                if detection.confidence >= thresholds[detection.class_name]
-            ]
-            for camera_id, batch in zip(camera_ids, detections, strict=True)
-        },
-    }
+    return position

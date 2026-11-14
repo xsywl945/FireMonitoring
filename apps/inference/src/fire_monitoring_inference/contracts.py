@@ -116,6 +116,10 @@ class VlmAnalysisPayload(StrictModel):
     scene_type: Literal["classroom", "laboratory", "corridor", "other"] | None = Field(
         default=None, alias="sceneType"
     )
+    burning_objects: list[Annotated[str, Field(max_length=100)]] = Field(
+        default_factory=list, alias="burningObjects", max_length=10
+    )
+    people_at_risk: bool | None = Field(default=None, alias="peopleAtRisk")
     risk_level: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] | None = Field(
         default=None, alias="riskLevel"
     )

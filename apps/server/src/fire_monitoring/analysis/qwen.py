@@ -29,6 +29,8 @@ class QwenAnalyzer:
             "has_visible_smoke": payload.has_visible_smoke,
             "source_nature": payload.source_nature,
             "scene_type": payload.scene_type,
+            "burning_objects": list(payload.burning_objects),
+            "people_at_risk": payload.people_at_risk,
             "risk_level": payload.risk_level,
             "reasoning_summary": payload.reasoning_summary,
             "recommended_actions": list(payload.recommended_actions),

@@ -101,6 +101,8 @@ export interface Analysis {
   reasoning_summary: string | null
   risk_level: string | null
   recommended_actions: string[]
+  burning_objects: string[]
+  people_at_risk: boolean | null
   uncertainties: string[]
   confidence: number | null
   error_code: string | null

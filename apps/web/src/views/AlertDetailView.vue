@@ -51,8 +51,17 @@ async function addNote() {
   }
 }
 
-onMounted(load)
+function onFireEvent(event: Event) {
+  const payload = (event as CustomEvent).detail as { alert_id: number; kind: string }
+  if (payload.alert_id === alertId.value && payload.kind !== "CONFIRMED") load()
+}
+
+onMounted(() => {
+  window.addEventListener("fire-event", onFireEvent)
+  load()
+})
 onBeforeUnmount(() => {
+  window.removeEventListener("fire-event", onFireEvent)
   for (const url of Object.values(images.value)) URL.revokeObjectURL(url)
 })
 </script>
@@ -86,6 +95,12 @@ onBeforeUnmount(() => {
       <template v-if="detail.analysis">
         <p>状态：{{ detail.analysis.status }}</p>
         <p v-if="detail.analysis.risk_level">风险：{{ detail.analysis.risk_level }}</p>
+        <p v-if="detail.analysis.burning_objects.length">
+          燃烧物：{{ detail.analysis.burning_objects.join("、") }}
+        </p>
+        <p v-if="detail.analysis.people_at_risk === true || detail.analysis.people_at_risk === false">
+          人员：{{ detail.analysis.people_at_risk ? "有人" : "未见人员" }}
+        </p>
         <p>{{ detail.analysis.reasoning_summary }}</p>
         <ul>
           <li v-for="item in detail.analysis.recommended_actions" :key="item">{{ item }}</li>

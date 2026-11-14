@@ -1,6 +1,6 @@
 # 火情监控
 
-教室火情检测、四路定位和告警研判。后端是 `apps/server` 的 FastAPI 服务。前端是 `apps/web` 的 Vue 3、TypeScript、Vite 和 Element Plus。检测、时序确认、四摄定位、千问分析和 ESP32 串口泵在 `apps/inference`，由后端调用。
+教室火情检测、多路定位和告警研判。后端是 `apps/server` 的 FastAPI 服务。前端是 `apps/web` 的 Vue 3、TypeScript、Vite 和 Element Plus。时序确认、几何定位、千问客户端和 ESP32 水泵协议在 `apps/inference`，由后端在同一进程里调用。
 
 实时画面进入 MediaMTX。浏览器使用 WebRTC（WHEP）播放。检测从 MediaMTX 的 RTSP 读流，不直接占用摄像头。USB 摄像头由 FFmpeg 推流，网络摄像头由 MediaMTX 拉 RTSP。
 
@@ -49,7 +49,7 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\stop.ps1
 
 ## 页面
 
-登录。教室管理，含最多 4 路摄像头绑定、标定和平面图。摄像头管理。实时监控，选定教室后四宫格，显示检测框和状态。告警研判，含四路关键帧、大模型分析、平面图火点、处置记录和手动重跑分析。系统配置只读，密钥打码。角色只有管理员和值班员。
+登录。教室管理，含最多 4 路摄像头绑定、标定和平面图。未标定的绑定在教室详情里标红。摄像头管理。实时监控，选定教室后四宫格，显示检测框和状态。告警研判，含关键帧、大模型分析、燃烧物、是否有人、平面图火点、处置记录和手动重跑分析。任意页面都会通过 WebSocket 弹出告警并播放提示音。系统配置只读，密钥打码。角色只有管理员和值班员。
 
 ## 现场需要做的事
 
@@ -62,7 +62,9 @@ u = origin_px[0] + (X - origin_world_x) / meters_per_pixel
 v = origin_px[1] - (Y - origin_world_y) / meters_per_pixel
 ```
 
-检测框变成定位观测的规则：火用框底边中点，烟用框中心。协方差取框宽、框高的四分之一作为标准差，写在对角线上。可靠度用置信度，并限制在 0.001 到 0.999，避免取 0 或 1。像素会限制在画面内。时间窗内的观测按 `localize_frames` 的 manifest 写入每路 `source`，再调用 `fire_monitoring_inference.localization.localize_frames`。返回 `ESTIMATED` 时告警写入 `xyz`、`covariance`、`condition_number` 和 `support_camera_ids`，平面图标出火点。返回 `UNOBSERVABLE` 时没有坐标，告警不写 `xyz`，平面图不标点。
+每路一个采集线程，只保留最新帧，并按 2 fps 留一段环形缓冲。检测线程把到点的各路最新帧一批送进 YOLO，速度不超过该路 `target_fps`。检测线程只发出「已确认」事件。定位、千问、短信、水泵在各自的线程里处理。检测线程一旦抛错，进程退出，`/api/v1/health` 在退出前返回 503。
+
+检测框变成定位观测的规则：火用框底边中点，烟用框中心。协方差取框宽、框高的四分之一作为标准差，写在对角线上。可靠度用置信度，并限制在 0.001 到 0.999，避免取 0 或 1。像素会限制在画面内。定位直接使用这些观测，不再把告警图片重新送进模型。至少 2 路同时有标定和窗口内观测才做几何定位，最多 4 路。返回 `ESTIMATED` 时告警写入 `xyz`、`covariance`、`condition_number` 和 `support_camera_ids`，平面图标出火点。不足 2 路或几何上不可观测时状态是 `UNOBSERVABLE`，告警、短信和水泵照常进行，平面图不标点。从确认到 WebSocket 弹出之间的毫秒数写在日志里，logger 名是 `fire_monitoring.alerts`。
 
 ## config.json
 
@@ -97,7 +99,7 @@ MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一�
 
 ### llm
 
-千问兼容接口。`enabled` 为 true 时，告警确认后自动分析四路关键帧，研判页也可以手动重跑。`base_url`、`model`、`api_key` 是 DashScope 兼容模式的地址、模型名和密钥。
+千问兼容接口。`enabled` 为 true 时，告警确认后在独立线程里分析关键帧，研判页也可以手动重跑。分析不挡住检测、短信和水泵。`pump.require_vlm` 为 true 时，水泵等到千问结果再决定是否喷水。返回里的 `burning_objects` 和 `people_at_risk` 会写入告警并显示在研判页。`base_url`、`model`、`api_key` 是 DashScope 兼容模式的地址、模型名和密钥。超时 25 秒。
 
 ### sms
 
