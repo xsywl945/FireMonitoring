@@ -177,6 +177,16 @@ def test_place_name_uses_room_size():
     assert place_name(4.5, 6, 9, 12) == "中部"
 
 
+def test_direct_spray_requires_cover_probability_above_the_threshold():
+    machine = RoomMachine(MachineConfig(pending_s=0, spray_s=5))
+    effects = machine.step(shot())
+    assert machine.phase == "喷射"
+    assert machine.sweep is None
+    assert machine.cover_probability >= 0.5
+    assert effects[-1].detail["cover_probability"] >= effects[-1].detail["cover_threshold"]
+    assert effects[-1].run
+
+
 def test_electrical_room_prior_prohibits_water_without_qwen():
     resolved = classify(None, "electrical_room")
     assert resolved["water_prohibited"] is True

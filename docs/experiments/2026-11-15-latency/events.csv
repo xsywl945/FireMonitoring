@@ -1,0 +1,7 @@
+trial,stage,t_s
+full,capture,0.0
+full,detect,8.0
+full,confirm,33.875
+full,localize,33.875
+full,aim,33.875
+full,spray,36.875

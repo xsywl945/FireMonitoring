@@ -1,0 +1,7 @@
+path,label,scene
+samples/paper.jpg,A,classroom
+samples/solvent.jpg,B,classroom
+samples/gas.jpg,C,classroom
+samples/panel.jpg,E,classroom
+samples/pan.jpg,F,classroom
+samples/poster.jpg,误报,classroom

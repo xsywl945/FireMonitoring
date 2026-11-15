@@ -1,0 +1,55 @@
+{
+  "data": "合成数据",
+  "clock": "剧本时间",
+  "trials": {
+    "full": {
+      "capture": 0.0,
+      "detect": 8.0,
+      "confirm": 33.875,
+      "localize": 33.875,
+      "aim": 33.875,
+      "spray": 36.875
+    }
+  },
+  "segments_s": {
+    "capture_to_detect": {
+      "n": 1,
+      "p50_s": 8.0,
+      "p90_s": 8.0,
+      "max_s": 8.0
+    },
+    "detect_to_confirm": {
+      "n": 1,
+      "p50_s": 25.875,
+      "p90_s": 25.875,
+      "max_s": 25.875
+    },
+    "confirm_to_localize": {
+      "n": 1,
+      "p50_s": 0.0,
+      "p90_s": 0.0,
+      "max_s": 0.0
+    },
+    "localize_to_aim": {
+      "n": 1,
+      "p50_s": 0.0,
+      "p90_s": 0.0,
+      "max_s": 0.0
+    },
+    "aim_to_spray": {
+      "n": 1,
+      "p50_s": 3.0,
+      "p90_s": 3.0,
+      "max_s": 3.0
+    }
+  },
+  "wall_clock_s": {
+    "capture": 0.8399479300001076,
+    "detect": 0.8430904809999902,
+    "confirm": 0.9498699060000035,
+    "localize": 0.9859062180000819,
+    "aim": 1.1748529989999952,
+    "spray": 1.188746067000011
+  },
+  "note": "堆叠图用剧本时钟。wall_clock_s 是同一次播放的墙钟，确认到定位的耗时看这里。"
+}

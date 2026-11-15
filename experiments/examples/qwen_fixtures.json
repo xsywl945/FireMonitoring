@@ -1,0 +1,174 @@
+{
+  "direct": {
+    "samples/paper.jpg": {
+      "class": "A",
+      "agents": ["水"],
+      "false_alarm": false,
+      "latency_ms": 800,
+      "prompt_tokens": 320,
+      "completion_tokens": 24
+    },
+    "samples/solvent.jpg": {
+      "class": "B",
+      "agents": ["水"],
+      "false_alarm": false,
+      "latency_ms": 860,
+      "prompt_tokens": 320,
+      "completion_tokens": 24
+    },
+    "samples/gas.jpg": {
+      "class": "C",
+      "agents": ["干粉"],
+      "false_alarm": false,
+      "latency_ms": 840,
+      "prompt_tokens": 320,
+      "completion_tokens": 24
+    },
+    "samples/panel.jpg": {
+      "class": "A",
+      "agents": ["水"],
+      "false_alarm": false,
+      "latency_ms": 910,
+      "prompt_tokens": 320,
+      "completion_tokens": 24
+    },
+    "samples/pan.jpg": {
+      "class": "F",
+      "agents": ["水"],
+      "false_alarm": false,
+      "latency_ms": 880,
+      "prompt_tokens": 320,
+      "completion_tokens": 24
+    },
+    "samples/poster.jpg": {
+      "class": "A",
+      "agents": ["水"],
+      "false_alarm": false,
+      "latency_ms": 790,
+      "prompt_tokens": 320,
+      "completion_tokens": 24
+    }
+  },
+  "evidence": {
+    "samples/paper.jpg": {
+      "latency_ms": 1200,
+      "prompt_tokens": 640,
+      "completion_tokens": 90,
+      "evidence": {
+        "schemaVersion": "4.0",
+        "burningObjects": [{"frameIndex": 1, "name": "纸", "evidence": "桌面纸张起火"}],
+        "suspectedCause": "open_flame",
+        "energizedEquipment": false,
+        "liquid": false,
+        "oilPan": false,
+        "metalPowder": false,
+        "personCount": 0,
+        "personLocation": "",
+        "sceneType": "classroom",
+        "smokeColor": "none",
+        "smokeDensity": "none",
+        "uncertainties": []
+      }
+    },
+    "samples/solvent.jpg": {
+      "latency_ms": 1240,
+      "prompt_tokens": 640,
+      "completion_tokens": 90,
+      "evidence": {
+        "schemaVersion": "4.0",
+        "burningObjects": [{"frameIndex": 1, "name": "溶剂", "evidence": "实验桌有液体燃烧"}],
+        "suspectedCause": "unknown",
+        "energizedEquipment": false,
+        "liquid": true,
+        "oilPan": false,
+        "metalPowder": false,
+        "personCount": 0,
+        "personLocation": "",
+        "sceneType": "classroom",
+        "smokeColor": "none",
+        "smokeDensity": "none",
+        "uncertainties": []
+      }
+    },
+    "samples/gas.jpg": {
+      "latency_ms": 1180,
+      "prompt_tokens": 640,
+      "completion_tokens": 70,
+      "evidence": {
+        "schemaVersion": "4.0",
+        "burningObjects": [],
+        "suspectedCause": "unknown",
+        "energizedEquipment": false,
+        "liquid": false,
+        "oilPan": false,
+        "metalPowder": false,
+        "personCount": 0,
+        "personLocation": "",
+        "sceneType": "classroom",
+        "smokeColor": "none",
+        "smokeDensity": "none",
+        "uncertainties": ["看不清是否为气体"]
+      }
+    },
+    "samples/panel.jpg": {
+      "latency_ms": 1300,
+      "prompt_tokens": 640,
+      "completion_tokens": 96,
+      "evidence": {
+        "schemaVersion": "4.0",
+        "burningObjects": [{"frameIndex": 1, "name": "配电箱", "evidence": "箱门冒烟并有弧光"}],
+        "suspectedCause": "electrical_short",
+        "energizedEquipment": true,
+        "liquid": false,
+        "oilPan": false,
+        "metalPowder": false,
+        "personCount": 0,
+        "personLocation": "",
+        "sceneType": "classroom",
+        "smokeColor": "gray",
+        "smokeDensity": "light",
+        "uncertainties": []
+      }
+    },
+    "samples/pan.jpg": {
+      "latency_ms": 1260,
+      "prompt_tokens": 640,
+      "completion_tokens": 92,
+      "evidence": {
+        "schemaVersion": "4.0",
+        "burningObjects": [{"frameIndex": 1, "name": "油锅", "evidence": "锅内油面起火"}],
+        "suspectedCause": "cooking_oil",
+        "energizedEquipment": false,
+        "liquid": false,
+        "oilPan": true,
+        "metalPowder": false,
+        "personCount": 0,
+        "personLocation": "",
+        "sceneType": "classroom",
+        "smokeColor": "black",
+        "smokeDensity": "dense",
+        "uncertainties": []
+      }
+    },
+    "samples/poster.jpg": {
+      "latency_ms": 1100,
+      "prompt_tokens": 640,
+      "completion_tokens": 60,
+      "evidence": {
+        "schemaVersion": "4.0",
+        "burningObjects": [],
+        "suspectedCause": "unknown",
+        "energizedEquipment": false,
+        "liquid": false,
+        "oilPan": false,
+        "metalPowder": false,
+        "personCount": 0,
+        "personLocation": "",
+        "sceneType": "classroom",
+        "smokeColor": "none",
+        "smokeDensity": "none",
+        "uncertainties": ["画面是海报上的火焰"]
+      }
+    }
+  }
+}
