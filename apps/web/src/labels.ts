@@ -57,6 +57,33 @@ export const roleLabels: Record<string, string> = {
   operator: "值班员",
 }
 
+export const alertStatusLabels: Record<string, string> = {
+  OPEN: "待处置",
+  ACKNOWLEDGED: "已确认",
+  FALSE_ALARM: "误报",
+  CLOSED: "已结案",
+}
+
+export const dispositionLabels: Record<string, string> = {
+  acknowledge: "确认",
+  false_alarm: "标记误报",
+  close: "结案",
+}
+
+export const faultLabels: Record<string, string> = {
+  OFFLINE: "离线",
+  FROZEN: "画面冻结",
+  BLUR: "严重模糊",
+}
+
+export function healthText(item: { online: boolean; frozen: boolean; blur: boolean }) {
+  if (!item.online) return "离线"
+  const marks = ["在线"]
+  if (item.frozen) marks.push("画面冻结")
+  if (item.blur) marks.push("严重模糊")
+  return marks.join("，")
+}
+
 export function formatTime(value: string) {
   return new Date(value).toLocaleString("zh-CN", { hour12: false })
 }

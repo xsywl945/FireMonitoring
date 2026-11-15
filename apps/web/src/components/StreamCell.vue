@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue"
 import type { LiveCamera } from "../api/types"
-import { stateLabels } from "../labels"
+import { healthText, stateLabels } from "../labels"
 
 const props = defineProps<{ camera: LiveCamera | null }>()
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
         <div>
           火 {{ stateLabels[camera.states.fire] || camera.states.fire }}
           / 烟 {{ stateLabels[camera.states.smoke] || camera.states.smoke }}
-          / {{ camera.online ? "检测在线" : "检测离线" }}
+          / {{ healthText(camera) }}
         </div>
         <div v-if="failure">{{ failure }}</div>
       </div>

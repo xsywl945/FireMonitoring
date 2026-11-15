@@ -32,6 +32,18 @@ export function signedIn() {
   return Boolean(localStorage.getItem(TOKEN))
 }
 
+async function fail(response: Response): Promise<never> {
+  const text = await response.text()
+  let message = text || response.statusText
+  try {
+    const body = JSON.parse(text) as { detail?: unknown }
+    if (typeof body.detail === "string") message = body.detail
+  } catch {
+    message = text || response.statusText
+  }
+  throw new Error(message)
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   const token = localStorage.getItem(TOKEN)
@@ -45,20 +57,29 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (location.pathname !== "/login") location.assign("/login")
     throw new Error("未登录")
   }
-  if (!response.ok) {
-    const text = await response.text()
-    let message = text || response.statusText
-    try {
-      const body = JSON.parse(text) as { detail?: unknown }
-      if (typeof body.detail === "string") message = body.detail
-    } catch {
-      message = text || response.statusText
-    }
-    throw new Error(message)
-  }
+  if (!response.ok) await fail(response)
   const type = response.headers.get("content-type") || ""
   if (!type.includes("application/json")) return undefined as T
   return response.json() as Promise<T>
+}
+
+export async function download(path: string, filename: string) {
+  const headers = new Headers()
+  const token = localStorage.getItem(TOKEN)
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  const response = await fetch(`/api/v1${path}`, { headers })
+  if (response.status === 401) {
+    clearSession()
+    if (location.pathname !== "/login") location.assign("/login")
+    throw new Error("未登录")
+  }
+  if (!response.ok) await fail(response)
+  const url = URL.createObjectURL(await response.blob())
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 export async function fetchBlob(path: string): Promise<string> {

@@ -65,6 +65,9 @@ class Alert(Base):
     position_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     analysis_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     observations_json: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="OPEN")
+    level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    fire_classes: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
 
 class AlertFrame(Base):
@@ -83,8 +86,30 @@ class Disposition(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     alert_id: Mapped[int] = mapped_column(ForeignKey("alerts.id", ondelete="CASCADE"))
+    action: Mapped[str] = mapped_column(String(20))
     note: Mapped[str] = mapped_column(String(2000))
     actor: Mapped[str] = mapped_column(String(50))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AlertClip(Base):
+    __tablename__ = "alert_clips"
+    __table_args__ = (UniqueConstraint("alert_id", "camera_id", name="uk_alert_clip"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    alert_id: Mapped[int] = mapped_column(ForeignKey("alerts.id", ondelete="CASCADE"))
+    camera_id: Mapped[int] = mapped_column(Integer)
+    object_key: Mapped[str] = mapped_column(String(500))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class DeviceEvent(Base):
+    __tablename__ = "device_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    camera_id: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(20))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

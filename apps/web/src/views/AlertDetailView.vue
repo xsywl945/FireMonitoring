@@ -4,11 +4,13 @@ import { useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import FloorPlan from "../components/FloorPlan.vue"
 import type { PlanShape } from "../components/FloorPlan.vue"
-import { api, fetchBlob } from "../api/client"
+import { api, download, fetchBlob } from "../api/client"
 import type { AlertDetail } from "../api/types"
 import {
   alertLabels,
+  alertStatusLabels,
   causeLabels,
+  dispositionLabels,
   formatTime,
   growthLabels,
   messageOf,
@@ -20,6 +22,7 @@ const route = useRoute()
 const alertId = computed(() => Number(route.params.id))
 const detail = ref<AlertDetail | null>(null)
 const images = ref<Record<number, string>>({})
+const videos = ref<Record<number, string>>({})
 const note = ref("")
 
 const analysis = computed(() => detail.value?.analysis ?? null)
@@ -57,11 +60,17 @@ const chart = computed(() => {
 
 async function loadImages(alert: AlertDetail) {
   for (const url of Object.values(images.value)) URL.revokeObjectURL(url)
+  for (const url of Object.values(videos.value)) URL.revokeObjectURL(url)
   const next: Record<number, string> = {}
   for (const frame of alert.frames) {
     next[frame.camera_id] = await fetchBlob(`/alerts/${alert.id}/frames/${frame.camera_id}`)
   }
   images.value = next
+  const clips: Record<number, string> = {}
+  for (const clip of alert.clips) {
+    clips[clip.camera_id] = await fetchBlob(`/alerts/${alert.id}/clips/${clip.camera_id}`)
+  }
+  videos.value = clips
 }
 
 async function load() {
@@ -79,15 +88,22 @@ async function rerun() {
   }
 }
 
-async function addNote() {
-  if (!note.value.trim()) return
+async function act(action: "acknowledge" | "false_alarm" | "close") {
   try {
-    await api(`/alerts/${alertId.value}/dispositions`, {
+    await api(`/alerts/${alertId.value}/disposition`, {
       method: "POST",
-      body: JSON.stringify({ note: note.value.trim() }),
+      body: JSON.stringify({ action, note: note.value.trim() }),
     })
     note.value = ""
     await load()
+  } catch (error) {
+    ElMessage.error(messageOf(error))
+  }
+}
+
+async function exportPdf() {
+  try {
+    await download(`/alerts/${alertId.value}/report`, `alert-${alertId.value}.pdf`)
   } catch (error) {
     ElMessage.error(messageOf(error))
   }
@@ -110,14 +126,19 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("fire-event", onFireEvent)
   for (const url of Object.values(images.value)) URL.revokeObjectURL(url)
+  for (const url of Object.values(videos.value)) URL.revokeObjectURL(url)
 })
 </script>
 
 <template>
   <div v-if="detail" class="stack">
     <div class="panel">
-      <div>{{ detail.room_name }} / {{ alertLabels[detail.alert_type] || detail.alert_type }}</div>
+      <div class="toolbar">
+        <strong>{{ detail.room_name }} / {{ alertLabels[detail.alert_type] || detail.alert_type }}</strong>
+        <el-button @click="exportPdf">导出 PDF</el-button>
+      </div>
       <div>{{ formatTime(detail.started_at) }}</div>
+      <div>处置状态：{{ alertStatusLabels[detail.status] || detail.status }}</div>
       <div v-if="analysis">等级 {{ analysis.level.grade }}</div>
       <div v-if="detail.position?.status === 'ESTIMATED' && detail.position.xyz">
         已定位 {{ detail.position.xyz.map((item) => item.toFixed(2)).join(", ") }}

@@ -35,6 +35,8 @@ class LiveCamera(BaseModel):
     height: int
     states: dict[str, str]
     detections: list[DetectionBox]
+    frozen: bool
+    blur: bool
 
 
 class LiveOut(BaseModel):
@@ -73,6 +75,8 @@ def live(
                 height=snap["height"],
                 states=snap["states"],
                 detections=[DetectionBox(**item) for item in snap["detections"]],
+                frozen=bool(snap.get("frozen", False)),
+                blur=bool(snap.get("blur", False)),
             )
         )
     return LiveOut(room_id=room_id, cameras=cameras)

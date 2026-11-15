@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..config import AppConfig
 from ..localization.observe import SourceObservation, locate_position
-from ..models import Alert, AlertEvent, AlertFrame, Camera, Room
+from ..models import Alert, AlertEvent, AlertFrame, Camera, Disposition, Room
 from ..pump.bridge import trigger_pump
 from ..sms.service import SmsService
 
@@ -64,6 +64,7 @@ def record_alert(
         observations_json=json.dumps(
             [_source_payload(item) for item in sources], ensure_ascii=False
         ),
+        status="OPEN",
     )
     session.add(alert)
     session.flush()
@@ -106,11 +107,52 @@ def write_position(session: Session, alert_id: int, position: dict) -> dict:
     return payload
 
 
+TRANSITIONS = {
+    ("OPEN", "acknowledge"): "ACKNOWLEDGED",
+    ("OPEN", "false_alarm"): "FALSE_ALARM",
+    ("ACKNOWLEDGED", "false_alarm"): "FALSE_ALARM",
+    ("ACKNOWLEDGED", "close"): "CLOSED",
+}
+
+
+def apply_analysis(alert: Alert, analysis: dict) -> None:
+    alert.analysis_json = json.dumps(analysis, ensure_ascii=False)
+    alert.level = analysis["level"]["grade"]
+    classes = analysis["rules"]["classes"]
+    alert.fire_classes = ",".join(classes) if classes else None
+
+
+def change_disposition(
+    session: Session, alert: Alert, *, action: str, note: str, actor: str
+) -> tuple[Disposition, dict]:
+    nxt = TRANSITIONS.get((alert.status, action))
+    if nxt is None:
+        raise ValueError(f"状态 {alert.status} 不能执行 {action}")
+    alert.status = nxt
+    row = Disposition(
+        alert_id=alert.id,
+        action=action,
+        note=note,
+        actor=actor,
+        occurred_at=datetime.now(UTC),
+    )
+    session.add(row)
+    payload = record_event(
+        session,
+        room_id=alert.room_id,
+        alert_id=alert.id,
+        kind=nxt,
+        detail={"action": action, "actor": actor, "note": note},
+    )
+    session.commit()
+    return row, payload
+
+
 def write_analysis(session: Session, alert_id: int, analysis: dict) -> dict:
     alert = session.get(Alert, alert_id)
     if alert is None:
         raise RuntimeError(f"alert {alert_id} does not exist")
-    alert.analysis_json = json.dumps(analysis, ensure_ascii=False)
+    apply_analysis(alert, analysis)
     payload = record_event(
         session,
         room_id=alert.room_id,
@@ -245,6 +287,6 @@ def rerun_analysis(session: Session, alert: Alert, evidence, analyzer, config, l
         document["inputs"]["before_key"] = inputs["before_key"]
     if inputs.get("after_key"):
         document["inputs"]["after_key"] = inputs["after_key"]
-    alert.analysis_json = json.dumps(document, ensure_ascii=False)
+    apply_analysis(alert, document)
     session.commit()
     return document

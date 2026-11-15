@@ -39,6 +39,10 @@ class FrameBuffer:
         with self._lock:
             return self.latest
 
+    def copy_ring(self) -> list[CapturedFrame]:
+        with self._lock:
+            return list(self.ring)
+
     def clear(self) -> None:
         with self._lock:
             self.latest = None

@@ -29,22 +29,17 @@ def issue_token(user: User, config: AppConfig) -> str:
 
 
 def seed_users(session: Session, config: AppConfig) -> None:
+    if session.scalar(select(User.id)) is not None:
+        return
     now = datetime.now(UTC)
     for item in config.auth.users:
-        user = session.scalar(select(User).where(User.username == item.username))
-        hashed = hash_password(item.password)
-        if user is None:
-            session.add(
-                User(
-                    username=item.username,
-                    display_name=item.display_name,
-                    password_hash=hashed,
-                    role=item.role,
-                    created_at=now,
-                )
+        session.add(
+            User(
+                username=item.username,
+                display_name=item.display_name,
+                password_hash=hash_password(item.password),
+                role=item.role,
+                created_at=now,
             )
-        else:
-            user.display_name = item.display_name
-            user.password_hash = hashed
-            user.role = item.role
+        )
     session.commit()

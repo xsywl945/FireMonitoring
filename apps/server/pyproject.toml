@@ -17,6 +17,7 @@ dependencies = [
   "PyJWT>=2.10,<3",
   "pymysql>=1.1,<2",
   "python-multipart>=0.0.16",
+  "reportlab>=4.2,<5",
   "sqlalchemy>=2.0,<3",
   "uvicorn>=0.32,<1",
 ]
@@ -28,6 +29,7 @@ detect = [
   "ultralytics==8.4.100",
 ]
 dev = [
+  "pypdf>=5,<6",
   "pytest>=8.3,<9",
 ]
 
