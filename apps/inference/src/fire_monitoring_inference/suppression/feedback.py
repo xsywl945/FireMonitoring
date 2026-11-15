@@ -26,64 +26,50 @@ def zigzag(mean, covariance, radius: float) -> list[np.ndarray]:
     return points
 
 
-ELLIPSE_K = 2.0
-
-
-def _axis_count(half: float, step: float) -> int:
-    if 2 * half <= step:
-        return 1
-    return int(np.ceil((2 * half) / step))
-
-
-def _from_center(values: np.ndarray) -> list[float]:
-    middle = len(values) // 2
-    order = [middle]
-    for step in range(1, len(values)):
-        if middle - step >= 0:
-            order.append(middle - step)
-        if middle + step < len(values):
-            order.append(middle + step)
-    return [float(values[index]) for index in order]
-
-
-def ellipse_sweep(mean, covariance, radius: float, *, k: float = ELLIPSE_K, max_points: int | None = None) -> list[np.ndarray]:
-    if radius <= 0:
-        raise ValueError("sweep radius must be positive")
-    if k <= 0:
-        raise ValueError("ellipse scale must be positive")
-    mean = np.asarray(mean, dtype=float).reshape(3)
+def _landing_offsets(covariance, radius: float, max_points: int) -> list[np.ndarray]:
     plane = np.asarray(covariance, dtype=float)[:2, :2]
     plane = 0.5 * (plane + plane.T)
     values, vectors = np.linalg.eigh(plane)
-    values = np.maximum(values, 0.0)
-    step = float(radius)
-    halves = [k * float(np.sqrt(value)) for value in values]
-    counts = [_axis_count(half, step) for half in halves]
-    if max_points is not None and counts[0] * counts[1] > max_points:
-        return []
-    axes = []
-    for count, half in zip(counts, halves, strict=True):
-        samples = np.array([0.0]) if count == 1 else np.linspace(-half, half, count)
-        axes.append(_from_center(samples))
-    points = []
-    for row_index, along in enumerate(axes[0]):
-        across = axes[1] if row_index % 2 == 0 else list(reversed(axes[1]))
-        for side in across:
-            xy = mean[:2] + along * vectors[:, 0] + side * vectors[:, 1]
-            points.append(np.array([xy[0], xy[1], float(mean[2])]))
-    return points
+    major = int(np.argmax(values))
+    axes = [major, 1 - major]
+    offsets = [np.zeros(3)]
+    ring = 1
+    while len(offsets) < max_points:
+        for axis in axes:
+            direction = vectors[:, axis]
+            for sign in (1.0, -1.0):
+                xy = sign * ring * radius * direction
+                offsets.append(np.array([xy[0], xy[1], 0.0]))
+                if len(offsets) >= max_points:
+                    return offsets
+        ring += 1
+    return offsets
+
+
+def plan_path(mean, covariance, radius: float, *, max_points: int) -> dict:
+    if radius <= 0:
+        raise ValueError("sweep radius must be positive")
+    if max_points < 1:
+        raise ValueError("water budget needs at least one point")
+    from .coverage import prefix_cover_probabilities
+
+    mean = np.asarray(mean, dtype=float).reshape(3)
+    offsets = _landing_offsets(covariance, radius, max_points)
+    probabilities = prefix_cover_probabilities(covariance, offsets, radius)
+    best_n = 1
+    best_p = probabilities[0]
+    for count, probability in enumerate(probabilities, start=1):
+        if probability > best_p:
+            best_p = probability
+            best_n = count
+    points = [mean + offsets[index] for index in range(best_n)]
+    return {"points": points, "nominal": best_p}
 
 
 def plan_spray(mean, covariance, radius: float, *, max_points: int, threshold: float) -> dict:
-    if max_points < 1:
-        raise ValueError("water budget needs at least one point")
-    points = ellipse_sweep(mean, covariance, radius, max_points=max_points)
-    if not points:
-        return {"spray": False, "points": [], "nominal": 0.0}
-    from .coverage import pattern_cover_probability
-
-    offsets = np.stack(points) - np.asarray(mean, dtype=float).reshape(3)
-    nominal = pattern_cover_probability(covariance, offsets, radius)
-    if nominal < threshold:
-        return {"spray": False, "points": [], "nominal": nominal}
-    return {"spray": True, "points": points, "nominal": nominal}
+    planned = plan_path(mean, covariance, radius, max_points=max_points)
+    return {
+        "spray": planned["nominal"] >= threshold,
+        "points": planned["points"] if planned["nominal"] >= threshold else [],
+        "nominal": planned["nominal"],
+    }

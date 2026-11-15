@@ -23,14 +23,28 @@ def cover_probability(covariance, radius: float, *, samples: int = 8000, seed: i
     return float(np.mean(np.sum(draws * draws, axis=1) <= radius * radius))
 
 
-def pattern_cover_probability(covariance, offsets, radius: float, *, samples: int = 2000, seed: int = 0) -> float:
+def prefix_cover_probabilities(
+    covariance, offsets, radius: float, *, samples: int = 2000, seed: int = 0
+) -> list[float]:
     if radius < 0:
         raise ValueError("coverage radius must be non-negative")
-    points = np.asarray(offsets, dtype=float)
-    if points.size == 0:
-        return 0.0
-    points = points.reshape(-1, 3)
+    points = np.asarray(offsets, dtype=float).reshape(-1, 3)
+    if len(points) == 0:
+        return []
     cov = np.asarray(covariance, dtype=float)
     draws = np.random.default_rng(seed).multivariate_normal(np.zeros(3), cov, size=samples)
-    distance = np.linalg.norm(draws[:, None, :] - points[None, :, :], axis=2)
-    return float(np.mean(np.any(distance <= radius, axis=1)))
+    covered = np.zeros(len(draws), dtype=bool)
+    probabilities = []
+    for point in points:
+        covered |= np.linalg.norm(draws - point, axis=1) <= radius
+        probabilities.append(float(np.mean(covered)))
+    return probabilities
+
+
+def pattern_cover_probability(covariance, offsets, radius: float, *, samples: int = 2000, seed: int = 0) -> float:
+    probabilities = prefix_cover_probabilities(
+        covariance, offsets, radius, samples=samples, seed=seed
+    )
+    if not probabilities:
+        return 0.0
+    return probabilities[-1]
