@@ -19,8 +19,8 @@ from sqlalchemy.orm import Session
 from ..auth.deps import iso
 from ..models import Alert, AlertEvent, AlertFrame, Camera, Disposition, Room
 
-FONT_PATH = Path(__file__).resolve().parents[1] / "assets" / "DroidSansFallbackFull.ttf"
-FONT_NAME = "DroidSansFallback"
+FONT_PATH = Path(__file__).resolve().parents[1] / "assets" / "wqy-microhei.ttc"
+FONT_NAME = "WenQuanYi"
 
 STATUS_LABELS = {
     "OPEN": "待处置",
@@ -231,10 +231,10 @@ def _annotate_plan(image_bytes: bytes, meta: dict, position: dict | None, spread
 
 
 def _picture(data: bytes, width: float) -> Image:
-    reader = ImageReader(BytesIO(data))
-    pixel_w, pixel_h = reader.getSize()
-    height = width * pixel_h / pixel_w
-    return Image(reader, width=width, height=height)
+    stream = BytesIO(data)
+    pixel_w, pixel_h = ImageReader(stream).getSize()
+    stream.seek(0)
+    return Image(stream, width=width, height=width * pixel_h / pixel_w)
 
 
 def _table(font: str, style: ParagraphStyle, rows: list[tuple[str, str]]) -> Table:
@@ -261,7 +261,7 @@ def _table(font: str, style: ParagraphStyle, rows: list[tuple[str, str]]) -> Tab
 
 def _font() -> str:
     if FONT_NAME not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(FONT_NAME, str(FONT_PATH)))
+        pdfmetrics.registerFont(TTFont(FONT_NAME, str(FONT_PATH), subfontIndex=0))
     return FONT_NAME
 
 

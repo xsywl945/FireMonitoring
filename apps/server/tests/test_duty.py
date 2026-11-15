@@ -352,7 +352,7 @@ def test_disposition_transitions_history_csv_and_pdf(tmp_path: Path) -> None:
     assert report.headers["content-type"] == "application/pdf"
     reader = PdfReader(BytesIO(report.content))
     text = "".join((page.extract_text() or "") for page in reader.pages)
-    compact = "".join(text.split())
+    compact = "".join(text.replace("\x00", "").split())
     for needle in ("101", "纸张", "固体物质火灾", "水", "二氧化碳灭火器", "Ⅱ", "明火持续", "现场熄灭", "duty"):
         assert needle in compact
     images = [image for page in reader.pages for image in page.images]

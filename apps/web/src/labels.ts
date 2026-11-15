@@ -1,3 +1,5 @@
+import type { Calibration } from "./api/types"
+
 export const sceneLabels: Record<string, string> = {
   classroom: "教室",
   laboratory: "实验室",
@@ -52,6 +54,13 @@ export const stateLabels: Record<string, string> = {
   COOLDOWN: "冷却",
 }
 
+export const healthLabels: Record<string, string> = {
+  ok: "正常",
+  offline: "离线",
+  frozen: "画面冻结",
+  blur: "模糊",
+}
+
 export const roleLabels: Record<string, string> = {
   admin: "管理员",
   operator: "值班员",
@@ -76,18 +85,21 @@ export const faultLabels: Record<string, string> = {
   BLUR: "严重模糊",
 }
 
-export function healthText(item: { online: boolean; frozen: boolean; blur: boolean }) {
-  if (!item.online) return "离线"
-  const marks = ["在线"]
-  if (item.frozen) marks.push("画面冻结")
-  if (item.blur) marks.push("严重模糊")
-  return marks.join("，")
-}
-
 export function formatTime(value: string) {
   return new Date(value).toLocaleString("zh-CN", { hour12: false })
 }
 
 export function messageOf(error: unknown) {
   return error instanceof Error ? error.message : "请求失败"
+}
+
+export function calibrationStatus(calibration: Calibration | null) {
+  if (!calibration) return "未标定"
+  if (calibration.landmarks.length >= 4) return "已标定"
+  return "仅内参"
+}
+
+export function px(value: number | null | undefined) {
+  if (value == null) return "—"
+  return `${value.toFixed(3)} px`
 }

@@ -147,6 +147,15 @@ onBeforeUnmount(() => {
       </div>
       <div v-else>无法定位</div>
     </div>
+    <div v-if="detail.clips.length" class="panel">
+      <div class="toolbar"><strong>事件片段</strong></div>
+      <div class="frames">
+        <div v-for="clip in detail.clips" :key="clip.camera_id">
+          <video controls :src="videos[clip.camera_id]" />
+          <div class="frame-meta">{{ clip.camera_name }}</div>
+        </div>
+      </div>
+    </div>
     <div class="panel">
       <div class="toolbar"><strong>关键帧</strong></div>
       <div class="frames">
@@ -229,18 +238,31 @@ onBeforeUnmount(() => {
       <p>红线为当前范围，橙线为 30 秒外推，灰线为 60 秒外推，蓝线为可燃物区域。</p>
     </div>
     <div class="panel">
-      <div class="toolbar"><strong>处置记录</strong></div>
-      <el-table :data="detail.dispositions" border>
-        <el-table-column label="时间" width="200">
-          <template #default="{ row }">{{ formatTime(row.occurred_at) }}</template>
-        </el-table-column>
-        <el-table-column prop="actor" label="人员" width="120" />
-        <el-table-column prop="note" label="记录" />
-      </el-table>
-      <div style="display: flex; gap: 8px; margin-top: 12px">
-        <el-input v-model="note" placeholder="处置说明" />
-        <el-button type="primary" @click="addNote">记录</el-button>
+      <div class="toolbar">
+        <strong>处置</strong>
+        <div>
+          <el-button v-if="detail.status === 'OPEN'" type="primary" @click="act('acknowledge')">确认</el-button>
+          <el-button
+            v-if="detail.status === 'OPEN' || detail.status === 'ACKNOWLEDGED'"
+            @click="act('false_alarm')"
+          >
+            标记误报
+          </el-button>
+          <el-button v-if="detail.status === 'ACKNOWLEDGED'" type="primary" @click="act('close')">结案</el-button>
+        </div>
       </div>
+      <el-timeline v-if="detail.dispositions.length">
+        <el-timeline-item
+          v-for="item in detail.dispositions"
+          :key="item.id"
+          :timestamp="`${formatTime(item.occurred_at)} ${item.actor}`"
+        >
+          {{ dispositionLabels[item.action] || item.action }}
+          <div v-if="item.note">{{ item.note }}</div>
+        </el-timeline-item>
+      </el-timeline>
+      <p v-else>暂无处置记录</p>
+      <el-input v-model="note" placeholder="处置说明，结案时可填" style="margin-top: 12px" />
     </div>
   </div>
 </template>

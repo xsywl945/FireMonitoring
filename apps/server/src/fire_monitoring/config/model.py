@@ -146,7 +146,6 @@ class CameraDefaults(_Strict):
 
 class HealthSettings(_Strict):
     freeze_seconds: float = Field(gt=0, le=3600)
-    blur_variance: float = Field(gt=0)
     offline_seconds: float = Field(ge=0, le=3600)
 
 

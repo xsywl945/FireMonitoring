@@ -1,37 +1,50 @@
 import numpy as np
 
-from fire_monitoring.detection.health import HealthTracker, blur_variance
+from fire_monitoring.calibration.health import assess_frame
+from fire_monitoring.detection.health import FaultTracker
+
+
+def _sharp() -> np.ndarray:
+    image = np.zeros((180, 240, 3), np.uint8)
+    image[::8, :, :] = 255
+    image[:, ::8, :] = 255
+    return image
+
+
+def _blurry(shift: int) -> np.ndarray:
+    image = np.zeros((180, 240, 3), np.uint8)
+    image[:, :, 0] = np.linspace(shift, 40 + shift, 240, dtype=np.uint8)
+    return image
 
 
 def test_freeze_blur_and_offline_on_synthetic_frames() -> None:
-    sharp = np.zeros((32, 32), np.uint8)
-    sharp[::2, :] = 255
-    flat = np.full((32, 32), 128, np.uint8)
-    assert blur_variance(sharp) > blur_variance(flat)
-    tracker = HealthTracker(freeze_seconds=5, blur_variance_limit=blur_variance(sharp), offline_seconds=3)
+    sharp = _sharp()
+    status, gray = assess_frame(None, sharp)
+    assert status == "ok"
+    tracker = FaultTracker(freeze_seconds=5, offline_seconds=3)
+    assert tracker.update(1, status, 0) == []
 
-    first, faults = tracker.observe(1, sharp, 0)
-    assert first.online and not first.frozen and not first.blur and faults == []
-    second, faults = tracker.observe(1, sharp, 4.9)
-    assert not second.frozen and faults == []
-    frozen, faults = tracker.observe(1, sharp.copy(), 5)
-    assert frozen.frozen and not frozen.blur
-    assert [item.kind for item in faults] == ["FROZEN"]
-    again, faults = tracker.observe(1, sharp, 9)
-    assert again.frozen and faults == []
+    status, _same = assess_frame(gray, sharp)
+    assert status == "frozen"
+    assert tracker.update(1, status, 1) == []
+    frozen = tracker.update(1, status, 6)
+    assert [item.kind for item in frozen] == ["FROZEN"]
+    assert tracker.update(1, status, 9) == []
 
-    changed, faults = tracker.observe(1, flat, 10)
-    assert not changed.frozen and changed.blur
-    assert [item.kind for item in faults] == ["BLUR"]
+    blurry = _blurry(0)
+    status, gray = assess_frame(None, blurry)
+    assert status == "blur"
+    status, _gray = assess_frame(gray, _blurry(5))
+    assert status == "blur"
+    blur_tracker = FaultTracker(freeze_seconds=5, offline_seconds=3)
+    assert [item.kind for item in blur_tracker.update(2, status, 0)] == ["BLUR"]
+    assert blur_tracker.update(2, status, 1) == []
 
-    other, faults = tracker.observe(2, None, 0)
-    assert not other.online and faults == []
-    offline, faults = tracker.observe(2, None, 3)
-    assert [item.kind for item in faults] == ["OFFLINE"]
-    held, faults = tracker.observe(2, None, 6)
-    assert not held.online and faults == []
-
-    back, faults = tracker.observe(1, None, 11)
-    assert not back.online and faults == []
-    gone, faults = tracker.observe(1, None, 14)
-    assert [item.kind for item in faults] == ["OFFLINE"]
+    assert tracker.update(3, "offline", 0) == []
+    offline = tracker.update(3, "offline", 3)
+    assert [item.kind for item in offline] == ["OFFLINE"]
+    assert tracker.update(3, "offline", 6) == []
+    assert tracker.update(3, "ok", 7) == []
+    assert tracker.update(3, "offline", 10) == []
+    again = tracker.update(3, "offline", 13)
+    assert [item.kind for item in again] == ["OFFLINE"]

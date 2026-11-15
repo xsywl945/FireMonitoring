@@ -63,10 +63,7 @@ def camera_out(camera: Camera) -> CameraOut:
 
 class CameraHealthOut(BaseModel):
     camera_id: int
-    online: bool
-    frozen: bool
-    blur: bool
-    blur_variance: float | None
+    health: str
 
 
 class DeviceEventOut(BaseModel):
@@ -105,10 +102,7 @@ def camera_health(
         result.append(
             CameraHealthOut(
                 camera_id=camera.id,
-                online=bool(snap.get("online", False)),
-                frozen=bool(snap.get("frozen", False)),
-                blur=bool(snap.get("blur", False)),
-                blur_variance=snap.get("blur_variance"),
+                health=str(snap.get("health", "offline")),
             )
         )
     return result

@@ -107,7 +107,6 @@
   },
   "health": {
     "freeze_seconds": 5,
-    "blur_variance": 50,
     "offline_seconds": 3
   },
   "timezone": "Asia/Shanghai"

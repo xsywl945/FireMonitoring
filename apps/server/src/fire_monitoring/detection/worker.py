@@ -10,9 +10,10 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from ..alerts.pipeline import AlertPipeline, ConfirmedJob
+from ..calibration.health import assess_frame
 from ..detection.capture import CameraCapture
 from ..detection.clips import ClipRecorder
-from ..detection.health import HealthTracker
+from ..detection.health import FaultTracker
 from ..detection.ingest import DetectionHit, DetectionState, consume_frame
 from ..models import Camera, DeviceEvent, Room, RoomCamera
 
@@ -48,9 +49,7 @@ class LiveHub:
                     "height": 0,
                     "states": {"fire": "NORMAL", "smoke": "NORMAL"},
                     "detections": [],
-                    "frozen": False,
-                    "blur": False,
-                    "blur_variance": None,
+                    "health": "offline",
                 }
             return dict(current)
 
@@ -82,14 +81,9 @@ class DetectionWorker:
         self.detector = detector
         self._open_capture = open_capture or self._open_rtsp
         self.on_fatal = on_fatal or _exit_process
-        self.events = events
         self.failed = False
         self.state = DetectionState()
-        self.health = HealthTracker(
-            config.health.freeze_seconds,
-            config.health.blur_variance,
-            config.health.offline_seconds,
-        )
+        self.faults = FaultTracker(config.health.freeze_seconds, config.health.offline_seconds)
         self.clips = ClipRecorder(evidence, session_factory, events, self._fatal)
         self.pipeline = AlertPipeline(
             config,
@@ -106,6 +100,7 @@ class DetectionWorker:
         self._thread: threading.Thread | None = None
         self._assignments: list[Assignment] = []
         self._captures: dict[int, CameraCapture] = {}
+        self._previous_gray: dict[int, object] = {}
         self._next_due: dict[int, float] = {}
         self._loaded_at = 0.0
 
@@ -166,7 +161,7 @@ class DetectionWorker:
                 frame = None if capture is None else capture.buffer.snapshot()
                 if frame is None:
                     self._mark_offline(assignment.camera_id)
-                    self._apply_health(assignment.camera_id, None, now)
+                    self._record_faults(self.faults.update(assignment.camera_id, "offline", now))
                     self._next_due[assignment.camera_id] = now + min(0.2, 1 / assignment.target_fps)
                     continue
                 due.append((assignment, frame))
@@ -191,12 +186,14 @@ class DetectionWorker:
                         config=self.config,
                         on_alert=self._on_alert,
                     )
-                    view, faults = self.health.observe(assignment.camera_id, frame.image, now)
-                    snapshot["frozen"] = view.frozen
-                    snapshot["blur"] = view.blur
-                    snapshot["blur_variance"] = view.blur_variance
+                    status, gray = assess_frame(
+                        self._previous_gray.get(assignment.camera_id),
+                        frame.image,
+                    )
+                    self._previous_gray[assignment.camera_id] = gray
+                    snapshot["health"] = status
                     self.live.update(assignment.camera_id, snapshot)
-                    self._record_faults(faults)
+                    self._record_faults(self.faults.update(assignment.camera_id, status, now))
             else:
                 self._stop.wait(0.01)
 
@@ -234,6 +231,7 @@ class DetectionWorker:
         for camera_id in list(self._captures):
             if camera_id not in wanted:
                 self._captures.pop(camera_id).stop()
+                self._previous_gray.pop(camera_id, None)
         for camera_id, assignment in wanted.items():
             if camera_id not in self._captures:
                 capture = CameraCapture(assignment, self._open_capture, self._fatal)
@@ -267,20 +265,25 @@ class DetectionWorker:
         self.pipeline.submit(job)
         self.clips.schedule(job, captures)
 
+    def latest_png(self, camera_id: int) -> bytes:
+        import cv2
+
+        capture = self._captures.get(camera_id)
+        if capture is None:
+            raise RuntimeError("摄像头未在采集")
+        frame = capture.buffer.snapshot()
+        if frame is None:
+            raise RuntimeError("没有画面")
+        ok, encoded = cv2.imencode(".png", frame.image)
+        if not ok:
+            raise RuntimeError("png encode failed")
+        return encoded.tobytes()
+
     def _mark_offline(self, camera_id: int) -> None:
         current = self.live.get(camera_id)
         current["online"] = False
+        current["health"] = "offline"
         self.live.update(camera_id, current)
-
-    def _apply_health(self, camera_id: int, frame, now: float) -> None:
-        view, faults = self.health.observe(camera_id, None if frame is None else frame.image, now)
-        current = self.live.get(camera_id)
-        current["online"] = view.online
-        current["frozen"] = view.frozen
-        current["blur"] = view.blur
-        current["blur_variance"] = view.blur_variance
-        self.live.update(camera_id, current)
-        self._record_faults(faults)
 
     def _record_faults(self, faults) -> None:
         if not faults:
@@ -291,14 +294,6 @@ class DetectionWorker:
             for fault in faults:
                 session.add(
                     DeviceEvent(camera_id=fault.camera_id, kind=fault.kind, occurred_at=occurred_at)
-                )
-                self.events.publish(
-                    {
-                        "kind": "DEVICE",
-                        "camera_id": fault.camera_id,
-                        "fault": fault.kind,
-                        "occurred_at": occurred_at.isoformat(),
-                    }
                 )
             session.commit()
         finally:
