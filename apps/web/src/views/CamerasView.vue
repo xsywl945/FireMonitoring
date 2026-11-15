@@ -3,7 +3,7 @@ import { onMounted, reactive, ref } from "vue"
 import { ElMessage, ElMessageBox } from "element-plus"
 import { api, currentRole } from "../api/client"
 import type { Camera } from "../api/types"
-import { messageOf } from "../labels"
+import { calibrationStatus, messageOf, px } from "../labels"
 
 const admin = currentRole() === "admin"
 const cameras = ref<Camera[]>([])
@@ -93,8 +93,15 @@ onMounted(load)
       <el-table-column prop="source_uri" label="地址" />
       <el-table-column prop="stream_key" label="流标识" width="140" />
       <el-table-column prop="target_fps" label="帧率" width="80" />
-      <el-table-column label="标定" width="80">
-        <template #default="{ row }">{{ row.calibration ? "已录入" : "未录入" }}</template>
+      <el-table-column label="标定" min-width="180">
+        <template #default="{ row }">
+          {{ calibrationStatus(row.calibration) }}
+          <template v-if="row.calibration">
+            {{ px(row.calibration.intrinsics_reprojection_error_px) }}
+            /
+            {{ px(row.calibration.extrinsics_reprojection_error_px) }}
+          </template>
+        </template>
       </el-table-column>
       <el-table-column v-if="admin" label="操作" width="140">
         <template #default="{ row }">
