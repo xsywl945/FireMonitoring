@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 
 from experiments.plotting import configure_font, save_figure, write_json
-from fire_monitoring_inference.suppression.coverage import cover_probability, pattern_cover_probability
-from fire_monitoring_inference.suppression.feedback import ellipse_sweep, plan_spray, zigzag
+from fire_monitoring_inference.suppression.coverage import pattern_cover_probability
+from fire_monitoring_inference.suppression.feedback import plan_path, plan_spray, zigzag
 
 DWELL_S = 1.0
 RADIUS_M = 0.2
@@ -21,24 +21,20 @@ BASIS = {
     "radius_m": "沿用原先的 0.2 m。配置里的 cover_radius_m 是 1 m，用 1 m 时大协方差也会被一次喷水盖住。",
     "sigmas_m": "定位标准差从小于半径到数倍半径。不是从结果里挑的。",
     "fixed_sweep_sigma_m": "固定水平扫射的水平标准差 0.3 m，不随本次协方差改变。",
-    "ellipse_k": "2σ 椭圆。二维高斯落在 2σ 椭圆里的概率约 0.86，没有按曲线改。",
-    "max_points": "单次喷射 5 s，最多修正 2 次，状态机最多走 3 个落点，对应 max_water_s 15。",
-    "cover_threshold": "config.example.json 的 suppression.cover_threshold，0.5。",
+    "max_points": "单次喷射 5 s，最多修正 2 次，最多 3 个落点，对应 max_water_s 15。间距等于喷射半径。",
+    "cover_threshold": "config.example.json 的 suppression.cover_threshold，0.5。和路径并集覆盖概率比较。",
     "dwell_s": "图上每个落点按 1 s 计，用来比较路径长度。",
 }
 
 
 def _nominal(covariance: np.ndarray, points: list[np.ndarray], radius: float) -> float:
-    if len(points) == 1 and np.allclose(points[0], 0):
-        return cover_probability(covariance, radius)
-    offsets = np.stack(points)
-    return pattern_cover_probability(covariance, offsets, radius)
+    return pattern_cover_probability(covariance, np.stack(points), radius)
 
 
 def _patterns(covariance: np.ndarray, radius: float) -> dict:
     estimate = np.zeros(3)
     fixed_h = zigzag(estimate, FIXED_COVARIANCE, radius)
-    ellipse = ellipse_sweep(estimate, covariance, radius)
+    planned = plan_path(estimate, covariance, radius, max_points=MAX_POINTS)
     gated = plan_spray(
         estimate,
         covariance,
@@ -47,9 +43,13 @@ def _patterns(covariance: np.ndarray, radius: float) -> dict:
         threshold=COVER_THRESHOLD,
     )
     return {
-        "fixed_point": {"points": [estimate], "spray": True},
-        "fixed_horizontal": {"points": fixed_h, "spray": True},
-        "ellipse": {"points": ellipse, "spray": True},
+        "fixed_point": {"points": [estimate], "spray": True, "nominal": _nominal(covariance, [estimate], radius)},
+        "fixed_horizontal": {
+            "points": fixed_h,
+            "spray": True,
+            "nominal": _nominal(covariance, fixed_h, radius),
+        },
+        "ellipse": {"points": planned["points"], "spray": True, "nominal": planned["nominal"]},
         "ellipse_gated": gated,
     }
 
@@ -66,10 +66,7 @@ def sweep(draws: int, seed: int, radius: float = RADIUS_M) -> dict:
         hits = {name: [] for name in METHODS}
         water = {name: [] for name in METHODS}
         refused = {name: [] for name in METHODS}
-        nominal = {}
-        for name, plan in patterns.items():
-            points = plan["points"]
-            nominal[name] = 0.0 if not plan["spray"] else _nominal(covariance, points, radius)
+        nominal = {name: patterns[name]["nominal"] for name in METHODS}
         for _index in range(draws):
             truth = rng.multivariate_normal(np.zeros(3), covariance)
             for name, plan in patterns.items():

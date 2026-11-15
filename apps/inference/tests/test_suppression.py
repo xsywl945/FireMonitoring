@@ -17,7 +17,8 @@ from fire_monitoring_inference.suppression.ballistics import (
 from fire_monitoring_inference.suppression.calibrate import LaserSample, fit_gimbal
 from fire_monitoring_inference.suppression.cli import main
 from fire_monitoring_inference.suppression.coverage import cover_probability, max_std
-from fire_monitoring_inference.suppression.feedback import corrected_aim, ellipse_sweep
+from fire_monitoring_inference.suppression.coverage import pattern_cover_probability
+from fire_monitoring_inference.suppression.feedback import corrected_aim, plan_path, plan_spray
 from fire_monitoring_inference.suppression.kinematics import (
     NOMINAL_SCALE,
     GimbalParams,
@@ -319,32 +320,46 @@ def test_low_coverage_refuses_when_the_ellipse_exceeds_the_water_budget():
     assert not any(effect.run for effect in effects)
 
 
-def test_ellipse_sweep_follows_the_projected_principal_axes():
+def test_path_starts_at_the_mean_and_steps_by_the_spray_radius():
     angle = np.deg2rad(35)
     rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-    plane = rotation @ np.diag([0.075**2, 0.02**2]) @ rotation.T
+    plane = rotation @ np.diag([0.3**2, 0.05**2]) @ rotation.T
     covariance = np.zeros((3, 3))
     covariance[:2, :2] = plane
     covariance[2, 2] = 0.02**2
-    points = ellipse_sweep([0.0, 0.0, 0.4], covariance, 0.1, max_points=3)
-    assert len(points) == 3
-    assert np.linalg.norm(points[0][:2]) == pytest.approx(0, abs=1e-9)
-    xy = np.stack(points)[:, :2]
-    assert np.std(xy @ rotation[:, 0]) > np.std(xy @ rotation[:, 1])
+    mean = np.array([1.5, 2.5, 0.4])
+    planned = plan_path(mean, covariance, 0.1, max_points=3)
+    assert np.allclose(planned["points"][0], mean)
+    assert len(planned["points"]) > 1
+    step = planned["points"][1][:2] - mean[:2]
+    assert np.linalg.norm(step) == pytest.approx(0.1)
+    assert abs(np.dot(step, rotation[:, 0])) > abs(np.dot(step, rotation[:, 1]))
 
 
-def test_short_ellipse_sprays_when_one_disk_is_under_the_threshold():
-    angle = np.deg2rad(35)
-    rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-    plane = rotation @ np.diag([0.075**2, 0.02**2]) @ rotation.T
-    covariance = np.diag([0.02**2, 0.02**2, 0.02**2])
-    covariance[:2, :2] = plane
-    position = {"status": "ESTIMATED", "xyz": [1.5, 2.5, 0.4], "covariance": covariance.tolist()}
+def test_path_coverage_is_at_least_the_single_point_and_small_sigma_is_one_point():
+    wide = np.eye(3) * 0.1**2
+    single = pattern_cover_probability(wide, np.zeros(3), 0.2)
+    planned = plan_path(np.zeros(3), wide, 0.2, max_points=3)
+    assert planned["nominal"] >= single
+    decision = plan_spray(np.zeros(3), wide, 0.2, max_points=3, threshold=0.5)
+    assert decision["spray"] is True
+    assert decision["nominal"] >= 0.5
+    tight = np.eye(3) * 0.02**2
+    small = plan_path(np.array([1.0, 2.0, 0.3]), tight, 0.2, max_points=3)
+    assert len(small["points"]) == 1
+    assert np.allclose(small["points"][0], [1.0, 2.0, 0.3])
+
+
+def test_single_point_above_threshold_is_not_refused():
+    covariance = (np.eye(3) * 0.1**2).tolist()
+    position = {"status": "ESTIMATED", "xyz": [1.5, 2.5, 0.4], "covariance": covariance}
     machine = RoomMachine(MachineConfig(pending_s=0, spray_s=5, max_water_s=15))
-    machine.step(shot(position=position, cover_radius_m=0.1, cover_threshold=0.9, max_std_m=1.0))
+    effects = machine.step(
+        shot(position=position, cover_radius_m=0.2, cover_threshold=0.5, max_std_m=1.0)
+    )
     assert machine.phase == "喷射"
-    assert machine.sweep is not None
-    assert len(machine.sweep) == 3
+    assert any(effect.run for effect in effects)
+    assert not any(effect.detail.get("reason") == "COVERAGE" for effect in effects)
 
 
 def test_large_covariance_stays_in_observation():
