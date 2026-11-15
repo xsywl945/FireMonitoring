@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from fire_monitoring.config import load_config, masked_config
+from fire_monitoring.config import apply_public_update, load_config, public_config
 
 EXAMPLE = Path(__file__).resolve().parents[3] / "config.example.json"
 
@@ -38,13 +38,28 @@ def test_enabled_pump_requires_port_and_room(tmp_path: Path) -> None:
         load_config(path)
 
 
-def test_masked_config_hides_secrets() -> None:
+def test_public_config_omits_secrets() -> None:
     config = load_config(EXAMPLE)
-    masked = masked_config(config)
-    text = json.dumps(masked)
+    public = public_config(config)
+    text = json.dumps(public)
     assert config.auth.jwt_secret not in text
     assert config.database.password not in text
-    assert masked["database"]["password"] == "ch****me"
-    assert masked["llm"]["api_key"] == ""
-    assert masked["model"]["thresholds"]["fire"] == 0.3
-    assert masked["auth"]["users"][0]["password"] != "123456"
+    assert "password" not in public["database"]
+    assert "users" not in public["auth"]
+    assert "jwt_secret" not in public["auth"]
+    assert "api_key" not in public["llm"]
+    assert public["model"]["thresholds"]["fire"] == 0.3
+    assert public["health"]["freeze_seconds"] == 5
+
+
+def test_public_update_keeps_secrets() -> None:
+    current = json.loads(EXAMPLE.read_text(encoding="utf-8"))
+    merged = apply_public_update(current, {"cameras": {"default_fps": 8}})
+    assert merged["cameras"]["default_fps"] == 8
+    assert merged["database"]["password"] == current["database"]["password"]
+    assert merged["auth"]["users"][0]["password"] == "123456"
+    assert merged["auth"]["jwt_secret"] == current["auth"]["jwt_secret"]
+    with pytest.raises(ValueError):
+        apply_public_update(current, {"database": {"password": "nope"}})
+    with pytest.raises(ValueError):
+        apply_public_update(current, {"auth": {"users": []}})

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,6 +41,7 @@ def create_app(
     open_capture=None,
     localizer=None,
     on_fatal=None,
+    config_path: Path | None = None,
 ) -> FastAPI:
     from . import models
 
@@ -99,6 +101,7 @@ def create_app(
     app.include_router(pump_router, prefix="/api/v1")
     app.include_router(events_router, prefix="/api/v1")
     app.state.config = config
+    app.state.config_path = config_path or Path("config.json")
     app.state.session_factory = session_factory
     app.state.evidence = evidence
     app.state.analyzer = analyzer

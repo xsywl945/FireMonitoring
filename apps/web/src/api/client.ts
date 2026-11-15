@@ -82,10 +82,6 @@ export async function download(path: string, filename: string) {
 }
 
 export async function fetchBlob(path: string): Promise<string> {
-  const headers = new Headers()
-  const token = localStorage.getItem(TOKEN)
-  if (token) headers.set("Authorization", `Bearer ${token}`)
-  const response = await fetch(`/api/v1${path}`, { headers })
-  if (!response.ok) throw new Error("读取图片失败")
-  return URL.createObjectURL(await response.blob())
+  const blob = await fetchAuthorized(path)
+  return URL.createObjectURL(blob)
 }

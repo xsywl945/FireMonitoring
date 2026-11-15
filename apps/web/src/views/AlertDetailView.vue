@@ -4,11 +4,13 @@ import { useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import FloorPlan from "../components/FloorPlan.vue"
 import type { PlanShape } from "../components/FloorPlan.vue"
-import { api, fetchBlob } from "../api/client"
+import { api, download, fetchBlob } from "../api/client"
 import type { AlertDetail } from "../api/types"
 import {
   alertLabels,
+  alertStatusLabels,
   causeLabels,
+  dispositionLabels,
   formatTime,
   growthLabels,
   messageOf,
@@ -20,6 +22,7 @@ const route = useRoute()
 const alertId = computed(() => Number(route.params.id))
 const detail = ref<AlertDetail | null>(null)
 const images = ref<Record<number, string>>({})
+const videos = ref<Record<number, string>>({})
 const note = ref("")
 
 const analysis = computed(() => detail.value?.analysis ?? null)
@@ -57,11 +60,17 @@ const chart = computed(() => {
 
 async function loadImages(alert: AlertDetail) {
   for (const url of Object.values(images.value)) URL.revokeObjectURL(url)
+  for (const url of Object.values(videos.value)) URL.revokeObjectURL(url)
   const next: Record<number, string> = {}
   for (const frame of alert.frames) {
     next[frame.camera_id] = await fetchBlob(`/alerts/${alert.id}/frames/${frame.camera_id}`)
   }
   images.value = next
+  const clips: Record<number, string> = {}
+  for (const clip of alert.clips) {
+    clips[clip.camera_id] = await fetchBlob(`/alerts/${alert.id}/clips/${clip.camera_id}`)
+  }
+  videos.value = clips
 }
 
 async function load() {
@@ -79,15 +88,22 @@ async function rerun() {
   }
 }
 
-async function addNote() {
-  if (!note.value.trim()) return
+async function act(action: "acknowledge" | "false_alarm" | "close") {
   try {
-    await api(`/alerts/${alertId.value}/dispositions`, {
+    await api(`/alerts/${alertId.value}/disposition`, {
       method: "POST",
-      body: JSON.stringify({ note: note.value.trim() }),
+      body: JSON.stringify({ action, note: note.value.trim() }),
     })
     note.value = ""
     await load()
+  } catch (error) {
+    ElMessage.error(messageOf(error))
+  }
+}
+
+async function exportPdf() {
+  try {
+    await download(`/alerts/${alertId.value}/report`, `alert-${alertId.value}.pdf`)
   } catch (error) {
     ElMessage.error(messageOf(error))
   }
@@ -110,14 +126,19 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("fire-event", onFireEvent)
   for (const url of Object.values(images.value)) URL.revokeObjectURL(url)
+  for (const url of Object.values(videos.value)) URL.revokeObjectURL(url)
 })
 </script>
 
 <template>
   <div v-if="detail" class="stack">
     <div class="panel">
-      <div>{{ detail.room_name }} / {{ alertLabels[detail.alert_type] || detail.alert_type }}</div>
+      <div class="toolbar">
+        <strong>{{ detail.room_name }} / {{ alertLabels[detail.alert_type] || detail.alert_type }}</strong>
+        <el-button @click="exportPdf">导出 PDF</el-button>
+      </div>
       <div>{{ formatTime(detail.started_at) }}</div>
+      <div>处置状态：{{ alertStatusLabels[detail.status] || detail.status }}</div>
       <div v-if="analysis">等级 {{ analysis.level.grade }}</div>
       <div v-if="detail.position?.status === 'ESTIMATED' && detail.position.xyz">
         已定位 {{ detail.position.xyz.map((item) => item.toFixed(2)).join(", ") }}
@@ -125,6 +146,15 @@ onBeforeUnmount(() => {
         ，支撑摄像头 {{ detail.position.support_camera_ids.join("、") }}
       </div>
       <div v-else>无法定位</div>
+    </div>
+    <div v-if="detail.clips.length" class="panel">
+      <div class="toolbar"><strong>事件片段</strong></div>
+      <div class="frames">
+        <div v-for="clip in detail.clips" :key="clip.camera_id">
+          <video controls :src="videos[clip.camera_id]" />
+          <div class="frame-meta">{{ clip.camera_name }}</div>
+        </div>
+      </div>
     </div>
     <div class="panel">
       <div class="toolbar"><strong>关键帧</strong></div>
@@ -208,18 +238,31 @@ onBeforeUnmount(() => {
       <p>红线为当前范围，橙线为 30 秒外推，灰线为 60 秒外推，蓝线为可燃物区域。</p>
     </div>
     <div class="panel">
-      <div class="toolbar"><strong>处置记录</strong></div>
-      <el-table :data="detail.dispositions" border>
-        <el-table-column label="时间" width="200">
-          <template #default="{ row }">{{ formatTime(row.occurred_at) }}</template>
-        </el-table-column>
-        <el-table-column prop="actor" label="人员" width="120" />
-        <el-table-column prop="note" label="记录" />
-      </el-table>
-      <div style="display: flex; gap: 8px; margin-top: 12px">
-        <el-input v-model="note" placeholder="处置说明" />
-        <el-button type="primary" @click="addNote">记录</el-button>
+      <div class="toolbar">
+        <strong>处置</strong>
+        <div>
+          <el-button v-if="detail.status === 'OPEN'" type="primary" @click="act('acknowledge')">确认</el-button>
+          <el-button
+            v-if="detail.status === 'OPEN' || detail.status === 'ACKNOWLEDGED'"
+            @click="act('false_alarm')"
+          >
+            标记误报
+          </el-button>
+          <el-button v-if="detail.status === 'ACKNOWLEDGED'" type="primary" @click="act('close')">结案</el-button>
+        </div>
       </div>
+      <el-timeline v-if="detail.dispositions.length">
+        <el-timeline-item
+          v-for="item in detail.dispositions"
+          :key="item.id"
+          :timestamp="`${formatTime(item.occurred_at)} ${item.actor}`"
+        >
+          {{ dispositionLabels[item.action] || item.action }}
+          <div v-if="item.note">{{ item.note }}</div>
+        </el-timeline-item>
+      </el-timeline>
+      <p v-else>暂无处置记录</p>
+      <el-input v-model="note" placeholder="处置说明，结案时可填" style="margin-top: 12px" />
     </div>
   </div>
 </template>

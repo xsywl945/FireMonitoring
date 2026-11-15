@@ -102,6 +102,15 @@ export interface AlertSummary {
   position: Position | null
   analysis_status: string | null
   level: string | null
+  fire_classes: string | null
+  status: string
+}
+
+export interface AlertPage {
+  items: AlertSummary[]
+  total: number
+  page: number
+  page_size: number
 }
 
 export interface BurningObject {
@@ -183,8 +192,28 @@ export interface FrameInfo {
 
 export interface Disposition {
   id: number
+  action: string
   note: string
   actor: string
+  occurred_at: string
+}
+
+export interface AlertClip {
+  camera_id: number
+  camera_name: string
+  started_at: string
+  ended_at: string
+}
+
+export interface CameraHealth {
+  camera_id: number
+  health: string
+}
+
+export interface DeviceFault {
+  id: number
+  camera_id: number
+  kind: string
   occurred_at: string
 }
 
@@ -198,8 +227,12 @@ export interface AlertDetail {
   analysis: Analysis | null
   observations: unknown[]
   frames: FrameInfo[]
+  clips: AlertClip[]
   dispositions: Disposition[]
   floor_plan: FloorPlan | null
+  status: string
+  level: string | null
+  fire_classes: string | null
 }
 
 export interface PumpStatus {

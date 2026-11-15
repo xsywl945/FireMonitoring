@@ -105,5 +105,9 @@
   "cameras": {
     "default_fps": 15
   },
+  "health": {
+    "freeze_seconds": 5,
+    "offline_seconds": 3
+  },
   "timezone": "Asia/Shanghai"
 }

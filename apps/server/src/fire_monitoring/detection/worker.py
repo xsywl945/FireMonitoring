@@ -5,14 +5,17 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
 from ..alerts.pipeline import AlertPipeline, ConfirmedJob
 from ..calibration.health import assess_frame
 from ..detection.capture import CameraCapture
+from ..detection.clips import ClipRecorder
+from ..detection.health import FaultTracker
 from ..detection.ingest import DetectionHit, DetectionState, consume_frame
-from ..models import Camera, Room, RoomCamera
+from ..models import Camera, DeviceEvent, Room, RoomCamera
 
 logger = logging.getLogger("fire_monitoring.detection")
 
@@ -80,6 +83,8 @@ class DetectionWorker:
         self.on_fatal = on_fatal or _exit_process
         self.failed = False
         self.state = DetectionState()
+        self.faults = FaultTracker(config.health.freeze_seconds, config.health.offline_seconds)
+        self.clips = ClipRecorder(evidence, session_factory, events, self._fatal)
         self.pipeline = AlertPipeline(
             config,
             session_factory,
@@ -126,6 +131,7 @@ class DetectionWorker:
         for capture in self._captures.values():
             capture.stop()
         self._captures.clear()
+        self.clips.stop()
         self.pipeline.stop()
 
     @property
@@ -155,6 +161,7 @@ class DetectionWorker:
                 frame = None if capture is None else capture.buffer.snapshot()
                 if frame is None:
                     self._mark_offline(assignment.camera_id)
+                    self._record_faults(self.faults.update(assignment.camera_id, "offline", now))
                     self._next_due[assignment.camera_id] = now + min(0.2, 1 / assignment.target_fps)
                     continue
                 due.append((assignment, frame))
@@ -186,6 +193,7 @@ class DetectionWorker:
                     self._previous_gray[assignment.camera_id] = gray
                     snapshot["health"] = status
                     self.live.update(assignment.camera_id, snapshot)
+                    self._record_faults(self.faults.update(assignment.camera_id, status, now))
             else:
                 self._stop.wait(0.01)
 
@@ -236,21 +244,26 @@ class DetectionWorker:
             for assignment in self._assignments
             if assignment.room_id == draft.room_id and assignment.calibration_json
         }
-        self.pipeline.submit(
-            ConfirmedJob(
-                room_id=draft.room_id,
-                alert_type=draft.alert_type,
-                started_at=draft.started_at,
-                sources=draft.sources,
-                calibrations=calibrations,
-                frames=draft.frames,
-                pump_observations=draft.pump_observations,
-                confirmed_monotonic=time.perf_counter(),
-                before_jpeg=draft.before_jpeg,
-                after_jpeg=draft.after_jpeg,
-                samples=draft.samples,
-            )
+        job = ConfirmedJob(
+            room_id=draft.room_id,
+            alert_type=draft.alert_type,
+            started_at=draft.started_at,
+            sources=draft.sources,
+            calibrations=calibrations,
+            frames=draft.frames,
+            pump_observations=draft.pump_observations,
+            confirmed_monotonic=time.perf_counter(),
+            before_jpeg=draft.before_jpeg,
+            after_jpeg=draft.after_jpeg,
+            samples=draft.samples,
         )
+        captures = {
+            item.camera_id: self._captures[item.camera_id]
+            for item in self._assignments
+            if item.room_id == draft.room_id and item.camera_id in self._captures
+        }
+        self.pipeline.submit(job)
+        self.clips.schedule(job, captures)
 
     def latest_png(self, camera_id: int) -> bytes:
         import cv2
@@ -271,6 +284,20 @@ class DetectionWorker:
         current["online"] = False
         current["health"] = "offline"
         self.live.update(camera_id, current)
+
+    def _record_faults(self, faults) -> None:
+        if not faults:
+            return
+        occurred_at = datetime.now(UTC)
+        session = self.session_factory()
+        try:
+            for fault in faults:
+                session.add(
+                    DeviceEvent(camera_id=fault.camera_id, kind=fault.kind, occurred_at=occurred_at)
+                )
+            session.commit()
+        finally:
+            session.close()
 
     def _open_rtsp(self, assignment: Assignment):
         import cv2

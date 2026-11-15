@@ -9,6 +9,7 @@ import LoginView from "../views/LoginView.vue"
 import MonitorView from "../views/MonitorView.vue"
 import RoomDetailView from "../views/RoomDetailView.vue"
 import RoomsView from "../views/RoomsView.vue"
+import UsersView from "../views/UsersView.vue"
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -25,6 +26,7 @@ export const router = createRouter({
         { path: "monitor", component: MonitorView, meta: { title: "实时监控" } },
         { path: "alerts", component: AlertsView, meta: { title: "告警研判" } },
         { path: "alerts/:id", component: AlertDetailView, meta: { title: "告警详情", parent: "告警研判" } },
+        { path: "users", component: UsersView, meta: { title: "用户管理", admin: true } },
         { path: "config", component: ConfigView, meta: { title: "系统配置", admin: true } },
       ],
     },

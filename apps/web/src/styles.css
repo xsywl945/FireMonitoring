@@ -94,6 +94,34 @@ body,
   margin-bottom: 12px;
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.pager {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.config-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e6e8eb;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -164,7 +192,8 @@ body,
   color: #344054;
 }
 
-.frames img {
+.frames img,
+.frames video {
   width: 100%;
   display: block;
   background: #111;

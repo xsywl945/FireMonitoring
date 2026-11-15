@@ -121,7 +121,6 @@ onBeforeUnmount(() => {
         <div>
           火 {{ stateLabels[camera.states.fire] || camera.states.fire }}
           / 烟 {{ stateLabels[camera.states.smoke] || camera.states.smoke }}
-          / {{ camera.online ? "检测在线" : "检测离线" }}
           / {{ healthLabels[camera.health] || camera.health }}
         </div>
         <div v-if="failure">{{ failure }}</div>

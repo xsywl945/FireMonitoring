@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue"
+import { onBeforeUnmount, onMounted, reactive, ref } from "vue"
 import { ElMessage, ElMessageBox } from "element-plus"
 import { api, currentRole } from "../api/client"
-import type { Camera } from "../api/types"
-import { calibrationStatus, messageOf, px } from "../labels"
+import type { Camera, CameraHealth, DeviceFault } from "../api/types"
+import { calibrationStatus, faultLabels, formatTime, healthLabels, messageOf, px } from "../labels"
 
 const admin = currentRole() === "admin"
 const cameras = ref<Camera[]>([])
+const health = ref<Record<number, string>>({})
+const faults = ref<DeviceFault[]>([])
+let timer = 0
 const visible = ref(false)
 const editing = ref<Camera | null>(null)
 const form = reactive({
@@ -19,6 +22,18 @@ const form = reactive({
 
 async function load() {
   cameras.value = await api<Camera[]>("/cameras")
+}
+
+async function loadHealth() {
+  const rows = await api<CameraHealth[]>("/cameras/health")
+  const next: Record<number, string> = {}
+  for (const row of rows) next[row.camera_id] = row.health
+  health.value = next
+  faults.value = await api<DeviceFault[]>("/cameras/faults")
+}
+
+function cameraName(cameraId: number) {
+  return cameras.value.find((item) => item.id === cameraId)?.name || String(cameraId)
 }
 
 function openCreate() {
@@ -76,10 +91,16 @@ async function remove(row: Camera) {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  await loadHealth()
+  timer = window.setInterval(loadHealth, 2000)
+})
+onBeforeUnmount(() => window.clearInterval(timer))
 </script>
 
 <template>
+  <div class="stack">
   <div class="panel">
     <div class="toolbar">
       <strong>摄像头</strong>
@@ -93,6 +114,9 @@ onMounted(load)
       <el-table-column prop="source_uri" label="地址" />
       <el-table-column prop="stream_key" label="流标识" width="140" />
       <el-table-column prop="target_fps" label="帧率" width="80" />
+      <el-table-column label="状态" width="120">
+        <template #default="{ row }">{{ healthLabels[health[row.id]] || "离线" }}</template>
+      </el-table-column>
       <el-table-column label="标定" min-width="180">
         <template #default="{ row }">
           {{ calibrationStatus(row.calibration) }}
@@ -132,5 +156,20 @@ onMounted(load)
         <el-button type="primary" @click="save">保存</el-button>
       </template>
     </el-dialog>
+  </div>
+  <div v-if="faults.length" class="panel">
+    <div class="toolbar"><strong>设备故障</strong></div>
+    <el-table :data="faults" border>
+      <el-table-column label="时间" width="200">
+        <template #default="{ row }">{{ formatTime(row.occurred_at) }}</template>
+      </el-table-column>
+      <el-table-column label="摄像头">
+        <template #default="{ row }">{{ cameraName(row.camera_id) }}</template>
+      </el-table-column>
+      <el-table-column label="类型" width="140">
+        <template #default="{ row }">{{ faultLabels[row.kind] || row.kind }}</template>
+      </el-table-column>
+    </el-table>
+  </div>
   </div>
 </template>

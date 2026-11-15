@@ -8,9 +8,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth.deps import get_current_user, get_db, require_admin
+from ..auth.deps import get_current_user, get_db, iso, require_admin
 from ..config import AppConfig
-from ..models import Camera, User
+from ..models import Camera, DeviceEvent, User
 
 router = APIRouter(prefix="/cameras", tags=["cameras"])
 
@@ -61,6 +61,18 @@ def camera_out(camera: Camera) -> CameraOut:
     )
 
 
+class CameraHealthOut(BaseModel):
+    camera_id: int
+    health: str
+
+
+class DeviceEventOut(BaseModel):
+    id: int
+    camera_id: int
+    kind: str
+    occurred_at: str
+
+
 def _get_camera(session: Session, camera_id: int) -> Camera:
     camera = session.get(Camera, camera_id)
     if camera is None:
@@ -75,6 +87,45 @@ def list_cameras(
 ) -> list[CameraOut]:
     cameras = session.scalars(select(Camera).order_by(Camera.id)).all()
     return [camera_out(camera) for camera in cameras]
+
+
+@router.get("/health", response_model=list[CameraHealthOut])
+def camera_health(
+    request: Request,
+    session: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> list[CameraHealthOut]:
+    cameras = session.scalars(select(Camera).order_by(Camera.id)).all()
+    result = []
+    for camera in cameras:
+        snap = request.app.state.live.get(camera.id)
+        result.append(
+            CameraHealthOut(
+                camera_id=camera.id,
+                health=str(snap.get("health", "offline")),
+            )
+        )
+    return result
+
+
+@router.get("/faults", response_model=list[DeviceEventOut])
+def camera_faults(
+    session: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+    limit: int = 50,
+) -> list[DeviceEventOut]:
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=422, detail="limit 超出范围")
+    rows = session.scalars(select(DeviceEvent).order_by(DeviceEvent.id.desc()).limit(limit)).all()
+    return [
+        DeviceEventOut(
+            id=row.id,
+            camera_id=row.camera_id,
+            kind=row.kind,
+            occurred_at=iso(row.occurred_at),
+        )
+        for row in rows
+    ]
 
 
 @router.post("", response_model=CameraOut)

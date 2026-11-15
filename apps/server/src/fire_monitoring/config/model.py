@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Literal, Self
 
@@ -143,6 +144,11 @@ class CameraDefaults(_Strict):
     default_fps: float = Field(gt=0, le=60)
 
 
+class HealthSettings(_Strict):
+    freeze_seconds: float = Field(gt=0, le=3600)
+    offline_seconds: float = Field(ge=0, le=3600)
+
+
 class AppConfig(_Strict):
     server: ServerSettings
     database: DatabaseSettings
@@ -157,6 +163,7 @@ class AppConfig(_Strict):
     pump: PumpSettings
     auth: AuthSettings
     cameras: CameraDefaults
+    health: HealthSettings
     timezone: str
 
 
@@ -165,23 +172,51 @@ def load_config(path: Path | None = None) -> AppConfig:
     return AppConfig.model_validate_json(file.read_text(encoding="utf-8"))
 
 
-def mask_secret(value: str) -> str:
-    if value == "":
-        return ""
-    if len(value) <= 4:
-        return "****"
-    return f"{value[:2]}****{value[-2:]}"
+_HIDDEN = {
+    "database": ("password",),
+    "minio": ("access_key", "secret_key"),
+    "llm": ("api_key",),
+    "sms": ("access_key_id", "access_key_secret"),
+    "auth": ("jwt_secret", "users"),
+}
 
 
-def masked_config(config: AppConfig) -> dict:
-    data = config.model_dump()
-    data["database"]["password"] = mask_secret(data["database"]["password"])
-    data["minio"]["access_key"] = mask_secret(data["minio"]["access_key"])
-    data["minio"]["secret_key"] = mask_secret(data["minio"]["secret_key"])
-    data["llm"]["api_key"] = mask_secret(data["llm"]["api_key"])
-    data["sms"]["access_key_id"] = mask_secret(data["sms"]["access_key_id"])
-    data["sms"]["access_key_secret"] = mask_secret(data["sms"]["access_key_secret"])
-    data["auth"]["jwt_secret"] = mask_secret(data["auth"]["jwt_secret"])
-    for user in data["auth"]["users"]:
-        user["password"] = mask_secret(user["password"])
+def public_config(config: AppConfig) -> dict:
+    data = config.model_dump(mode="json")
+    for section, keys in _HIDDEN.items():
+        for key in keys:
+            del data[section][key]
     return data
+
+
+def _require_public(patch: dict, allowed: dict, prefix: str) -> None:
+    for key, value in patch.items():
+        path = f"{prefix}{key}"
+        if key not in allowed:
+            raise ValueError(f"不能修改 {path}")
+        child = allowed[key]
+        if isinstance(child, dict):
+            if not isinstance(value, dict):
+                raise ValueError(f"{path} 必须是对象")
+            _require_public(value, child, f"{path}.")
+        elif isinstance(value, dict):
+            raise ValueError(f"不能修改 {path}")
+
+
+def _overlay(target: dict, patch: dict) -> None:
+    for key, value in patch.items():
+        current = target.get(key)
+        if isinstance(value, dict) and isinstance(current, dict):
+            _overlay(current, value)
+        else:
+            target[key] = value
+
+
+def apply_public_update(current: dict, patch: dict) -> dict:
+    if not isinstance(patch, dict):
+        raise ValueError("配置必须是对象")
+    allowed = public_config(AppConfig.model_validate(current))
+    _require_public(patch, allowed, "")
+    merged = json.loads(json.dumps(current))
+    _overlay(merged, patch)
+    return AppConfig.model_validate(merged).model_dump(mode="json")
