@@ -13,9 +13,13 @@ def test_large_sigma_refuses_instead_of_spraying():
         return min(rows, key=lambda row: abs(row["sigma_m"] - sigma))
 
     small = at(0.05)
+    mid = at(0.1)
     large = at(0.8)
     assert small["fixed_point"]["hit_rate"] > large["fixed_point"]["hit_rate"]
-    assert large["ellipse_gated"]["refusal_rate"] > small["ellipse_gated"]["refusal_rate"]
+    assert mid["ellipse"]["hit_rate"] >= mid["fixed_point"]["hit_rate"]
+    assert mid["ellipse_gated"]["refusal_rate"] == 0
+    assert mid["ellipse_gated"]["nominal"] >= mid["fixed_point"]["nominal"]
+    assert large["ellipse_gated"]["refusal_rate"] > mid["ellipse_gated"]["refusal_rate"]
     assert large["ellipse_gated"]["water_s"] < large["ellipse"]["water_s"]
     assert large["fixed_point"]["refusal_rate"] == 0
     assert payload["cover_threshold"] == 0.5

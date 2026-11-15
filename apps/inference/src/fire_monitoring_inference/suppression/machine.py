@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .aim import solve_aim
-from .feedback import corrected_aim, ellipse_sweep, plan_spray
+from .feedback import corrected_aim, plan_path
 from .interlock import aim_probability, resolved_rules, spray_block
 from .voice import (
     ESTOP_VOICE,
@@ -224,27 +224,27 @@ class RoomMachine:
             return
         target = self._target(shot)
         aim = None if target is None else solve_aim(shot.gimbal, target, shot.speed, shot.drag)
-        probability = aim_probability(shot, aim)
+        budget = max(1, int(shot.max_water_s // self.config.spray_s))
+        plan = None
+        position = shot.position
+        if (
+            self.sweep is None
+            and position is not None
+            and position.get("status") == "ESTIMATED"
+            and position.get("xyz") is not None
+            and aim is not None
+        ):
+            plan = plan_path(position["xyz"], position["covariance"], shot.cover_radius_m, max_points=budget)
+            probability = plan["nominal"]
+        else:
+            probability = aim_probability(shot, aim)
         self.cover_probability = probability
         sweeping = self.sweep is not None
         reason = spray_block(shot, aim, probability, sweeping=sweeping)
-        if reason == "COVERAGE" and self.sweep is None and shot.position and shot.position.get("xyz"):
-            budget = max(1, int(shot.max_water_s // self.config.spray_s))
-            plan = plan_spray(
-                shot.position["xyz"],
-                shot.position["covariance"],
-                shot.cover_radius_m,
-                max_points=budget,
-                threshold=shot.cover_threshold,
-            )
-            self.cover_probability = plan["nominal"]
-            probability = plan["nominal"]
-            if plan["spray"]:
-                self.sweep = plan["points"]
-                self.sweep_i = 0
-                target = self.sweep[0]
-                aim = solve_aim(shot.gimbal, target, shot.speed, shot.drag)
-                reason = spray_block(shot, aim, probability, sweeping=True)
+        if reason is None and plan is not None and len(plan["points"]) > 1:
+            self.sweep = plan["points"]
+            self.sweep_i = 0
+            target = self.sweep[0]
         if reason == "PERSON":
             self._mark(
                 out,
@@ -337,8 +337,8 @@ class RoomMachine:
             mean = self.aim_point if self.aim_point is not None else np.array(shot.position["xyz"])
             cov = shot.position["covariance"] if shot.position and shot.position.get("covariance") else np.eye(3)
             budget = max(1, int(shot.max_water_s // self.config.spray_s))
-            points = ellipse_sweep(mean, cov, shot.cover_radius_m, max_points=budget)
-            self.sweep = points or [np.asarray(mean, dtype=float)]
+            planned = plan_path(mean, cov, shot.cover_radius_m, max_points=budget)
+            self.sweep = planned["points"]
             self.sweep_i = min(self.corrections, len(self.sweep) - 1)
             self.aim_point = self.sweep[self.sweep_i]
             detail = {"correction": self.corrections, "mode": "sweep"}
