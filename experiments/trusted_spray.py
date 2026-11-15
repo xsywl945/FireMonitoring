@@ -3,209 +3,135 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import cv2
 import numpy as np
-from scipy.spatial.transform import Rotation
 
 from experiments.plotting import configure_font, save_figure, write_json
-from fire_monitoring_inference.multiview_geometry import calibrate, locate, project
-from fire_monitoring_inference.suppression.coverage import cover_probability
-from fire_monitoring_inference.suppression.feedback import zigzag
+from fire_monitoring_inference.suppression.coverage import cover_probability, pattern_cover_probability
+from fire_monitoring_inference.suppression.feedback import ellipse_sweep, plan_spray, zigzag
 
 DWELL_S = 1.0
-OPERATING_RADIUS_M = 0.2
-RADII_M = (0.01, 0.02, 0.05, 0.1, 0.2, 0.4)
+RADIUS_M = 0.2
+SIGMAS_M = (0.05, 0.10, 0.20, 0.35, 0.55, 0.80)
+DRAWS = 80
+COVER_THRESHOLD = 0.5
+MAX_POINTS = 3
 FIXED_COVARIANCE = np.diag([0.3**2, 0.3**2, 0.02**2])
+METHODS = ("fixed_point", "fixed_horizontal", "ellipse", "ellipse_gated")
+BASIS = {
+    "radius_m": "沿用原先的 0.2 m。配置里的 cover_radius_m 是 1 m，用 1 m 时大协方差也会被一次喷水盖住。",
+    "sigmas_m": "定位标准差从小于半径到数倍半径。不是从结果里挑的。",
+    "fixed_sweep_sigma_m": "固定水平扫射的水平标准差 0.3 m，不随本次协方差改变。",
+    "ellipse_k": "2σ 椭圆。二维高斯落在 2σ 椭圆里的概率约 0.86，没有按曲线改。",
+    "max_points": "单次喷射 5 s，最多修正 2 次，状态机最多走 3 个落点，对应 max_water_s 15。",
+    "cover_threshold": "config.example.json 的 suppression.cover_threshold，0.5。",
+    "dwell_s": "图上每个落点按 1 s 计，用来比较路径长度。",
+}
 
 
-def _union_probability(
-    points: list[np.ndarray], mean: np.ndarray, covariance: np.ndarray, radius: float, seed: int
-) -> float:
-    draws = np.random.default_rng(seed).multivariate_normal(np.asarray(mean, dtype=float), covariance, size=2000)
-    distance = np.linalg.norm(draws[:, None, :] - np.asarray(points, dtype=float)[None, :, :], axis=2)
-    return float(np.mean(np.any(distance <= radius, axis=1)))
+def _nominal(covariance: np.ndarray, points: list[np.ndarray], radius: float) -> float:
+    if len(points) == 1 and np.allclose(points[0], 0):
+        return cover_probability(covariance, radius)
+    offsets = np.stack(points)
+    return pattern_cover_probability(covariance, offsets, radius)
 
 
-def _strategy(points: list[np.ndarray], truth: np.ndarray, radius: float) -> dict:
-    hits = [float(np.linalg.norm(point - truth)) <= radius for point in points]
-    first = next((index for index, hit in enumerate(hits) if hit), None)
+def _patterns(covariance: np.ndarray, radius: float) -> dict:
+    estimate = np.zeros(3)
+    fixed_h = zigzag(estimate, FIXED_COVARIANCE, radius)
+    ellipse = ellipse_sweep(estimate, covariance, radius)
+    gated = plan_spray(
+        estimate,
+        covariance,
+        radius,
+        max_points=MAX_POINTS,
+        threshold=COVER_THRESHOLD,
+    )
     return {
-        "hit": any(hits),
-        "water_s": len(points) * DWELL_S,
-        "first_hit_s": None if first is None else first * DWELL_S,
-        "points": len(points),
+        "fixed_point": {"points": [estimate], "spray": True},
+        "fixed_horizontal": {"points": fixed_h, "spray": True},
+        "ellipse": {"points": ellipse, "spray": True},
+        "ellipse_gated": gated,
     }
 
 
-def localize_trials(count: int, seed: int) -> list[dict]:
+def sweep(draws: int, seed: int, radius: float = RADIUS_M) -> dict:
+    if draws < 2:
+        raise SystemExit("每个协方差至少抽 2 次")
     rng = np.random.default_rng(seed)
-    cv2.setRNGSeed(int(seed) % (2**31))
-    world = rng.uniform([-1, -1, 0], [1, 1, 2], (24, 3))
-    trials = []
-    for event in range(count):
-        angles = np.arange(4) * np.pi / 2 + rng.uniform(-0.4, 0.4, 4)
-        radius = rng.uniform(3.2, 5.5, 4)
-        centers = np.column_stack(
-            [
-                radius * np.cos(angles),
-                radius * np.sin(angles),
-                rng.uniform(1.2, 3.0, 4),
-            ]
-        )
-        poses = []
-        for center in centers:
-            forward = np.array([0.0, 0.0, 1.0]) - center
-            forward /= np.linalg.norm(forward)
-            right = np.cross(forward, [0.0, 0.0, 1.0])
-            right /= np.linalg.norm(right)
-            rotation = np.stack([right, np.cross(forward, right), forward])
-            rotation = (
-                Rotation.from_euler(
-                    "xyz", [*rng.uniform(-0.12, 0.12, 2), rng.uniform(-0.5, 0.5)]
-                ).as_matrix()
-                @ rotation
-            )
-            poses.append(np.r_[cv2.Rodrigues(rotation)[0].ravel(), -rotation @ center])
-        poses = np.array(poses)
-        focal = rng.uniform(700, 900, 4)
-        intrinsics = np.array([[[f, 0, 640], [0, f, 360], [0, 0, 1.0]] for f in focal])
-        distortion = np.zeros((4, 5))
-        observations, landmarks = [], []
-        for camera_k, pose in zip(intrinsics, poses, strict=True):
-            uv = cv2.projectPoints(world, pose[:3], pose[3:], camera_k, None)[0].reshape(-1, 2)
-            keep = ((uv > [0, 0]) & (uv < [1280, 720])).all(axis=1)
-            if int(keep.sum()) < 8:
-                raise RuntimeError("控制点可见数量不足")
-            landmarks.append(world[keep])
-            observations.append(uv[keep] + rng.normal(0, 1.0, (int(keep.sum()), 2)))
-        estimated, covariance = calibrate(landmarks, observations, intrinsics, distortion, 1.0)
-        source = rng.uniform([-0.4, -0.4, 0.3], [0.4, 0.4, 1.5])
-        truth_pixels = project(source, intrinsics, distortion, poses)[0]
-        visible = ((truth_pixels > [0, 0]) & (truth_pixels < [1280, 720])).all(axis=1)
-        if not visible.all():
-            raise RuntimeError("火点不在四路画面内")
-        pixels = truth_pixels + rng.normal(0, 1.5, (4, 2))
-        result = locate(
-            pixels,
-            intrinsics,
-            distortion,
-            estimated,
-            covariance,
-            np.tile(4 * np.eye(2), (4, 1, 1)),
-            np.full(4, 1280 * 720),
-            np.full(4, 0.95),
-        )
-        if result["status"] != "ESTIMATED":
-            raise RuntimeError("合成定位不可观测")
-        trials.append(
-            {
-                "truth": source,
-                "xyz": np.array(result["xyz"], dtype=float),
-                "covariance": np.array(result["covariance"], dtype=float),
-            }
-        )
-    return trials
-
-
-def _patterns(estimate: np.ndarray, covariance: np.ndarray, radius: float) -> dict[str, list[np.ndarray]]:
-    return {
-        "fixed_point": [estimate],
-        "fixed_sweep": zigzag(estimate, FIXED_COVARIANCE, radius),
-        "adaptive_sweep": zigzag(estimate, covariance, radius),
-    }
-
-
-def score_trials(trials: list[dict], radius: float) -> dict:
-    names = ("fixed_point", "fixed_sweep", "adaptive_sweep")
-    bucket = {
-        name: {"hit": [], "water_s": [], "first_hit_s": []} for name in names
-    }
-    for index, trial in enumerate(trials):
-        patterns = _patterns(trial["xyz"], trial["covariance"], radius)
-        for name, points in patterns.items():
-            outcome = _strategy(points, trial["truth"], radius)
-            bucket[name]["hit"].append(outcome["hit"])
-            bucket[name]["water_s"].append(outcome["water_s"])
-            if outcome["first_hit_s"] is not None:
-                bucket[name]["first_hit_s"].append(outcome["first_hit_s"])
-    summary = {}
-    for name, item in bucket.items():
-        hits = item["first_hit_s"]
-        summary[name] = {
-            "hit_rate": float(np.mean(item["hit"])),
-            "water_s_mean": float(np.mean(item["water_s"])),
-            "first_hit_s_mean": None if not hits else float(np.mean(hits)),
-            "hits": int(np.sum(item["hit"])),
-            "n": len(item["hit"]),
-        }
-    return summary
-
-
-def calibration_pairs(trials: list[dict], seed: int) -> list[dict]:
     rows = []
-    for index, trial in enumerate(trials):
-        covariance = trial["covariance"]
-        for radius in RADII_M:
-            patterns = _patterns(trial["xyz"], trial["covariance"], radius)
-            nominal = {
-                "fixed_point": cover_probability(covariance, radius, samples=2000, seed=seed + index),
-                "fixed_sweep": _union_probability(
-                    patterns["fixed_sweep"], trial["xyz"], covariance, radius, seed + 1000 + index
-                ),
-                "adaptive_sweep": _union_probability(
-                    patterns["adaptive_sweep"], trial["xyz"], covariance, radius, seed + 2000 + index
-                ),
+    pairs: dict[str, list[dict]] = {name: [] for name in METHODS}
+    for sigma in SIGMAS_M:
+        covariance = float(sigma) ** 2 * np.eye(3)
+        patterns = _patterns(covariance, radius)
+        hits = {name: [] for name in METHODS}
+        water = {name: [] for name in METHODS}
+        refused = {name: [] for name in METHODS}
+        nominal = {}
+        for name, plan in patterns.items():
+            points = plan["points"]
+            nominal[name] = 0.0 if not plan["spray"] else _nominal(covariance, points, radius)
+        for _index in range(draws):
+            truth = rng.multivariate_normal(np.zeros(3), covariance)
+            for name, plan in patterns.items():
+                if not plan["spray"]:
+                    hits[name].append(False)
+                    water[name].append(0.0)
+                    refused[name].append(True)
+                    continue
+                points = plan["points"]
+                hit = any(float(np.linalg.norm(point - truth)) <= radius for point in points)
+                hits[name].append(hit)
+                water[name].append(len(points) * DWELL_S)
+                refused[name].append(False)
+                pairs[name].append({"nominal": nominal[name], "hit": hit})
+        entry = {"sigma_m": float(sigma)}
+        for name in METHODS:
+            hit_rate = float(np.mean(hits[name]))
+            entry[name] = {
+                "hit_rate": hit_rate,
+                "hit_rate_std": float(np.sqrt(hit_rate * (1.0 - hit_rate) / draws)),
+                "water_s": float(np.mean(water[name])),
+                "refusal_rate": float(np.mean(refused[name])),
+                "nominal": nominal[name],
+                "n": draws,
             }
-            for name, points in patterns.items():
-                hit = _strategy(points, trial["truth"], radius)["hit"]
-                rows.append(
-                    {
-                        "method": name,
-                        "radius_m": radius,
-                        "nominal": nominal[name],
-                        "hit": bool(hit),
-                    }
-                )
-    return rows
+        rows.append(entry)
+    return {
+        "data": "合成数据",
+        "seed": seed,
+        "draws": draws,
+        "radius_m": radius,
+        "dwell_s": DWELL_S,
+        "cover_threshold": COVER_THRESHOLD,
+        "max_points": MAX_POINTS,
+        "basis": BASIS,
+        "sweep": rows,
+        "calibration": _bins(pairs),
+        "note": "火点相对估计点按给定协方差抽取。拒喷时用水为 0，不计命中。",
+    }
 
 
-def _bins(rows: list[dict]) -> dict[str, list[dict]]:
+def _bins(pairs: dict[str, list[dict]]) -> dict[str, list[dict]]:
     edges = (0.0, 0.2, 0.4, 0.6, 0.8, 1.01)
-    grouped: dict[str, dict[str, list[dict]]] = {}
-    for row in rows:
-        for low, high in zip(edges, edges[1:]):
-            if low <= row["nominal"] < high:
-                key = f"{low:.1f}-{min(high, 1):.1f}"
-                grouped.setdefault(row["method"], {}).setdefault(key, []).append(row)
-                break
-    if not grouped:
-        raise SystemExit("校准曲线没有样本")
     result = {}
-    for method, bins in grouped.items():
-        result[method] = [
+    for name, rows in pairs.items():
+        grouped: dict[str, list[dict]] = {}
+        for row in rows:
+            for low, high in zip(edges, edges[1:]):
+                if low <= row["nominal"] < high:
+                    key = f"{low:.1f}-{min(high, 1):.1f}"
+                    grouped.setdefault(key, []).append(row)
+                    break
+        result[name] = [
             {
                 "bin": key,
                 "n": len(chosen),
                 "nominal_mean": float(np.mean([item["nominal"] for item in chosen])),
                 "hit_rate": float(np.mean([item["hit"] for item in chosen])),
             }
-            for key, chosen in sorted(bins.items())
+            for key, chosen in sorted(grouped.items())
         ]
     return result
-
-
-def run(count: int, seed: int) -> dict:
-    trials = localize_trials(count, seed)
-    return {
-        "data": "合成数据",
-        "seed": seed,
-        "trials": count,
-        "dwell_s": DWELL_S,
-        "operating_radius_m": OPERATING_RADIUS_M,
-        "strategies": score_trials(trials, OPERATING_RADIUS_M),
-        "calibration": _bins(calibration_pairs(trials, seed)),
-        "note": "火点位置和协方差来自可变布局合成定位，不是现场喷射。",
-    }
 
 
 def _plot(payload: dict, directory: Path) -> None:
@@ -214,28 +140,53 @@ def _plot(payload: dict, directory: Path) -> None:
 
     labels = {
         "fixed_point": "固定点",
-        "fixed_sweep": "固定扫射",
-        "adaptive_sweep": "自适应扫射",
+        "fixed_horizontal": "固定水平扫射",
+        "ellipse": "协方差二维扫射",
+        "ellipse_gated": "二维扫射+拒喷",
     }
-    names = list(labels)
-    strategies = payload["strategies"]
-    index = np.arange(len(names))
-    fig, axes = plt.subplots(1, 2, figsize=(7.4, 3.6))
-    axes[0].bar(index, [strategies[name]["hit_rate"] for name in names], color="#0072B2")
-    axes[0].set_xticks(index, [labels[name] for name in names])
-    axes[0].set_ylim(0, 1)
-    axes[0].set_ylabel("命中率")
-    axes[1].bar(index, [strategies[name]["water_s_mean"] for name in names], color="#009E73")
-    axes[1].set_xticks(index, [labels[name] for name in names])
-    axes[1].set_ylabel("用水时长 (s)")
-    fig.suptitle("三种喷射（合成数据）")
+    colors = {
+        "fixed_point": "#0072B2",
+        "fixed_horizontal": "#E69F00",
+        "ellipse": "#009E73",
+        "ellipse_gated": "#CC79A7",
+    }
+    rows = payload["sweep"]
+    sigmas = [row["sigma_m"] for row in rows]
+    fig, axes = plt.subplots(1, 3, figsize=(10.2, 3.5))
+    metrics = (
+        ("hit_rate", "hit_rate_std", "命中率", (0, 1)),
+        ("water_s", None, "用水时长 (s)", None),
+        ("refusal_rate", None, "拒喷比例", (0, 1)),
+    )
+    for axis, (key, err, ylabel, ylim) in zip(axes, metrics, strict=True):
+        for name in METHODS:
+            y = [row[name][key] for row in rows]
+            if err is None:
+                axis.plot(sigmas, y, marker="o", color=colors[name], label=labels[name])
+            else:
+                axis.errorbar(
+                    sigmas,
+                    y,
+                    yerr=[row[name][err] for row in rows],
+                    marker="o",
+                    capsize=3,
+                    color=colors[name],
+                    label=labels[name],
+                )
+        axis.set_xlabel("定位标准差 (m)")
+        axis.set_ylabel(ylabel)
+        if ylim is not None:
+            axis.set_ylim(*ylim)
+    axes[0].legend(frameon=False, fontsize=7)
+    fig.suptitle("喷射随定位协方差变化（合成数据）")
     fig.tight_layout()
-    save_figure(fig, directory, "hit-rate")
+    save_figure(fig, directory, "sigma-sweep")
 
     fig, ax = plt.subplots(figsize=(6.2, 3.8))
-    colors = {"fixed_point": "#0072B2", "fixed_sweep": "#E69F00", "adaptive_sweep": "#009E73"}
     ax.plot([0, 1], [0, 1], color="#999999", linewidth=1)
     for name, curve in payload["calibration"].items():
+        if not curve:
+            continue
         ax.plot(
             [row["nominal_mean"] for row in curve],
             [row["hit_rate"] for row in curve],
@@ -248,20 +199,18 @@ def _plot(payload: dict, directory: Path) -> None:
     ax.set_xlabel("名义覆盖概率")
     ax.set_ylabel("实测命中率")
     ax.set_title("覆盖概率校准（合成数据）")
-    ax.legend(frameon=False)
+    ax.legend(frameon=False, fontsize=8)
     fig.tight_layout()
     save_figure(fig, directory, "calibration")
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="可信喷射的合成覆盖实验")
-    parser.add_argument("--trials", type=int, default=16)
+    parser = argparse.ArgumentParser(description="可信喷射随定位协方差变化")
+    parser.add_argument("--draws", type=int, default=DRAWS)
     parser.add_argument("--seed", type=int, default=20261115)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
-    if args.trials < 1:
-        raise SystemExit("试验次数至少为 1")
-    payload = run(args.trials, args.seed)
+    payload = sweep(args.draws, args.seed)
     args.out.mkdir(parents=True, exist_ok=True)
     write_json(args.out / "result.json", payload)
     _plot(payload, args.out)

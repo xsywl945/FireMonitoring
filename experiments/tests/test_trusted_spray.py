@@ -1,24 +1,30 @@
 import json
 from pathlib import Path
 
-from experiments.trusted_spray import main, run
+from experiments.trusted_spray import main, sweep
 
 
-def test_three_strategies_report_water_and_hits():
-    payload = run(2, 11)
+def test_large_sigma_refuses_instead_of_spraying():
+    payload = sweep(40, 11)
     assert payload["data"] == "合成数据"
-    names = set(payload["strategies"])
-    assert names == {"fixed_point", "fixed_sweep", "adaptive_sweep"}
-    fixed = payload["strategies"]["fixed_point"]["water_s_mean"]
-    sweep = payload["strategies"]["fixed_sweep"]["water_s_mean"]
-    assert sweep > fixed
-    assert payload["calibration"]["fixed_point"]
+    rows = payload["sweep"]
+
+    def at(sigma: float) -> dict:
+        return min(rows, key=lambda row: abs(row["sigma_m"] - sigma))
+
+    small = at(0.05)
+    large = at(0.8)
+    assert small["fixed_point"]["hit_rate"] > large["fixed_point"]["hit_rate"]
+    assert large["ellipse_gated"]["refusal_rate"] > small["ellipse_gated"]["refusal_rate"]
+    assert large["ellipse_gated"]["water_s"] < large["ellipse"]["water_s"]
+    assert large["fixed_point"]["refusal_rate"] == 0
+    assert payload["cover_threshold"] == 0.5
 
 
-def test_script_writes_figures(tmp_path: Path):
+def test_script_writes_the_sweep(tmp_path: Path):
     out = tmp_path / "out"
-    main(["--trials", "2", "--seed", "11", "--out", str(out)])
+    main(["--draws", "20", "--seed", "11", "--out", str(out)])
     payload = json.loads((out / "result.json").read_text(encoding="utf-8"))
-    assert payload["trials"] == 2
-    assert (out / "hit-rate.png").is_file()
+    assert payload["draws"] == 20
+    assert (out / "sigma-sweep.png").is_file()
     assert (out / "calibration.svg").is_file()

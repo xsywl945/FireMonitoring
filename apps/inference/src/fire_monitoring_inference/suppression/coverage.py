@@ -21,3 +21,16 @@ def cover_probability(covariance, radius: float, *, samples: int = 8000, seed: i
         return float(chi2.cdf((radius * radius) / variance, df=3))
     draws = np.random.default_rng(seed).multivariate_normal(np.zeros(3), cov, size=samples)
     return float(np.mean(np.sum(draws * draws, axis=1) <= radius * radius))
+
+
+def pattern_cover_probability(covariance, offsets, radius: float, *, samples: int = 2000, seed: int = 0) -> float:
+    if radius < 0:
+        raise ValueError("coverage radius must be non-negative")
+    points = np.asarray(offsets, dtype=float)
+    if points.size == 0:
+        return 0.0
+    points = points.reshape(-1, 3)
+    cov = np.asarray(covariance, dtype=float)
+    draws = np.random.default_rng(seed).multivariate_normal(np.zeros(3), cov, size=samples)
+    distance = np.linalg.norm(draws[:, None, :] - points[None, :, :], axis=2)
+    return float(np.mean(np.any(distance <= radius, axis=1)))

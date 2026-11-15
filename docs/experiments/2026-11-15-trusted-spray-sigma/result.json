@@ -1,0 +1,307 @@
+{
+  "data": "合成数据",
+  "seed": 20261115,
+  "draws": 80,
+  "radius_m": 0.2,
+  "dwell_s": 1.0,
+  "cover_threshold": 0.5,
+  "max_points": 3,
+  "basis": {
+    "radius_m": "沿用原先的 0.2 m。配置里的 cover_radius_m 是 1 m，用 1 m 时大协方差也会被一次喷水盖住。",
+    "sigmas_m": "定位标准差从小于半径到数倍半径。不是从结果里挑的。",
+    "fixed_sweep_sigma_m": "固定水平扫射的水平标准差 0.3 m，不随本次协方差改变。",
+    "ellipse_k": "2σ 椭圆。二维高斯落在 2σ 椭圆里的概率约 0.86，没有按曲线改。",
+    "max_points": "单次喷射 5 s，最多修正 2 次，状态机最多走 3 个落点，对应 max_water_s 15。",
+    "cover_threshold": "config.example.json 的 suppression.cover_threshold，0.5。",
+    "dwell_s": "图上每个落点按 1 s 计，用来比较路径长度。"
+  },
+  "sweep": [
+    {
+      "sigma_m": 0.05,
+      "fixed_point": {
+        "hit_rate": 1.0,
+        "hit_rate_std": 0.0,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.9988660157102147,
+        "n": 80
+      },
+      "fixed_horizontal": {
+        "hit_rate": 1.0,
+        "hit_rate_std": 0.0,
+        "water_s": 7.0,
+        "refusal_rate": 0.0,
+        "nominal": 1.0,
+        "n": 80
+      },
+      "ellipse": {
+        "hit_rate": 1.0,
+        "hit_rate_std": 0.0,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.9988660157102147,
+        "n": 80
+      },
+      "ellipse_gated": {
+        "hit_rate": 1.0,
+        "hit_rate_std": 0.0,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.9988660157102147,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.1,
+      "fixed_point": {
+        "hit_rate": 0.7375,
+        "hit_rate_std": 0.049192701440355965,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.7385358700508888,
+        "n": 80
+      },
+      "fixed_horizontal": {
+        "hit_rate": 0.8125,
+        "hit_rate_std": 0.04363825013677794,
+        "water_s": 7.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.8375,
+        "n": 80
+      },
+      "ellipse": {
+        "hit_rate": 0.2375,
+        "hit_rate_std": 0.047578060857920636,
+        "water_s": 4.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.4165,
+        "n": 80
+      },
+      "ellipse_gated": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 0.0,
+        "refusal_rate": 1.0,
+        "nominal": 0.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.2,
+      "fixed_point": {
+        "hit_rate": 0.2125,
+        "hit_rate_std": 0.045736165941189254,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.19874804309879915,
+        "n": 80
+      },
+      "fixed_horizontal": {
+        "hit_rate": 0.3125,
+        "hit_rate_std": 0.05182226234930312,
+        "water_s": 7.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.4005,
+        "n": 80
+      },
+      "ellipse": {
+        "hit_rate": 0.575,
+        "hit_rate_std": 0.05526922742358536,
+        "water_s": 16.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.5855,
+        "n": 80
+      },
+      "ellipse_gated": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 0.0,
+        "refusal_rate": 1.0,
+        "nominal": 0.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.35,
+      "fixed_point": {
+        "hit_rate": 0.025,
+        "hit_rate_std": 0.017455300054711177,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.045036050080604566,
+        "n": 80
+      },
+      "fixed_horizontal": {
+        "hit_rate": 0.15,
+        "hit_rate_std": 0.03992179855667828,
+        "water_s": 7.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.1495,
+        "n": 80
+      },
+      "ellipse": {
+        "hit_rate": 0.3375,
+        "hit_rate_std": 0.052867020674518816,
+        "water_s": 49.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.365,
+        "n": 80
+      },
+      "ellipse_gated": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 0.0,
+        "refusal_rate": 1.0,
+        "nominal": 0.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.55,
+      "fixed_point": {
+        "hit_rate": 0.025,
+        "hit_rate_std": 0.017455300054711177,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.012292995686995545,
+        "n": 80
+      },
+      "fixed_horizontal": {
+        "hit_rate": 0.0875,
+        "hit_rate_std": 0.03159187989025028,
+        "water_s": 7.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.0605,
+        "n": 80
+      },
+      "ellipse": {
+        "hit_rate": 0.25,
+        "hit_rate_std": 0.04841229182759271,
+        "water_s": 121.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.241,
+        "n": 80
+      },
+      "ellipse_gated": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 0.0,
+        "refusal_rate": 1.0,
+        "nominal": 0.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.8,
+      "fixed_point": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 1.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.0040785929644228435,
+        "n": 80
+      },
+      "fixed_horizontal": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 7.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.0215,
+        "n": 80
+      },
+      "ellipse": {
+        "hit_rate": 0.1875,
+        "hit_rate_std": 0.04363825013677794,
+        "water_s": 256.0,
+        "refusal_rate": 0.0,
+        "nominal": 0.1605,
+        "n": 80
+      },
+      "ellipse_gated": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 0.0,
+        "refusal_rate": 1.0,
+        "nominal": 0.0,
+        "n": 80
+      }
+    }
+  ],
+  "calibration": {
+    "fixed_point": [
+      {
+        "bin": "0.0-0.2",
+        "n": 320,
+        "nominal_mean": 0.06503892045770551,
+        "hit_rate": 0.065625
+      },
+      {
+        "bin": "0.6-0.8",
+        "n": 80,
+        "nominal_mean": 0.7385358700508888,
+        "hit_rate": 0.7375
+      },
+      {
+        "bin": "0.8-1.0",
+        "n": 80,
+        "nominal_mean": 0.9988660157102147,
+        "hit_rate": 1.0
+      }
+    ],
+    "fixed_horizontal": [
+      {
+        "bin": "0.0-0.2",
+        "n": 240,
+        "nominal_mean": 0.07716666666666666,
+        "hit_rate": 0.07916666666666666
+      },
+      {
+        "bin": "0.4-0.6",
+        "n": 80,
+        "nominal_mean": 0.40049999999999997,
+        "hit_rate": 0.3125
+      },
+      {
+        "bin": "0.8-1.0",
+        "n": 160,
+        "nominal_mean": 0.91875,
+        "hit_rate": 0.90625
+      }
+    ],
+    "ellipse": [
+      {
+        "bin": "0.0-0.2",
+        "n": 80,
+        "nominal_mean": 0.16050000000000003,
+        "hit_rate": 0.1875
+      },
+      {
+        "bin": "0.2-0.4",
+        "n": 160,
+        "nominal_mean": 0.30300000000000005,
+        "hit_rate": 0.29375
+      },
+      {
+        "bin": "0.4-0.6",
+        "n": 160,
+        "nominal_mean": 0.501,
+        "hit_rate": 0.40625
+      },
+      {
+        "bin": "0.8-1.0",
+        "n": 80,
+        "nominal_mean": 0.9988660157102147,
+        "hit_rate": 1.0
+      }
+    ],
+    "ellipse_gated": [
+      {
+        "bin": "0.8-1.0",
+        "n": 80,
+        "nominal_mean": 0.9988660157102147,
+        "hit_rate": 1.0
+      }
+    ]
+  },
+  "note": "火点相对估计点按给定协方差抽取。拒喷时用水为 0，不计命中。"
+}
