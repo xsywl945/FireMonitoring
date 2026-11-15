@@ -31,27 +31,50 @@ python -m experiments.localization_error --synthetic --out docs/experiments/2026
 
 ## 云台自标定和弹道补偿
 
-比较三种命中误差：只用人工测量的云台位姿并按视线瞄准、激光自标定后仍按视线瞄准、自标定后再做弹道补偿。收敛曲线是角度组数和误差的关系。运动学、`fit_gimbal` 和弹道积分都用 `apps/inference` 里已有的实现。
+三组都用 `solve_aim` 反解，不再按视线把喷嘴对准目标：
 
-合成数据：
+- 人工卷尺位姿，加上测量噪声，再用配置里的名义速度和阻力。
+- 激光自标定得到的位姿，仍用名义速度和阻力。
+- 激光自标定的位姿，加上试喷落距拟合出的速度和阻力。
+
+上一版里自标定的命中误差比人工位姿更大（0.74 m 对 0.64 m）。那两组都按视线瞄准，没有弹道。自标定把射线对准目标之后，重力造成的落差全部变成脱靶；人工位姿的仰角偏差有时反而补上一点。不是自标定把位姿标坏了。
+
+生成和反解不是同一个无噪声模型。生成用 `integrate` 的二次阻力，阻力系数是名义值的 2 倍，每次出水还有速度抖动，落点再加射流破碎。反解只用系统的 `solve_aim` 和 `fit_drag`。激光点坐标带三角化噪声，执行角度带步距取整和回差。8 个随机种子。图上的误差棒是种子间标准差。JSON 里有均值、P90 和最大值。
+
+参数和取值依据：
+
+| 参数 | 取值 | 依据 |
+|---|---|---|
+| 人工位置噪声 | 标准差 0.015 m | 约 95% 在 ±3 cm，按卷尺量安装点 |
+| 人工角度噪声 | 标准差 1° | 约 95% 在 ±2°，加在三个安装角上 |
+| 三角化噪声 | 标准差 0.016 m | `landmark_sigma_px` 为 2，演示相机焦距 430 px，约 3.5 m 处 2/430×3.5 |
+| 舵机步距 | 0.01° | `NOMINAL_SCALE` |
+| 回差 | ±0.2° | 协议里没有回差，按小型云台齿轮间隙取的固定值 |
+| 名义弹道 | 10 m/s，阻力 0.05 | `config.example.json` 的 `suppression.speed` 和 `drag` |
+| 生成阻力 | 0.10 | 名义阻力的 2 倍。0.05 不是辨识结果 |
+| 出口速度抖动 | 相对标准差 2.5% | 仓库没有压力记录。压力脉动约 5% 时，速度按平方根变化 |
+| 射流破碎 | 横侧、竖直各 0.02 m | 二次阻力模型没有这项。仓库没有射流宽度，没有按图改这个数 |
+| 试喷俯仰 | 12°、20°、28°、36° | 让落距回到枪口高度，供 `fit_drag` 使用 |
+
+这些数先写死再跑。8 个种子的均值：人工加名义弹道 0.123 m（标准差 0.064 m），自标定加名义弹道 0.110 m（标准差 0.028 m），自标定加试喷弹道 0.046 m（标准差 0.020 m）。自标定没有比人工位姿更差；名义阻力本身是错的，所以前两组的均值接近，自标定主要收紧了种子之间的离散。试喷拟合把阻力从 0.05 拉向生成用的 0.10，误差降到大约 5 cm，不再是无噪声时的 3 mm。收敛曲线从 12 组到 36 组都在 0.05 m 附近，因为 12 组已经把位姿收住，剩下的是速度抖动、破碎和拟合残差。
 
 ```bash
-python -m experiments.gimbal_ballistics --synthetic --out docs/experiments/2026-11-15-gimbal-ballistics
+python -m experiments.gimbal_ballistics --synthetic --out docs/experiments/2026-11-15-gimbal-ballistics-noise
 ```
 
-实测需要三份输入。落点表：
+实测落点表：
 
 ```text
 method,x_m,y_m,z_m,landing_x_m,landing_y_m,landing_z_m
 ```
 
-`method` 只能是 `manual`、`self_cal`、`ballistic`。激光表：
+`method` 为 `manual`、`self_cal`、`fitted`。激光表：
 
 ```text
 pan_cdeg,tilt_cdeg,x_m,y_m,z_m
 ```
 
-至少 12 行。`--manual` 是 `GimbalParams.to_dict()` 的 JSON，当作拟合初值。
+至少 12 行。`--manual` 是 `GimbalParams.to_dict()` 的 JSON。实测收敛曲线仍是激光残差，不是弹着点误差。
 
 ```bash
 python -m experiments.gimbal_ballistics \
@@ -59,25 +82,23 @@ python -m experiments.gimbal_ballistics \
   --out docs/experiments/日期-gimbal-ballistics
 ```
 
-合成结果里的收敛曲线是弹道补偿后的命中误差。实测曲线是激光残差，JSON 里写了这一点，两套数不能当成同一个量。
-
 输出 `result.json`、`hit-error.png`、`convergence.png` 以及对应的 SVG。
 
-现场：先按安装记录填写人工位姿。用激光在不同云台角度打到已知坐标，每组记 pan、tilt 和落点。试射时分别记录三种方式的弹着点。出水试射同样要批准、灭火器和监护。
+现场：卷尺量云台安装点和三个安装角。激光在不同命令角度打到可三角化的点，记下命令角度和点坐标。试喷用几个俯仰角，量落距。出水试射要批准、灭火器和监护。
 
 ## 可信喷射
 
-在可变布局的合成定位上加喷射覆盖。三种方式：对准估计点喷一次、按固定协方差扫射、按该次定位协方差用已有的 `zigzag` 扫射。半径内算命中。同时给出名义覆盖概率和实际命中率的分箱曲线。名义概率用现有的 `cover_probability`，扫射用协方差抽样估计并集。
+比较固定点、固定扫射和按协方差自适应扫射。喷水半径 0.2 m。原先在这个半径下三种方式都打中，是因为合成定位的协方差远小于半径。这次把定位标准差从 0.05 m 扫到 0.80 m，火点相对估计点按这个协方差抽取。固定扫射的水平标准差保持 0.3 m，不随本次协方差改变。每个扫射点算 1 s。
 
-状态机里已经有「覆盖概率低于 `cover_threshold` 时不直接喷，先按协方差扫」的判据，配置项是 `suppression.cover_threshold`。这次没有再写一套。
+0.05 m 时三种方式都打中，用水时长是 1 s、7 s、3 s。标准差到 0.35 m 时，固定点命中率约 0.03，两种扫射约 0.15。到 0.80 m 时三种命中率都是 0：`zigzag` 只在估计高度的水平面展开，竖直误差超过半径之后扫不到。自适应扫射的用水时长仍随标准差增加到 17 s。
 
 ```bash
-python -m experiments.trusted_spray --trials 16 --out docs/experiments/2026-11-15-trusted-spray
+python -m experiments.trusted_spray --draws 80 --out docs/experiments/2026-11-15-trusted-spray-sigma
 ```
 
-这是合成数据，不是现场喷水。输出 `result.json`、`hit-rate.png`、`calibration.png` 和 SVG。
+这是合成数据。输出 `result.json`、`sigma-sweep.png` 和 SVG。命中率的误差棒是二项标准误。
 
-现场如果要核对照，只能在批准后的受控小火上做，记录估计坐标、协方差、实际着火点和是否打中。用水时长和首次命中时间按水泵日志算，再写成脚本能读的表之前，不要把合成图当成现场结果。
+现场如果要核对照，只能在批准后的受控小火上做，记录估计坐标、协方差、实际着火点和是否打中。用水时长按水泵日志算。
 
 ## 延迟分解
 

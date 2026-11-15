@@ -1,0 +1,142 @@
+{
+  "data": "合成数据",
+  "seed": 20261115,
+  "draws": 80,
+  "radius_m": 0.2,
+  "dwell_s": 1.0,
+  "basis": {
+    "radius_m": "沿用原先的 0.2 m。配置里的 cover_radius_m 是 1 m，用 1 m 时大协方差也会被一次喷水盖住。",
+    "sigmas_m": "定位标准差从小于半径到数倍半径。不是从结果里挑的。",
+    "fixed_sweep_sigma_m": "固定扫射的水平标准差 0.3 m，不随本次协方差改变。",
+    "dwell_s": "每个扫射点喷 1 s。"
+  },
+  "sweep": [
+    {
+      "sigma_m": 0.05,
+      "fixed_point": {
+        "hit_rate": 1.0,
+        "hit_rate_std": 0.0,
+        "water_s": 1.0,
+        "n": 80
+      },
+      "fixed_sweep": {
+        "hit_rate": 1.0,
+        "hit_rate_std": 0.0,
+        "water_s": 7.0,
+        "n": 80
+      },
+      "adaptive_sweep": {
+        "hit_rate": 1.0,
+        "hit_rate_std": 0.0,
+        "water_s": 3.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.1,
+      "fixed_point": {
+        "hit_rate": 0.7375,
+        "hit_rate_std": 0.049192701440355965,
+        "water_s": 1.0,
+        "n": 80
+      },
+      "fixed_sweep": {
+        "hit_rate": 0.8125,
+        "hit_rate_std": 0.04363825013677794,
+        "water_s": 7.0,
+        "n": 80
+      },
+      "adaptive_sweep": {
+        "hit_rate": 0.8125,
+        "hit_rate_std": 0.04363825013677794,
+        "water_s": 3.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.2,
+      "fixed_point": {
+        "hit_rate": 0.2125,
+        "hit_rate_std": 0.045736165941189254,
+        "water_s": 1.0,
+        "n": 80
+      },
+      "fixed_sweep": {
+        "hit_rate": 0.3125,
+        "hit_rate_std": 0.05182226234930312,
+        "water_s": 7.0,
+        "n": 80
+      },
+      "adaptive_sweep": {
+        "hit_rate": 0.3,
+        "hit_rate_std": 0.05123475382979799,
+        "water_s": 5.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.35,
+      "fixed_point": {
+        "hit_rate": 0.025,
+        "hit_rate_std": 0.017455300054711177,
+        "water_s": 1.0,
+        "n": 80
+      },
+      "fixed_sweep": {
+        "hit_rate": 0.15,
+        "hit_rate_std": 0.03992179855667828,
+        "water_s": 7.0,
+        "n": 80
+      },
+      "adaptive_sweep": {
+        "hit_rate": 0.1625,
+        "hit_rate_std": 0.04124526487974105,
+        "water_s": 9.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.55,
+      "fixed_point": {
+        "hit_rate": 0.025,
+        "hit_rate_std": 0.017455300054711177,
+        "water_s": 1.0,
+        "n": 80
+      },
+      "fixed_sweep": {
+        "hit_rate": 0.0875,
+        "hit_rate_std": 0.03159187989025028,
+        "water_s": 7.0,
+        "n": 80
+      },
+      "adaptive_sweep": {
+        "hit_rate": 0.1,
+        "hit_rate_std": 0.03354101966249685,
+        "water_s": 13.0,
+        "n": 80
+      }
+    },
+    {
+      "sigma_m": 0.8,
+      "fixed_point": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 1.0,
+        "n": 80
+      },
+      "fixed_sweep": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 7.0,
+        "n": 80
+      },
+      "adaptive_sweep": {
+        "hit_rate": 0.0,
+        "hit_rate_std": 0.0,
+        "water_s": 17.0,
+        "n": 80
+      }
+    }
+  ],
+  "note": "火点相对估计点按给定协方差抽取，不是现场喷射。"
+}
