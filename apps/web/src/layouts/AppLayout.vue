@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { ElNotification } from "element-plus"
 import { clearSession, currentName, currentRole, currentToken } from "../api/client"
+import DemoBadge from "../components/DemoBadge.vue"
+import { loadDemoMode, type DemoMode } from "../demo"
 import { alertLabels, roleLabels } from "../labels"
 
 const route = useRoute()
@@ -52,7 +54,14 @@ function connect() {
   }
 }
 
-onMounted(connect)
+onMounted(async () => {
+  connect()
+  try {
+    demo.value = await loadDemoMode()
+  } catch {
+    demo.value = null
+  }
+})
 onBeforeUnmount(() => {
   closed = true
   socket?.close()
@@ -60,18 +69,29 @@ onBeforeUnmount(() => {
 
 const role = currentRole()
 const name = currentName()
+const demo = ref<DemoMode | null>(null)
 
-const items = [
-  { path: "/rooms", label: "教室管理" },
-  { path: "/cameras", label: "摄像头管理" },
-  { path: "/monitor", label: "实时监控" },
-  { path: "/alerts", label: "告警研判" },
-  { path: "/suppression", label: "灭火控制" },
-  { path: "/users", label: "用户管理", admin: true },
-  { path: "/config", label: "系统配置", admin: true },
-]
+const items = computed(() => {
+  const monitor = demo.value?.enabled ? "画面回放" : "实时监控"
+  return [
+    { path: "/rooms", label: "教室管理" },
+    { path: "/cameras", label: "摄像头管理" },
+    { path: "/monitor", label: monitor },
+    ...(demo.value?.enabled
+      ? [
+          { path: "/dashboard", label: "数据大屏" },
+          { path: "/twin", label: "数字孪生" },
+        ]
+      : []),
+    { path: "/alerts", label: "告警研判" },
+    { path: "/suppression", label: "灭火控制" },
+    { path: "/users", label: "用户管理", admin: true },
+    { path: "/config", label: "系统配置", admin: true },
+  ]
+})
 
-const menu = computed(() => items.filter((item) => !item.admin || role === "admin"))
+const menu = computed(() => items.value.filter((item) => !item.admin || role === "admin"))
+const showcase = computed(() => route.meta.showcase === true)
 const active = computed(() => {
   if (route.path.startsWith("/rooms")) return "/rooms"
   if (route.path.startsWith("/alerts")) return "/alerts"
@@ -79,7 +99,7 @@ const active = computed(() => {
 })
 const crumbs = computed(() => {
   const parent = route.meta.parent as string | undefined
-  const title = (route.meta.title as string) || ""
+  const title = demo.value?.enabled && route.path === "/monitor" ? "画面回放" : (route.meta.title as string) || ""
   return parent ? [parent, title] : [title]
 })
 
@@ -90,7 +110,10 @@ function logout() {
 </script>
 
 <template>
-  <div class="shell">
+  <div v-if="showcase" class="showcase">
+    <router-view />
+  </div>
+  <div v-else class="shell">
     <aside class="sider">
       <div class="brand">火情监控</div>
       <el-menu router :default-active="active">
@@ -105,6 +128,7 @@ function logout() {
           <el-breadcrumb-item v-for="item in crumbs" :key="item">{{ item }}</el-breadcrumb-item>
         </el-breadcrumb>
         <div class="user">
+          <DemoBadge v-if="demo?.enabled" :synthetic="demo.synthetic" />
           <span>{{ name }}（{{ roleLabels[role || ""] || role }}）</span>
           <el-button link type="primary" @click="logout">退出</el-button>
         </div>

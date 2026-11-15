@@ -46,6 +46,7 @@ hs_err_pid*
 *.engine
 *.plan
 /data/*
+!/data/demo/
 !/data/training-archive/
 /data/training-archive/*
 !/data/training-archive/2026-11-03-yolo26s-v3/
@@ -67,6 +68,7 @@ runtime/
 *.mp4
 *.avi
 *.mov
+!/data/demo/**/*.mp4
 
 # Local tools and generated state
 .tools/
