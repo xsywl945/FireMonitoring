@@ -4,7 +4,7 @@ from pathlib import Path
 from experiments.trusted_spray import main, sweep
 
 
-def test_hit_rate_falls_as_covariance_grows():
+def test_large_sigma_refuses_instead_of_spraying():
     payload = sweep(40, 11)
     assert payload["data"] == "合成数据"
     rows = payload["sweep"]
@@ -12,9 +12,13 @@ def test_hit_rate_falls_as_covariance_grows():
     def at(sigma: float) -> dict:
         return min(rows, key=lambda row: abs(row["sigma_m"] - sigma))
 
-    assert at(0.05)["fixed_point"]["hit_rate"] > at(0.8)["fixed_point"]["hit_rate"]
-    assert at(0.35)["adaptive_sweep"]["hit_rate"] > at(0.35)["fixed_point"]["hit_rate"]
-    assert at(0.8)["adaptive_sweep"]["water_s"] > at(0.05)["adaptive_sweep"]["water_s"]
+    small = at(0.05)
+    large = at(0.8)
+    assert small["fixed_point"]["hit_rate"] > large["fixed_point"]["hit_rate"]
+    assert large["ellipse_gated"]["refusal_rate"] > small["ellipse_gated"]["refusal_rate"]
+    assert large["ellipse_gated"]["water_s"] < large["ellipse"]["water_s"]
+    assert large["fixed_point"]["refusal_rate"] == 0
+    assert payload["cover_threshold"] == 0.5
 
 
 def test_script_writes_the_sweep(tmp_path: Path):
@@ -23,4 +27,4 @@ def test_script_writes_the_sweep(tmp_path: Path):
     payload = json.loads((out / "result.json").read_text(encoding="utf-8"))
     assert payload["draws"] == 20
     assert (out / "sigma-sweep.png").is_file()
-    assert (out / "sigma-sweep.svg").is_file()
+    assert (out / "calibration.svg").is_file()

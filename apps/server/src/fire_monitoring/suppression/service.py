@@ -287,6 +287,7 @@ class SuppressionService:
             max_std_m=settings.max_std_m,
             cover_radius_m=settings.cover_radius_m,
             cover_threshold=settings.cover_threshold,
+            max_water_s=settings.max_water_s,
             person_distance_m=settings.person_distance_m,
             manual_spray=manual_spray,
         )

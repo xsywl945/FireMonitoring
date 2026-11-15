@@ -113,6 +113,7 @@
     "max_std_m": 0.5,
     "cover_radius_m": 1,
     "cover_threshold": 0.5,
+    "max_water_s": 15,
     "person_distance_m": 1.5,
     "speed": 10,
     "drag": 0.05,

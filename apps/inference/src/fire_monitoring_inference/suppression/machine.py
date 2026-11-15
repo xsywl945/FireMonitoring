@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .aim import solve_aim
-from .feedback import corrected_aim, zigzag
+from .feedback import corrected_aim, ellipse_sweep, plan_spray
 from .interlock import aim_probability, resolved_rules, spray_block
 from .voice import (
     ESTOP_VOICE,
@@ -65,6 +65,7 @@ class MachineConfig:
     review_s: float = 5.0
     clear_s: float = 3.0
     max_corrections: int = 2
+    max_water_s: float = 15.0
     area_drop: float = 0.2
 
 
@@ -101,6 +102,7 @@ class Shot:
     cover_radius_m: float
     cover_threshold: float
     person_distance_m: float
+    max_water_s: float = 15.0
     manual_aim: tuple[int, int] | None = None
     manual_spray: bool = False
 
@@ -227,11 +229,22 @@ class RoomMachine:
         sweeping = self.sweep is not None
         reason = spray_block(shot, aim, probability, sweeping=sweeping)
         if reason == "COVERAGE" and self.sweep is None and shot.position and shot.position.get("xyz"):
-            self.sweep = zigzag(shot.position["xyz"], shot.position["covariance"], shot.cover_radius_m)
-            self.sweep_i = 0
-            target = self.sweep[0]
-            aim = solve_aim(shot.gimbal, target, shot.speed, shot.drag)
-            reason = spray_block(shot, aim, probability, sweeping=True)
+            budget = max(1, int(shot.max_water_s // self.config.spray_s))
+            plan = plan_spray(
+                shot.position["xyz"],
+                shot.position["covariance"],
+                shot.cover_radius_m,
+                max_points=budget,
+                threshold=shot.cover_threshold,
+            )
+            self.cover_probability = plan["nominal"]
+            probability = plan["nominal"]
+            if plan["spray"]:
+                self.sweep = plan["points"]
+                self.sweep_i = 0
+                target = self.sweep[0]
+                aim = solve_aim(shot.gimbal, target, shot.speed, shot.drag)
+                reason = spray_block(shot, aim, probability, sweeping=True)
         if reason == "PERSON":
             self._mark(
                 out,
@@ -323,7 +336,9 @@ class RoomMachine:
         else:
             mean = self.aim_point if self.aim_point is not None else np.array(shot.position["xyz"])
             cov = shot.position["covariance"] if shot.position and shot.position.get("covariance") else np.eye(3)
-            self.sweep = zigzag(mean, cov, shot.cover_radius_m)
+            budget = max(1, int(shot.max_water_s // self.config.spray_s))
+            points = ellipse_sweep(mean, cov, shot.cover_radius_m, max_points=budget)
+            self.sweep = points or [np.asarray(mean, dtype=float)]
             self.sweep_i = min(self.corrections, len(self.sweep) - 1)
             self.aim_point = self.sweep[self.sweep_i]
             detail = {"correction": self.corrections, "mode": "sweep"}

@@ -157,6 +157,7 @@ class SuppressionSettings(_Strict):
     max_std_m: float = 0.5
     cover_radius_m: float = 1
     cover_threshold: float = 0.5
+    max_water_s: float = 15
     person_distance_m: float = 1.5
     speed: float = 10
     drag: float = 0.05

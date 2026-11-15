@@ -17,7 +17,7 @@ from fire_monitoring_inference.suppression.ballistics import (
 from fire_monitoring_inference.suppression.calibrate import LaserSample, fit_gimbal
 from fire_monitoring_inference.suppression.cli import main
 from fire_monitoring_inference.suppression.coverage import cover_probability, max_std
-from fire_monitoring_inference.suppression.feedback import corrected_aim, zigzag
+from fire_monitoring_inference.suppression.feedback import corrected_aim, ellipse_sweep
 from fire_monitoring_inference.suppression.kinematics import (
     NOMINAL_SCALE,
     GimbalParams,
@@ -309,13 +309,54 @@ def test_each_interlock_refuses_to_spray(overrides, reason):
         assert any(effect.voice == "附近有人，请立即撤离" for effect in effects)
 
 
-def test_low_coverage_designs_a_sweep_instead_of_a_direct_shot():
+def test_low_coverage_refuses_when_the_ellipse_exceeds_the_water_budget():
     wide = {"status": "ESTIMATED", "xyz": [1.5, 2.5, 0.2], "covariance": (np.eye(3) * 0.04).tolist()}
-    machine = RoomMachine(MachineConfig(pending_s=0, spray_s=5))
-    machine.step(shot(position=wide, cover_radius_m=0.05, cover_threshold=0.99, max_std_m=1.0))
-    assert machine.sweep is not None
-    assert len(machine.sweep) == len(zigzag(wide["xyz"], wide["covariance"], 0.05))
+    machine = RoomMachine(MachineConfig(pending_s=0, spray_s=5, max_water_s=15))
+    effects = machine.step(shot(position=wide, cover_radius_m=0.05, cover_threshold=0.99, max_std_m=1.0))
+    assert machine.sweep is None
+    assert machine.phase != "喷射"
+    assert any(effect.detail.get("reason") == "COVERAGE" for effect in effects)
+    assert not any(effect.run for effect in effects)
+
+
+def test_ellipse_sweep_follows_the_projected_principal_axes():
+    angle = np.deg2rad(35)
+    rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    plane = rotation @ np.diag([0.075**2, 0.02**2]) @ rotation.T
+    covariance = np.zeros((3, 3))
+    covariance[:2, :2] = plane
+    covariance[2, 2] = 0.02**2
+    points = ellipse_sweep([0.0, 0.0, 0.4], covariance, 0.1, max_points=3)
+    assert len(points) == 3
+    assert np.linalg.norm(points[0][:2]) == pytest.approx(0, abs=1e-9)
+    xy = np.stack(points)[:, :2]
+    assert np.std(xy @ rotation[:, 0]) > np.std(xy @ rotation[:, 1])
+
+
+def test_short_ellipse_sprays_when_one_disk_is_under_the_threshold():
+    angle = np.deg2rad(35)
+    rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    plane = rotation @ np.diag([0.075**2, 0.02**2]) @ rotation.T
+    covariance = np.diag([0.02**2, 0.02**2, 0.02**2])
+    covariance[:2, :2] = plane
+    position = {"status": "ESTIMATED", "xyz": [1.5, 2.5, 0.4], "covariance": covariance.tolist()}
+    machine = RoomMachine(MachineConfig(pending_s=0, spray_s=5, max_water_s=15))
+    machine.step(shot(position=position, cover_radius_m=0.1, cover_threshold=0.9, max_std_m=1.0))
     assert machine.phase == "喷射"
+    assert machine.sweep is not None
+    assert len(machine.sweep) == 3
+
+
+def test_large_covariance_stays_in_observation():
+    covariance = (np.eye(3) * 0.5**2).tolist()
+    position = {"status": "ESTIMATED", "xyz": [1.5, 2.5, 0.4], "covariance": covariance}
+    machine = RoomMachine(MachineConfig(pending_s=0, spray_s=5, max_water_s=15))
+    effects = machine.step(
+        shot(position=position, cover_radius_m=0.2, cover_threshold=0.5, max_std_m=2.0)
+    )
+    assert machine.phase == "已确认"
+    assert machine.sweep is None
+    assert any(effect.detail.get("reason") == "COVERAGE" for effect in effects)
 
 
 def test_cli_calibrate_and_fit_drag(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
