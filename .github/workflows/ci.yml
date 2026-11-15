@@ -18,9 +18,10 @@ jobs:
       - run: python scripts/docs/build_materials.py --check
       - name: PowerShell syntax
         run: |
-          sudo apt-get update
-          curl -fsSL -o /tmp/powershell.deb https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/powershell_7.5.4-1.deb_amd64.deb
-          sudo apt-get install -y /tmp/powershell.deb
+          if ! command -v pwsh >/dev/null; then
+            curl -fsSL -o /tmp/powershell.deb https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/powershell_7.5.4-1.deb_amd64.deb
+            sudo apt-get install -y /tmp/powershell.deb
+          fi
           pwsh -NoProfile -File scripts/windows/test-syntax.ps1
 
   inference:
