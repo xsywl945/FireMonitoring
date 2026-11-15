@@ -23,6 +23,7 @@ const titles: Record<string, string> = {
   cameras: "摄像头默认值",
   health: "画面健康",
   suppression: "灭火控制",
+  demo: "演示",
   timezone: "时区",
 }
 

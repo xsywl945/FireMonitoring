@@ -43,7 +43,20 @@ def _size(room: Room, settings) -> tuple[float, float]:
 
 
 class SuppressionService:
-    def __init__(self, config, session_factory, pump, events, *, panel=None, speaker=None, clock=None) -> None:
+    def __init__(
+        self,
+        config,
+        session_factory,
+        pump,
+        events,
+        *,
+        panel=None,
+        speaker=None,
+        clock=None,
+        moment=None,
+        pump_run=True,
+        person_source=None,
+    ) -> None:
         self.config = config
         self.session_factory = session_factory
         self.pump = pump
@@ -51,6 +64,10 @@ class SuppressionService:
         self.panel = panel
         self.speaker = speaker or MemorySpeaker()
         self.clock = clock or time.monotonic
+        self.moment = moment or (lambda: datetime.now(UTC))
+        self.pump_run = pump_run
+        self.person_source = person_source
+        self.alarm = "OFF"
         self.web_estop = False
         self.machines: dict[int, RoomMachine] = {}
         self.context: dict[int, dict] = {}
@@ -167,6 +184,8 @@ class SuppressionService:
             "gimbal": self.gimbal.to_dict(),
             "speed": self.speed,
             "drag": self.drag,
+            "pump_run": self.pump_run,
+            "alarm": self.alarm,
         }
 
     def _load_gimbal(self) -> GimbalParams:
@@ -235,7 +254,7 @@ class SuppressionService:
         captured_at = context["captured_at"]
         if captured_at.tzinfo is None:
             captured_at = captured_at.replace(tzinfo=UTC)
-        age = (datetime.now(UTC) - captured_at).total_seconds()
+        age = (self.moment() - captured_at).total_seconds()
         settings = self.config.suppression
         shot = Shot(
             now=self.clock(),
@@ -246,7 +265,7 @@ class SuppressionService:
             analysis=context["analysis"],
             position=context["position"],
             heartbeat_ok=actuator["heartbeat"],
-            persons=context["persons"],
+            persons=self._persons(room_id, context),
             flame_present=context["flame_present"],
             flame_area=context["flame_area"],
             landing=context["landing"],
@@ -278,7 +297,7 @@ class SuppressionService:
         seconds = self.pump.config.cooldown_seconds
         if seconds <= 0:
             return True
-        now = datetime.now(UTC)
+        now = self.moment()
         for record in self.pump.snapshot()["records"]:
             stamp = record.get("attemptedAt")
             if not stamp:
@@ -301,6 +320,7 @@ class SuppressionService:
                     reply = self.panel.transport.request(f"MODE {effect.panel}")
                     if reply != f"MODE {effect.panel}":
                         raise RuntimeError(reply)
+                    self.alarm = effect.panel
                 if effect.voice and not self._muted():
                     self.speaker.say(effect.voice)
                 if effect.laser is not None and not effect.latch:
@@ -316,14 +336,16 @@ class SuppressionService:
                     self.pump.emergency_stop()
                 elif effect.stop:
                     self.pump.cutoff()
-                if effect.run:
+                detail = {"phase": effect.phase, "voice": effect.voice, **effect.detail}
+                if effect.run and not self.pump_run:
+                    detail["pump_run"] = False
+                elif effect.run:
                     self.pump.dispatch_run(
                         uuid4().hex,
                         self.pump.config.duration_ms,
                         captured_at=captured_at,
                         zone_id=room_id,
                     )
-                detail = {"phase": effect.phase, "voice": effect.voice, **effect.detail}
                 payloads.append(
                     record_event(
                         session,
@@ -338,6 +360,12 @@ class SuppressionService:
             session.close()
         for payload in payloads:
             self.events.publish(payload)
+
+
+    def _persons(self, room_id: int, context: dict) -> list:
+        if self.person_source is None:
+            return context["persons"]
+        return self.person_source(room_id)
 
 
 def _message(machine: RoomMachine | None) -> str | None:

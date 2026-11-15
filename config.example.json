@@ -130,5 +130,12 @@
     "freeze_seconds": 5,
     "offline_seconds": 3
   },
+  "demo": {
+    "enabled": false,
+    "pack": "data/demo/synthetic-classroom",
+    "hardware": "sim",
+    "pump_run": true,
+    "detector": "replay"
+  },
   "timezone": "Asia/Shanghai"
 }

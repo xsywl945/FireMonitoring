@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
 import { api, saveSession } from "../api/client"
+import DemoBadge from "../components/DemoBadge.vue"
+import { loadDemoMode, type DemoMode } from "../demo"
 import type { LoginResult } from "../api/types"
 import { messageOf } from "../labels"
 
@@ -10,6 +12,15 @@ const router = useRouter()
 const username = ref("admin")
 const password = ref("")
 const loading = ref(false)
+const demo = ref<DemoMode | null>(null)
+
+onMounted(async () => {
+  try {
+    demo.value = await loadDemoMode()
+  } catch {
+    demo.value = null
+  }
+})
 
 async function submit() {
   loading.value = true
@@ -31,8 +42,9 @@ async function submit() {
 <template>
   <div class="login-page">
     <form class="login-card" @submit.prevent="submit">
+      <DemoBadge v-if="demo?.enabled" :synthetic="demo.synthetic" />
       <h1>火情监控</h1>
-      <el-form label-position="top">
+      <el-form label-position="top" @submit.prevent="submit">
         <el-form-item label="用户名">
           <el-input v-model="username" />
         </el-form-item>

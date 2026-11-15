@@ -9,7 +9,9 @@ import LoginView from "../views/LoginView.vue"
 import MonitorView from "../views/MonitorView.vue"
 import RoomDetailView from "../views/RoomDetailView.vue"
 import RoomsView from "../views/RoomsView.vue"
+import DashboardView from "../views/DashboardView.vue"
 import SuppressionView from "../views/SuppressionView.vue"
+import TwinView from "../views/TwinView.vue"
 import UsersView from "../views/UsersView.vue"
 
 export const router = createRouter({
@@ -25,6 +27,8 @@ export const router = createRouter({
         { path: "rooms/:id", component: RoomDetailView, meta: { title: "教室详情", parent: "教室管理" } },
         { path: "cameras", component: CamerasView, meta: { title: "摄像头管理" } },
         { path: "monitor", component: MonitorView, meta: { title: "实时监控" } },
+        { path: "dashboard", component: DashboardView, meta: { title: "数据大屏", showcase: true } },
+        { path: "twin", component: TwinView, meta: { title: "数字孪生", showcase: true } },
         { path: "alerts", component: AlertsView, meta: { title: "告警研判" } },
         { path: "suppression", component: SuppressionView, meta: { title: "灭火控制" } },
         { path: "alerts/:id", component: AlertDetailView, meta: { title: "告警详情", parent: "告警研判" } },

@@ -1,0 +1,28 @@
+{
+  "synthetic": true,
+  "handwritten": true,
+  "note": "手写的合成响应，不是千问在线结果。",
+  "evidence": {
+    "schema_version": "4.0",
+    "liquid": false,
+    "oil_pan": false,
+    "metal_powder": false,
+    "scene_type": "classroom",
+    "smoke_color": "gray",
+    "smoke_density": "light",
+    "uncertainties": [
+      "手写的合成响应，不是千问看过画面后的输出"
+    ],
+    "burning_objects": [
+      {
+        "frame_index": 1,
+        "name": "课桌",
+        "evidence": "前排课桌桌面有明火，纸张卷曲"
+      }
+    ],
+    "suspected_cause": "open_flame",
+    "energized_equipment": false,
+    "person_count": 0,
+    "person_location": "画面中没有人"
+  }
+}

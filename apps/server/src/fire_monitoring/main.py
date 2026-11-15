@@ -26,6 +26,7 @@ from .pump.router import router as pump_router
 from .rooms.router import router as rooms_router
 from .sms.aliyun import AliyunSmsSender
 from .sms.service import SmsService
+from .demo.router import router as demo_router
 from .suppression.router import router as suppression_router
 from .suppression.service import SuppressionService
 
@@ -59,18 +60,19 @@ def create_app(
         analyzer = QwenAnalyzer(config)
     sms = SmsService(config, sms_sender or AliyunSmsSender(config.sms))
     pump_started = False
-    if pump is None and config.pump.enabled:
-        pump = build_pump(config)
-        pump.start()
-        pump_started = True
     panel = None
     panel_started = False
-    if config.panel.enabled:
-        from fire_monitoring_inference.panel_v2 import PanelLink
+    if not config.demo.enabled:
+        if pump is None and config.pump.enabled:
+            pump = build_pump(config)
+            pump.start()
+            pump_started = True
+        if config.panel.enabled:
+            from fire_monitoring_inference.panel_v2 import PanelLink
 
-        panel = PanelLink(config.panel.serial_port)
-        panel.start()
-        panel_started = True
+            panel = PanelLink(config.panel.serial_port)
+            panel.start()
+            panel_started = True
     live = LiveHub()
     events = EventHub()
 
@@ -78,6 +80,8 @@ def create_app(
     async def lifespan(app: FastAPI):
         app.state.events.bind(asyncio.get_running_loop())
         yield
+        if app.state.demo is not None:
+            app.state.demo.close()
         if app.state.worker is not None:
             app.state.worker.stop()
         if app.state.pump is not None and app.state.pump_started:
@@ -102,6 +106,7 @@ def create_app(
     app.include_router(config_router, prefix="/api/v1")
     app.include_router(pump_router, prefix="/api/v1")
     app.include_router(suppression_router, prefix="/api/v1")
+    app.include_router(demo_router, prefix="/api/v1")
     app.include_router(events_router, prefix="/api/v1")
     app.state.config = config
     app.state.config_path = config_path or Path("config.json")
@@ -115,10 +120,23 @@ def create_app(
     app.state.panel_started = panel_started
     app.state.live = live
     app.state.events = events
-    suppression = SuppressionService(config, session_factory, pump, events, panel=panel)
-    app.state.suppression = suppression
+    app.state.demo = None
+    if config.demo.enabled:
+        from .demo.service import DemoService
+
+        demo = DemoService(config, session_factory, evidence, events, live)
+        app.state.demo = demo
+        app.state.pump = demo.pump
+        app.state.panel = demo.panel
+        app.state.suppression = demo.suppression
+        app.state.pump_started = False
+        app.state.panel_started = False
+        suppression = demo.suppression
+    else:
+        suppression = SuppressionService(config, session_factory, pump, events, panel=panel)
+        app.state.suppression = suppression
     app.state.worker = None
-    if start_worker:
+    if start_worker and not config.demo.enabled:
         worker = DetectionWorker(
             config,
             session_factory,

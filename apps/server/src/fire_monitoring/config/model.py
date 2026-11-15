@@ -171,6 +171,14 @@ class SuppressionSettings(_Strict):
     person_weights: str = ""
 
 
+class DemoSettings(_Strict):
+    enabled: bool = False
+    pack: str = "data/demo/synthetic-classroom"
+    hardware: Literal["sim", "serial"] = "sim"
+    pump_run: bool = True
+    detector: Literal["replay", "model"] = "replay"
+
+
 class AppConfig(_Strict):
     server: ServerSettings
     database: DatabaseSettings
@@ -187,6 +195,7 @@ class AppConfig(_Strict):
     cameras: CameraDefaults
     health: HealthSettings
     suppression: SuppressionSettings = Field(default_factory=SuppressionSettings)
+    demo: DemoSettings = Field(default_factory=DemoSettings)
     timezone: str
 
 

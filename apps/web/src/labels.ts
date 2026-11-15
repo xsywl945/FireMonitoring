@@ -58,6 +58,7 @@ export const healthLabels: Record<string, string> = {
   ok: "正常",
   offline: "离线",
   frozen: "画面冻结",
+  replay: "回放",
   blur: "模糊",
 }
 

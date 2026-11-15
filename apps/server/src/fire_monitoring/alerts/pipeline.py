@@ -67,6 +67,7 @@ class AlertPipeline:
         self.localizer = localizer
         self.on_fatal = on_fatal or _exit_process
         self.failed = False
+        self.error: Exception | None = None
         self._inbox: queue.Queue = queue.Queue(maxsize=32)
         self._localize: queue.Queue = queue.Queue()
         self._qwen: queue.Queue = queue.Queue()
@@ -120,9 +121,10 @@ class AlertPipeline:
                 if job is None:
                     return
                 handler(job)
-            except Exception:
+            except Exception as exc:
                 logger.exception("%s failed", threading.current_thread().name)
                 self.failed = True
+                self.error = exc
                 self.on_fatal()
                 return
             finally:
@@ -175,8 +177,8 @@ class AlertPipeline:
         try:
             if not job.position_ready.wait(30):
                 raise TimeoutError("localization did not finish within 30s")
-            call = None
-            if self.config.llm.enabled and self.analyzer is not None and job.frames:
+            offline = self.analyzer is not None and getattr(self.analyzer, "serves_offline", False)
+            if self.analyzer is not None and job.frames and (self.config.llm.enabled or offline):
                 call = self.analyzer.analyze(
                     job.alert_id,
                     job.frames,
@@ -210,6 +212,10 @@ class AlertPipeline:
                     after_key = f"alerts/{job.alert_id}/after.jpg"
                     self.evidence.put(after_key, job.after_jpeg, "image/jpeg")
                     job.analysis["inputs"]["after_key"] = after_key
+                if call.get("cached"):
+                    job.analysis["cached"] = True
+                    job.analysis["cache_note"] = call["cache_note"]
+                    job.analysis["synthetic_response"] = bool(call.get("synthetic"))
                 payload = write_analysis(session, job.alert_id, job.analysis)
             finally:
                 session.close()
@@ -246,7 +252,8 @@ class AlertPipeline:
         if not job.position_ready.wait(30):
             raise TimeoutError("localization did not finish within 30s")
         analysis = None
-        if self.config.pump.require_vlm:
+        require_vlm = self.pump.config.require_vlm
+        if require_vlm:
             if not job.analysis_ready.wait(30):
                 raise TimeoutError("qwen did not finish within 30s")
             analysis = job.analysis
