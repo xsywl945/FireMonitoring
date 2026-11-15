@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from ..config import AppConfig
 from ..localization.observe import SourceObservation, locate_position
 from ..models import Alert, AlertEvent, AlertFrame, Camera, Disposition, Room
-from ..pump.bridge import trigger_pump
 from ..sms.service import SmsService
 
 
@@ -192,40 +191,6 @@ def notify_room(
         alert_id=alert_id,
         kind="SMS",
         detail={"room_name": room_name, "level": level, "method": method},
-    )
-    session.commit()
-    return payload
-
-
-def actuate(
-    session: Session,
-    pump,
-    *,
-    alert_id: int,
-    room_id: int,
-    alert_type: str,
-    observations: list[dict],
-    analysis: dict | None,
-    captured_at: datetime,
-    model_version: str,
-) -> dict | None:
-    if pump is None or not observations:
-        return None
-    trigger_pump(
-        pump,
-        room_id=room_id,
-        alert_type=alert_type,
-        observations=observations,
-        analysis=analysis,
-        captured_at=captured_at,
-        model_version=model_version,
-    )
-    payload = record_event(
-        session,
-        room_id=room_id,
-        alert_id=alert_id,
-        kind="PUMP",
-        detail={"alert_type": alert_type},
     )
     session.commit()
     return payload

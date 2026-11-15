@@ -11,7 +11,8 @@ from ..analysis.compose import compose
 from ..analysis.qwen import disabled_call
 from ..localization.observe import locate_position
 from ..models import Room
-from .service import actuate, notify_room, record_alert, write_analysis, write_position
+from ..suppression.service import SuppressionService
+from .service import notify_room, record_alert, write_analysis, write_position
 
 logger = logging.getLogger("fire_monitoring.alerts")
 
@@ -50,6 +51,8 @@ class AlertPipeline:
         *,
         localizer=None,
         on_fatal=None,
+        panel=None,
+        suppression=None,
     ) -> None:
         self.config = config
         self.session_factory = session_factory
@@ -58,6 +61,9 @@ class AlertPipeline:
         self.sms = sms
         self.pump = pump
         self.events = events
+        self.suppression = suppression or SuppressionService(
+            config, session_factory, pump, events, panel=panel
+        )
         self.localizer = localizer
         self.on_fatal = on_fatal or _exit_process
         self.failed = False
@@ -235,28 +241,18 @@ class AlertPipeline:
             self.events.publish(payload)
 
     def _pump_job(self, job: ConfirmedJob) -> None:
+        if self.pump is None or not job.pump_observations:
+            return
+        if not job.position_ready.wait(30):
+            raise TimeoutError("localization did not finish within 30s")
         analysis = None
         if self.config.pump.require_vlm:
             if not job.analysis_ready.wait(30):
                 raise TimeoutError("qwen did not finish within 30s")
             analysis = job.analysis
-        session = self.session_factory()
-        try:
-            payload = actuate(
-                session,
-                self.pump,
-                alert_id=job.alert_id,
-                room_id=job.room_id,
-                alert_type=job.alert_type,
-                observations=job.pump_observations,
-                analysis=analysis,
-                captured_at=job.started_at,
-                model_version=self.config.model.version,
-            )
-        finally:
-            session.close()
-        if payload is not None:
-            self.events.publish(payload)
+        elif job.analysis_ready.is_set():
+            analysis = job.analysis
+        self.suppression.handle(job, analysis)
 
 
 def _combustibles(room: Room) -> list:

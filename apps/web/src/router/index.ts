@@ -9,6 +9,7 @@ import LoginView from "../views/LoginView.vue"
 import MonitorView from "../views/MonitorView.vue"
 import RoomDetailView from "../views/RoomDetailView.vue"
 import RoomsView from "../views/RoomsView.vue"
+import SuppressionView from "../views/SuppressionView.vue"
 import UsersView from "../views/UsersView.vue"
 
 export const router = createRouter({
@@ -25,6 +26,7 @@ export const router = createRouter({
         { path: "cameras", component: CamerasView, meta: { title: "摄像头管理" } },
         { path: "monitor", component: MonitorView, meta: { title: "实时监控" } },
         { path: "alerts", component: AlertsView, meta: { title: "告警研判" } },
+        { path: "suppression", component: SuppressionView, meta: { title: "灭火控制" } },
         { path: "alerts/:id", component: AlertDetailView, meta: { title: "告警详情", parent: "告警研判" } },
         { path: "users", component: UsersView, meta: { title: "用户管理", admin: true } },
         { path: "config", component: ConfigView, meta: { title: "系统配置", admin: true } },

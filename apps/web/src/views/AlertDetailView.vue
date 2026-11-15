@@ -11,6 +11,7 @@ import {
   alertStatusLabels,
   causeLabels,
   dispositionLabels,
+  eventLabels,
   formatTime,
   growthLabels,
   messageOf,
@@ -112,6 +113,10 @@ async function exportPdf() {
 function onFireEvent(event: Event) {
   const payload = (event as CustomEvent).detail as { alert_id: number; kind: string }
   if (payload.alert_id === alertId.value && payload.kind !== "CONFIRMED") load()
+}
+
+function eventText(detail: Record<string, unknown>) {
+  return [detail.phase, detail.message, detail.reason].filter((item) => typeof item === "string" && item).join(" ")
 }
 
 function seconds(value: number | undefined) {
@@ -263,6 +268,16 @@ onBeforeUnmount(() => {
       </el-timeline>
       <p v-else>暂无处置记录</p>
       <el-input v-model="note" placeholder="处置说明，结案时可填" style="margin-top: 12px" />
+    </div>
+    <div class="panel">
+      <div class="toolbar"><strong>事件</strong></div>
+      <el-timeline v-if="detail.events.length">
+        <el-timeline-item v-for="item in detail.events" :key="item.id" :timestamp="formatTime(item.occurred_at)">
+          {{ eventLabels[item.kind] || item.kind }}
+          <span v-if="eventText(item.detail)"> {{ eventText(item.detail) }}</span>
+        </el-timeline-item>
+      </el-timeline>
+      <p v-else>暂无事件</p>
     </div>
   </div>
 </template>

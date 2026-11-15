@@ -14,7 +14,7 @@ from ..alerts.query import alert_count, alert_statement
 from ..alerts.report import build_alert_pdf, build_alerts_csv
 from ..alerts.service import change_disposition, rerun_analysis
 from ..auth.deps import get_current_user, get_db, iso
-from ..models import Alert, AlertClip, AlertFrame, Camera, Disposition, Room, User
+from ..models import Alert, AlertClip, AlertEvent, AlertFrame, Camera, Disposition, Room, User
 from ..rooms.router import FloorPlanOut, _floor_plan
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -71,6 +71,13 @@ class AlertPage(BaseModel):
     page_size: int
 
 
+class EventOut(BaseModel):
+    id: int
+    kind: str
+    detail: dict
+    occurred_at: str
+
+
 class AlertDetail(BaseModel):
     id: int
     room_id: int
@@ -83,6 +90,7 @@ class AlertDetail(BaseModel):
     frames: list[FrameOut]
     clips: list[ClipOut]
     dispositions: list[DispositionOut]
+    events: list[EventOut]
     floor_plan: FloorPlanOut | None
     status: str
     level: str | None
@@ -229,6 +237,9 @@ def get_alert(
     dispositions = session.scalars(
         select(Disposition).where(Disposition.alert_id == alert.id).order_by(Disposition.id)
     ).all()
+    events = session.scalars(
+        select(AlertEvent).where(AlertEvent.alert_id == alert.id).order_by(AlertEvent.id)
+    ).all()
     frame_out = []
     for frame in frames:
         camera = session.get(Camera, frame.camera_id)
@@ -270,6 +281,15 @@ def get_alert(
                 occurred_at=iso(item.occurred_at),
             )
             for item in dispositions
+        ],
+        events=[
+            EventOut(
+                id=item.id,
+                kind=item.kind,
+                detail=json.loads(item.detail_json),
+                occurred_at=iso(item.occurred_at),
+            )
+            for item in events
         ],
         floor_plan=_floor_plan(room.floor_plan_json) if room is not None else None,
         status=alert.status,

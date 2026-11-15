@@ -26,6 +26,8 @@ from .pump.router import router as pump_router
 from .rooms.router import router as rooms_router
 from .sms.aliyun import AliyunSmsSender
 from .sms.service import SmsService
+from .suppression.router import router as suppression_router
+from .suppression.service import SuppressionService
 
 
 def create_app(
@@ -99,6 +101,7 @@ def create_app(
     app.include_router(alerts_router, prefix="/api/v1")
     app.include_router(config_router, prefix="/api/v1")
     app.include_router(pump_router, prefix="/api/v1")
+    app.include_router(suppression_router, prefix="/api/v1")
     app.include_router(events_router, prefix="/api/v1")
     app.state.config = config
     app.state.config_path = config_path or Path("config.json")
@@ -112,6 +115,8 @@ def create_app(
     app.state.panel_started = panel_started
     app.state.live = live
     app.state.events = events
+    suppression = SuppressionService(config, session_factory, pump, events, panel=panel)
+    app.state.suppression = suppression
     app.state.worker = None
     if start_worker:
         worker = DetectionWorker(
@@ -127,6 +132,8 @@ def create_app(
             open_capture=open_capture,
             localizer=localizer,
             on_fatal=on_fatal,
+            panel=panel,
+            suppression=suppression,
         )
         app.state.worker = worker
         worker.start()

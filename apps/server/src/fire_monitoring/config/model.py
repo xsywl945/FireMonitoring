@@ -149,6 +149,28 @@ class HealthSettings(_Strict):
     offline_seconds: float = Field(ge=0, le=3600)
 
 
+class SuppressionSettings(_Strict):
+    pending_seconds: float = 3
+    review_seconds: float = 5
+    clear_seconds: float = 3
+    max_corrections: int = 2
+    max_std_m: float = 0.5
+    cover_radius_m: float = 1
+    cover_threshold: float = 0.5
+    person_distance_m: float = 1.5
+    speed: float = 10
+    drag: float = 0.05
+    room_width_m: float = 9
+    room_depth_m: float = 12
+    gimbal_x: float = 0
+    gimbal_y: float = 0
+    gimbal_z: float = 2.2
+    gimbal_yaw_deg: float = 0
+    gimbal_tilt_zero: float = 4000
+    gimbal_path: str = "runtime/gimbal.json"
+    person_weights: str = ""
+
+
 class AppConfig(_Strict):
     server: ServerSettings
     database: DatabaseSettings
@@ -164,6 +186,7 @@ class AppConfig(_Strict):
     auth: AuthSettings
     cameras: CameraDefaults
     health: HealthSettings
+    suppression: SuppressionSettings = Field(default_factory=SuppressionSettings)
     timezone: str
 
 

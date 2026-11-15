@@ -74,6 +74,8 @@ class DetectionWorker:
         open_capture=None,
         localizer=None,
         on_fatal=None,
+        panel=None,
+        suppression=None,
     ) -> None:
         self.config = config
         self.session_factory = session_factory
@@ -95,6 +97,8 @@ class DetectionWorker:
             events,
             localizer=localizer,
             on_fatal=self._fatal,
+            panel=panel,
+            suppression=suppression,
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None

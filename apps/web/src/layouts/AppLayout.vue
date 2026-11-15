@@ -66,6 +66,7 @@ const items = [
   { path: "/cameras", label: "摄像头管理" },
   { path: "/monitor", label: "实时监控" },
   { path: "/alerts", label: "告警研判" },
+  { path: "/suppression", label: "灭火控制" },
   { path: "/users", label: "用户管理", admin: true },
   { path: "/config", label: "系统配置", admin: true },
 ]

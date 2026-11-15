@@ -198,6 +198,13 @@ export interface Disposition {
   occurred_at: string
 }
 
+export interface AlertEventRow {
+  id: number
+  kind: string
+  detail: Record<string, unknown>
+  occurred_at: string
+}
+
 export interface AlertClip {
   camera_id: number
   camera_name: string
@@ -229,6 +236,7 @@ export interface AlertDetail {
   frames: FrameInfo[]
   clips: AlertClip[]
   dispositions: Disposition[]
+  events: AlertEventRow[]
   floor_plan: FloorPlan | null
   status: string
   level: string | null
