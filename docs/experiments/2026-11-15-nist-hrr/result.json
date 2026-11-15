@@ -1,0 +1,35 @@
+{
+  "data": "合成数据",
+  "source": "t² 反算的火焰高度",
+  "relative_error": {
+    "n": 36,
+    "mean": 2.3734341039978904e-16,
+    "p90": 4.010630923793161e-16,
+    "max": 5.976396426658763e-16
+  },
+  "growth": {
+    "measured_bin": "ultrafast",
+    "estimated_bin": "ultrafast",
+    "correct": true,
+    "measured_alpha": 0.18760000000000016,
+    "estimated_alpha": 0.1876000000000002,
+    "accuracy": 1.0
+  },
+  "thresholds": [
+    {
+      "level_kw": 100,
+      "predicted_s": 23.087854826980493,
+      "actual_s": 24.0,
+      "error_s": -0.9121451730195069,
+      "reached": true
+    },
+    {
+      "level_kw": 500,
+      "predicted_s": 51.62601284777503,
+      "actual_s": null,
+      "error_s": null,
+      "reached": false
+    }
+  ],
+  "series_n": 36
+}

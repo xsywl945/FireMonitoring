@@ -1,0 +1,1855 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="525.5975pt" height="257.545062pt" viewBox="0 0 525.5975 257.545062" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-11-15T16:52:29.202333</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 257.545062 
+L 525.5975 257.545062 
+L 525.5975 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 44.689063 232.798187 
+L 262.13375 232.798187 
+L 262.13375 40.34975 
+L 44.689063 40.34975 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 54.572912 232.798187 
+L 111.052052 232.798187 
+L 111.052052 40.34975 
+L 54.572912 40.34975 
+z
+" clip-path="url(#pd2962dfe81)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 125.171836 232.798187 
+L 181.650976 232.798187 
+L 181.650976 40.34975 
+L 125.171836 40.34975 
+z
+" clip-path="url(#pd2962dfe81)" style="fill: #0072b2"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 195.770761 232.798187 
+L 252.249901 232.798187 
+L 252.249901 40.34975 
+L 195.770761 40.34975 
+z
+" clip-path="url(#pd2962dfe81)" style="fill: #0072b2"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <defs>
+       <path id="ma73ca4d2c6" d="M 0 0 
+L 0 3.5 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#ma73ca4d2c6" x="82.812482" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <!-- 固定点 -->
+      <g transform="translate(67.812482 247.96225) scale(0.1 -0.1)">
+       <defs>
+        <path id="DroidSansFallback-2492" d="M 5825 4975 
+L 5825 -575 
+L 5325 -575 
+L 5325 -225 
+L 1075 -225 
+L 1075 -575 
+L 575 -575 
+L 575 4975 
+L 5825 4975 
+z
+M 1075 250 
+L 5325 250 
+L 5325 4500 
+L 1075 4500 
+L 1075 250 
+z
+M 1350 3550 
+L 2950 3550 
+L 2950 4275 
+L 3450 4275 
+L 3450 3550 
+L 5050 3550 
+L 5050 3075 
+L 3450 3075 
+L 3450 2350 
+L 4625 2350 
+L 4625 600 
+L 1825 600 
+L 1825 2350 
+L 2950 2350 
+L 2950 3075 
+L 1350 3075 
+L 1350 3550 
+z
+M 2300 1075 
+L 4125 1075 
+L 4125 1900 
+L 2300 1900 
+L 2300 1075 
+z
+" transform="scale(0.015625)"/>
+        <path id="DroidSansFallback-2932" d="M 5875 4675 
+L 5875 3575 
+L 5350 3575 
+L 5350 4225 
+L 1025 4225 
+L 1025 3600 
+L 525 3600 
+L 525 4675 
+L 3000 4675 
+L 2775 5075 
+L 3275 5225 
+Q 3475 4975 3575 4675 
+L 5875 4675 
+z
+M 1175 3400 
+L 5225 3400 
+L 5225 2950 
+L 3500 2950 
+L 3500 1825 
+L 5200 1825 
+L 5200 1375 
+L 3500 1375 
+L 3500 175 
+L 6100 125 
+L 5925 -400 
+L 4875 -400 
+Q 3200 -400 2612 -162 
+Q 2025 75 1600 725 
+Q 1300 25 725 -550 
+L 350 -175 
+Q 1400 975 1575 2450 
+L 2075 2325 
+Q 2000 1750 1800 1225 
+Q 2300 400 2975 250 
+L 2975 2950 
+L 1175 2950 
+L 1175 3400 
+z
+" transform="scale(0.015625)"/>
+        <path id="DroidSansFallback-3e51" d="M 5300 1025 
+Q 5750 425 6050 -275 
+L 5575 -550 
+Q 5325 150 4850 750 
+L 5300 1025 
+z
+M 1075 950 
+L 1525 700 
+Q 1150 -100 775 -550 
+L 350 -175 
+Q 800 350 1075 950 
+z
+M 3875 875 
+Q 4225 375 4475 -225 
+L 3950 -450 
+Q 3725 175 3400 675 
+L 3875 875 
+z
+M 2475 800 
+Q 2825 225 2950 -350 
+L 2400 -525 
+Q 2275 125 1950 675 
+L 2475 800 
+z
+M 2825 5175 
+L 3325 5175 
+L 3325 4500 
+L 5775 4500 
+L 5775 4025 
+L 3325 4025 
+L 3325 3200 
+L 5400 3200 
+L 5400 1200 
+L 975 1200 
+L 975 3200 
+L 2825 3200 
+L 2825 5175 
+z
+M 1475 1675 
+L 4900 1675 
+L 4900 2725 
+L 1475 2725 
+L 1475 1675 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DroidSansFallback-2492"/>
+       <use xlink:href="#DroidSansFallback-2932" transform="translate(100 0)"/>
+       <use xlink:href="#DroidSansFallback-3e51" transform="translate(200 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#ma73ca4d2c6" x="153.411406" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <!-- 固定扫射 -->
+      <g transform="translate(133.411406 247.96225) scale(0.1 -0.1)">
+       <defs>
+        <path id="DroidSansFallback-3003" d="M 2800 2650 
+L 5325 2650 
+L 5325 4050 
+L 2725 4050 
+L 2725 4525 
+L 5850 4525 
+L 5850 -350 
+L 5325 -350 
+L 5325 75 
+L 2600 75 
+L 2600 550 
+L 5325 550 
+L 5325 2175 
+L 2800 2175 
+L 2800 2650 
+z
+M 325 4125 
+L 1250 4125 
+L 1250 5175 
+L 1750 5175 
+L 1750 4125 
+L 2525 4125 
+L 2525 3650 
+L 1750 3650 
+L 1750 2350 
+L 2525 2675 
+L 2625 2225 
+L 1750 1825 
+L 1750 -25 
+Q 1725 -575 1200 -575 
+L 450 -500 
+L 350 25 
+L 1125 -75 
+Q 1250 -75 1250 225 
+L 1250 1625 
+L 425 1325 
+L 250 1850 
+L 1250 2175 
+L 1250 3650 
+L 325 3650 
+L 325 4125 
+z
+" transform="scale(0.015625)"/>
+        <path id="DroidSansFallback-299c" d="M 1475 5200 
+L 1975 5100 
+L 1775 4675 
+L 3000 4675 
+L 3000 25 
+Q 3000 -575 2200 -575 
+L 1750 -525 
+L 1625 -50 
+L 2175 -100 
+Q 2500 -100 2500 150 
+L 2500 1200 
+Q 1700 225 500 -350 
+L 225 75 
+Q 1475 700 2100 1425 
+L 325 1425 
+L 325 1875 
+L 625 1875 
+L 625 4675 
+L 1250 4675 
+L 1475 5200 
+z
+M 1125 3725 
+L 2500 3725 
+L 2500 4200 
+L 1125 4200 
+L 1125 3725 
+z
+M 1125 2800 
+L 2500 2800 
+L 2500 3300 
+L 1125 3300 
+L 1125 2800 
+z
+M 1125 1875 
+L 2500 1875 
+L 2500 2375 
+L 1125 2375 
+L 1125 1875 
+z
+M 3200 3875 
+L 4950 3875 
+L 4950 5175 
+L 5450 5175 
+L 5450 3875 
+L 6075 3875 
+L 6075 3375 
+L 5450 3375 
+L 5450 125 
+Q 5450 -275 5325 -412 
+Q 5200 -550 4825 -550 
+L 4050 -500 
+L 3950 0 
+L 4750 -50 
+Q 4950 -50 4950 250 
+L 4950 3375 
+L 3200 3375 
+L 3200 3875 
+z
+M 3825 2875 
+Q 4250 2250 4525 1550 
+L 4050 1275 
+Q 3800 1975 3375 2600 
+L 3825 2875 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DroidSansFallback-2492"/>
+       <use xlink:href="#DroidSansFallback-2932" transform="translate(100 0)"/>
+       <use xlink:href="#DroidSansFallback-3003" transform="translate(200 0)"/>
+       <use xlink:href="#DroidSansFallback-299c" transform="translate(300 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#ma73ca4d2c6" x="224.010331" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <!-- 自适应扫射 -->
+      <g transform="translate(199.010331 247.923187) scale(0.1 -0.1)">
+       <defs>
+        <path id="DroidSansFallback-4f82" d="M 2700 5200 
+L 3275 5075 
+L 3000 4450 
+L 5475 4450 
+L 5475 -575 
+L 4975 -575 
+L 4975 -75 
+L 1400 -75 
+L 1400 -575 
+L 900 -575 
+L 900 4450 
+L 2425 4450 
+Q 2625 4800 2700 5200 
+z
+M 1400 3100 
+L 4975 3100 
+L 4975 3975 
+L 1400 3975 
+L 1400 3100 
+z
+M 1400 1750 
+L 4975 1750 
+L 4975 2625 
+L 1400 2625 
+L 1400 1750 
+z
+M 1400 400 
+L 4975 400 
+L 4975 1275 
+L 1400 1275 
+L 1400 400 
+z
+" transform="scale(0.015625)"/>
+        <path id="DroidSansFallback-5d9a" d="M 5350 5100 
+L 5675 4700 
+L 4275 4500 
+L 4275 3675 
+L 5925 3675 
+L 5925 3225 
+L 4275 3225 
+L 4275 2500 
+L 5500 2500 
+L 5500 625 
+L 2400 625 
+L 2400 2500 
+L 3750 2500 
+L 3750 3225 
+L 2100 3225 
+L 2100 3675 
+L 3750 3675 
+L 3750 4425 
+L 2425 4300 
+L 2200 4750 
+L 5350 5100 
+z
+M 2925 1075 
+L 4975 1075 
+L 4975 2050 
+L 2925 2050 
+L 2925 1075 
+z
+M 750 5025 
+Q 1250 4700 1650 4250 
+L 1300 3825 
+Q 875 4325 400 4650 
+L 750 5025 
+z
+M 325 2950 
+L 1575 2950 
+L 1575 550 
+Q 1950 275 2500 200 
+Q 3050 125 6100 125 
+L 5850 -425 
+L 3850 -425 
+Q 2100 -425 1375 200 
+L 650 -525 
+L 300 0 
+L 1075 475 
+L 1075 2475 
+L 325 2475 
+L 325 2950 
+z
+" transform="scale(0.015625)"/>
+        <path id="DroidSansFallback-2c2c" d="M 5925 4450 
+L 5925 3975 
+L 1375 3975 
+L 1375 2125 
+Q 1375 550 700 -600 
+L 225 -325 
+Q 850 950 875 2050 
+L 875 4450 
+L 3250 4450 
+L 2975 5025 
+L 3475 5200 
+Q 3700 4850 3800 4450 
+L 5925 4450 
+z
+M 3600 3425 
+Q 4050 2400 4200 1375 
+L 3650 1225 
+Q 3525 2350 3100 3300 
+L 3600 3425 
+z
+M 1575 175 
+L 4175 175 
+Q 4775 1600 5200 3325 
+L 5725 3150 
+Q 5325 1500 4750 175 
+L 6075 175 
+L 6075 -300 
+L 1575 -300 
+L 1575 175 
+z
+M 2325 2950 
+Q 2825 2025 3075 875 
+L 2575 700 
+Q 2325 1850 1825 2800 
+L 2325 2950 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DroidSansFallback-4f82"/>
+       <use xlink:href="#DroidSansFallback-5d9a" transform="translate(100 0)"/>
+       <use xlink:href="#DroidSansFallback-2c2c" transform="translate(200 0)"/>
+       <use xlink:href="#DroidSansFallback-3003" transform="translate(300 0)"/>
+       <use xlink:href="#DroidSansFallback-299c" transform="translate(400 0)"/>
+      </g>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_4">
+      <defs>
+       <path id="m45280ee63c" d="M 0 0 
+L -3.5 0 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m45280ee63c" x="44.689063" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <!-- 0.0 -->
+      <g transform="translate(21.785938 236.626312) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-13" d="M 2034 4250 
+Q 1547 4250 1301 3770 
+Q 1056 3291 1056 2328 
+Q 1056 1369 1301 889 
+Q 1547 409 2034 409 
+Q 2525 409 2770 889 
+Q 3016 1369 3016 2328 
+Q 3016 3291 2770 3770 
+Q 2525 4250 2034 4250 
+z
+M 2034 4750 
+Q 2819 4750 3233 4129 
+Q 3647 3509 3647 2328 
+Q 3647 1150 3233 529 
+Q 2819 -91 2034 -91 
+Q 1250 -91 836 529 
+Q 422 1150 422 2328 
+Q 422 3509 836 4129 
+Q 1250 4750 2034 4750 
+z
+" transform="scale(0.015625)"/>
+        <path id="DejaVuSans-11" d="M 684 794 
+L 1344 794 
+L 1344 0 
+L 684 0 
+L 684 794 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-13"/>
+       <use xlink:href="#DejaVuSans-11" transform="translate(63.625 0)"/>
+       <use xlink:href="#DejaVuSans-13" transform="translate(95.40625 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_5">
+      <g>
+       <use xlink:href="#m45280ee63c" x="44.689063" y="194.3085" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <!-- 0.2 -->
+      <g transform="translate(21.785938 198.136625) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-15" d="M 1228 531 
+L 3431 531 
+L 3431 0 
+L 469 0 
+L 469 531 
+Q 828 903 1448 1529 
+Q 2069 2156 2228 2338 
+Q 2531 2678 2651 2914 
+Q 2772 3150 2772 3378 
+Q 2772 3750 2511 3984 
+Q 2250 4219 1831 4219 
+Q 1534 4219 1204 4116 
+Q 875 4013 500 3803 
+L 500 4441 
+Q 881 4594 1212 4672 
+Q 1544 4750 1819 4750 
+Q 2544 4750 2975 4387 
+Q 3406 4025 3406 3419 
+Q 3406 3131 3298 2873 
+Q 3191 2616 2906 2266 
+Q 2828 2175 2409 1742 
+Q 1991 1309 1228 531 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-13"/>
+       <use xlink:href="#DejaVuSans-11" transform="translate(63.625 0)"/>
+       <use xlink:href="#DejaVuSans-15" transform="translate(95.40625 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#m45280ee63c" x="44.689063" y="155.818813" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <!-- 0.4 -->
+      <g transform="translate(21.785938 159.646938) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-17" d="M 2419 4116 
+L 825 1625 
+L 2419 1625 
+L 2419 4116 
+z
+M 2253 4666 
+L 3047 4666 
+L 3047 1625 
+L 3713 1625 
+L 3713 1100 
+L 3047 1100 
+L 3047 0 
+L 2419 0 
+L 2419 1100 
+L 313 1100 
+L 313 1709 
+L 2253 4666 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-13"/>
+       <use xlink:href="#DejaVuSans-11" transform="translate(63.625 0)"/>
+       <use xlink:href="#DejaVuSans-17" transform="translate(95.40625 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_7">
+      <g>
+       <use xlink:href="#m45280ee63c" x="44.689063" y="117.329125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <!-- 0.6 -->
+      <g transform="translate(21.785938 121.15725) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-19" d="M 2113 2584 
+Q 1688 2584 1439 2293 
+Q 1191 2003 1191 1497 
+Q 1191 994 1439 701 
+Q 1688 409 2113 409 
+Q 2538 409 2786 701 
+Q 3034 994 3034 1497 
+Q 3034 2003 2786 2293 
+Q 2538 2584 2113 2584 
+z
+M 3366 4563 
+L 3366 3988 
+Q 3128 4100 2886 4159 
+Q 2644 4219 2406 4219 
+Q 1781 4219 1451 3797 
+Q 1122 3375 1075 2522 
+Q 1259 2794 1537 2939 
+Q 1816 3084 2150 3084 
+Q 2853 3084 3261 2657 
+Q 3669 2231 3669 1497 
+Q 3669 778 3244 343 
+Q 2819 -91 2113 -91 
+Q 1303 -91 875 529 
+Q 447 1150 447 2328 
+Q 447 3434 972 4092 
+Q 1497 4750 2381 4750 
+Q 2619 4750 2861 4703 
+Q 3103 4656 3366 4563 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-13"/>
+       <use xlink:href="#DejaVuSans-11" transform="translate(63.625 0)"/>
+       <use xlink:href="#DejaVuSans-19" transform="translate(95.40625 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_8">
+      <g>
+       <use xlink:href="#m45280ee63c" x="44.689063" y="78.839438" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_8">
+      <!-- 0.8 -->
+      <g transform="translate(21.785938 82.667563) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-1b" d="M 2034 2216 
+Q 1584 2216 1326 1975 
+Q 1069 1734 1069 1313 
+Q 1069 891 1326 650 
+Q 1584 409 2034 409 
+Q 2484 409 2743 651 
+Q 3003 894 3003 1313 
+Q 3003 1734 2745 1975 
+Q 2488 2216 2034 2216 
+z
+M 1403 2484 
+Q 997 2584 770 2862 
+Q 544 3141 544 3541 
+Q 544 4100 942 4425 
+Q 1341 4750 2034 4750 
+Q 2731 4750 3128 4425 
+Q 3525 4100 3525 3541 
+Q 3525 3141 3298 2862 
+Q 3072 2584 2669 2484 
+Q 3125 2378 3379 2068 
+Q 3634 1759 3634 1313 
+Q 3634 634 3220 271 
+Q 2806 -91 2034 -91 
+Q 1263 -91 848 271 
+Q 434 634 434 1313 
+Q 434 1759 690 2068 
+Q 947 2378 1403 2484 
+z
+M 1172 3481 
+Q 1172 3119 1398 2916 
+Q 1625 2713 2034 2713 
+Q 2441 2713 2670 2916 
+Q 2900 3119 2900 3481 
+Q 2900 3844 2670 4047 
+Q 2441 4250 2034 4250 
+Q 1625 4250 1398 4047 
+Q 1172 3844 1172 3481 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-13"/>
+       <use xlink:href="#DejaVuSans-11" transform="translate(63.625 0)"/>
+       <use xlink:href="#DejaVuSans-1b" transform="translate(95.40625 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_6">
+     <g id="line2d_9">
+      <g>
+       <use xlink:href="#m45280ee63c" x="44.689063" y="40.34975" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_9">
+      <!-- 1.0 -->
+      <g transform="translate(21.785938 44.177875) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-14" d="M 794 531 
+L 1825 531 
+L 1825 4091 
+L 703 3866 
+L 703 4441 
+L 1819 4666 
+L 2450 4666 
+L 2450 531 
+L 3481 531 
+L 3481 0 
+L 794 0 
+L 794 531 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-14"/>
+       <use xlink:href="#DejaVuSans-11" transform="translate(63.625 0)"/>
+       <use xlink:href="#DejaVuSans-13" transform="translate(95.40625 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="text_10">
+     <!-- 命中率 -->
+     <g transform="translate(15.403125 151.573969) rotate(-90) scale(0.1 -0.1)">
+      <defs>
+       <path id="DroidSansFallback-2215" d="M 3175 5250 
+L 3700 5100 
+L 3525 4925 
+Q 4775 4025 6125 3575 
+L 5825 3075 
+Q 4475 3600 3175 4600 
+Q 2025 3650 550 3050 
+L 300 3500 
+Q 2300 4325 3175 5250 
+z
+M 1575 3400 
+L 4825 3400 
+L 4825 2950 
+L 1575 2950 
+L 1575 3400 
+z
+M 5675 2400 
+L 5675 750 
+Q 5675 100 4975 100 
+L 4475 125 
+L 4350 650 
+L 4950 625 
+Q 5175 625 5175 900 
+L 5175 1925 
+L 3975 1925 
+L 3975 -600 
+L 3475 -600 
+L 3475 2400 
+L 5675 2400 
+z
+M 1250 225 
+L 1250 -275 
+L 800 -275 
+L 800 2400 
+L 2750 2400 
+L 2750 -25 
+L 2275 -25 
+L 2275 225 
+L 1250 225 
+z
+M 2275 700 
+L 2275 1950 
+L 1250 1950 
+L 1250 700 
+L 2275 700 
+z
+" transform="scale(0.015625)"/>
+       <path id="DroidSansFallback-1bc5" d="M 5725 4225 
+L 5725 1150 
+L 5225 1150 
+L 5225 1550 
+L 3425 1550 
+L 3425 -625 
+L 2925 -625 
+L 2925 1550 
+L 1200 1550 
+L 1200 1100 
+L 700 1100 
+L 700 4225 
+L 2925 4225 
+L 2925 5200 
+L 3425 5200 
+L 3425 4225 
+L 5725 4225 
+z
+M 1200 2025 
+L 2925 2025 
+L 2925 3750 
+L 1200 3750 
+L 1200 2025 
+z
+M 3425 3750 
+L 3425 2025 
+L 5225 2025 
+L 5225 3750 
+L 3425 3750 
+z
+" transform="scale(0.015625)"/>
+       <path id="DroidSansFallback-411f" d="M 3275 5200 
+Q 3475 4900 3575 4550 
+L 6050 4550 
+L 6050 4075 
+L 350 4075 
+L 350 4550 
+L 2950 4550 
+L 2750 5025 
+L 3275 5200 
+z
+M 2975 1625 
+L 3450 1625 
+L 3450 1100 
+L 6000 1100 
+L 6000 650 
+L 3450 650 
+L 3450 -575 
+L 2975 -575 
+L 2975 650 
+L 400 650 
+L 400 1100 
+L 2975 1100 
+L 2975 1625 
+z
+M 2925 4450 
+L 3375 4325 
+Q 3000 3550 2700 3200 
+L 3475 3275 
+L 3900 3800 
+L 4350 3650 
+Q 3625 2675 2725 2025 
+L 3875 2250 
+L 3650 2550 
+L 4050 2750 
+Q 4475 2250 4775 1625 
+L 4325 1425 
+L 4100 1900 
+L 2050 1525 
+L 1925 1925 
+Q 2525 2300 3075 2850 
+L 2175 2725 
+L 2100 3150 
+Q 2625 3775 2925 4450 
+z
+M 1100 3975 
+Q 1500 3625 1775 3200 
+L 1325 2950 
+Q 1075 3350 650 3700 
+L 1100 3975 
+z
+M 5325 3975 
+L 5750 3725 
+Q 5325 3175 4900 2850 
+L 4525 3200 
+Q 5025 3575 5325 3975 
+z
+M 1625 2725 
+L 2000 2450 
+Q 1550 1900 875 1425 
+L 500 1800 
+Q 1200 2275 1625 2725 
+z
+M 4925 2650 
+Q 5450 2350 5900 1925 
+L 5525 1475 
+Q 5100 1975 4600 2300 
+L 4925 2650 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#DroidSansFallback-2215"/>
+      <use xlink:href="#DroidSansFallback-1bc5" transform="translate(100 0)"/>
+      <use xlink:href="#DroidSansFallback-411f" transform="translate(200 0)"/>
+     </g>
+    </g>
+   </g>
+   <g id="patch_6">
+    <path d="M 44.689063 232.798187 
+L 44.689063 40.34975 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 262.13375 232.798187 
+L 262.13375 40.34975 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 44.689062 232.798187 
+L 262.13375 232.798187 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 44.689062 40.34975 
+L 262.13375 40.34975 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="patch_10">
+    <path d="M 300.952812 232.798187 
+L 518.3975 232.798187 
+L 518.3975 40.34975 
+L 300.952812 40.34975 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 310.836662 232.798187 
+L 367.315802 232.798187 
+L 367.315802 206.614727 
+L 310.836662 206.614727 
+z
+" clip-path="url(#p756b7f441a)" style="fill: #009e73"/>
+   </g>
+   <g id="patch_12">
+    <path d="M 381.435586 232.798187 
+L 437.914726 232.798187 
+L 437.914726 49.513961 
+L 381.435586 49.513961 
+z
+" clip-path="url(#p756b7f441a)" style="fill: #009e73"/>
+   </g>
+   <g id="patch_13">
+    <path d="M 452.034511 232.798187 
+L 508.513651 232.798187 
+L 508.513651 154.247805 
+L 452.034511 154.247805 
+z
+" clip-path="url(#p756b7f441a)" style="fill: #009e73"/>
+   </g>
+   <g id="matplotlib.axis_3">
+    <g id="xtick_4">
+     <g id="line2d_10">
+      <g>
+       <use xlink:href="#ma73ca4d2c6" x="339.076232" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_11">
+      <!-- 固定点 -->
+      <g transform="translate(324.076232 247.96225) scale(0.1 -0.1)">
+       <use xlink:href="#DroidSansFallback-2492"/>
+       <use xlink:href="#DroidSansFallback-2932" transform="translate(100 0)"/>
+       <use xlink:href="#DroidSansFallback-3e51" transform="translate(200 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_11">
+      <g>
+       <use xlink:href="#ma73ca4d2c6" x="409.675156" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_12">
+      <!-- 固定扫射 -->
+      <g transform="translate(389.675156 247.96225) scale(0.1 -0.1)">
+       <use xlink:href="#DroidSansFallback-2492"/>
+       <use xlink:href="#DroidSansFallback-2932" transform="translate(100 0)"/>
+       <use xlink:href="#DroidSansFallback-3003" transform="translate(200 0)"/>
+       <use xlink:href="#DroidSansFallback-299c" transform="translate(300 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_6">
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#ma73ca4d2c6" x="480.274081" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_13">
+      <!-- 自适应扫射 -->
+      <g transform="translate(455.274081 247.923187) scale(0.1 -0.1)">
+       <use xlink:href="#DroidSansFallback-4f82"/>
+       <use xlink:href="#DroidSansFallback-5d9a" transform="translate(100 0)"/>
+       <use xlink:href="#DroidSansFallback-2c2c" transform="translate(200 0)"/>
+       <use xlink:href="#DroidSansFallback-3003" transform="translate(300 0)"/>
+       <use xlink:href="#DroidSansFallback-299c" transform="translate(400 0)"/>
+      </g>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_4">
+    <g id="ytick_7">
+     <g id="line2d_13">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="232.798187" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_14">
+      <!-- 0 -->
+      <g transform="translate(287.590312 236.626312) scale(0.1 -0.1)">
+       <use xlink:href="#DejaVuSans-13"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_8">
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="206.614727" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_15">
+      <!-- 1 -->
+      <g transform="translate(287.590312 210.442852) scale(0.1 -0.1)">
+       <use xlink:href="#DejaVuSans-14"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_9">
+     <g id="line2d_15">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="180.431266" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_16">
+      <!-- 2 -->
+      <g transform="translate(287.590312 184.259391) scale(0.1 -0.1)">
+       <use xlink:href="#DejaVuSans-15"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_10">
+     <g id="line2d_16">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="154.247805" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_17">
+      <!-- 3 -->
+      <g transform="translate(287.590312 158.07593) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-16" d="M 2597 2516 
+Q 3050 2419 3304 2112 
+Q 3559 1806 3559 1356 
+Q 3559 666 3084 287 
+Q 2609 -91 1734 -91 
+Q 1441 -91 1130 -33 
+Q 819 25 488 141 
+L 488 750 
+Q 750 597 1062 519 
+Q 1375 441 1716 441 
+Q 2309 441 2620 675 
+Q 2931 909 2931 1356 
+Q 2931 1769 2642 2001 
+Q 2353 2234 1838 2234 
+L 1294 2234 
+L 1294 2753 
+L 1863 2753 
+Q 2328 2753 2575 2939 
+Q 2822 3125 2822 3475 
+Q 2822 3834 2567 4026 
+Q 2313 4219 1838 4219 
+Q 1578 4219 1281 4162 
+Q 984 4106 628 3988 
+L 628 4550 
+Q 988 4650 1302 4700 
+Q 1616 4750 1894 4750 
+Q 2613 4750 3031 4423 
+Q 3450 4097 3450 3541 
+Q 3450 3153 3228 2886 
+Q 3006 2619 2597 2516 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-16"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_11">
+     <g id="line2d_17">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="128.064344" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_18">
+      <!-- 4 -->
+      <g transform="translate(287.590312 131.892469) scale(0.1 -0.1)">
+       <use xlink:href="#DejaVuSans-17"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_12">
+     <g id="line2d_18">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="101.880883" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_19">
+      <!-- 5 -->
+      <g transform="translate(287.590312 105.709008) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-18" d="M 691 4666 
+L 3169 4666 
+L 3169 4134 
+L 1269 4134 
+L 1269 2991 
+Q 1406 3038 1543 3061 
+Q 1681 3084 1819 3084 
+Q 2600 3084 3056 2656 
+Q 3513 2228 3513 1497 
+Q 3513 744 3044 326 
+Q 2575 -91 1722 -91 
+Q 1428 -91 1123 -41 
+Q 819 9 494 109 
+L 494 744 
+Q 775 591 1075 516 
+Q 1375 441 1709 441 
+Q 2250 441 2565 725 
+Q 2881 1009 2881 1497 
+Q 2881 1984 2565 2268 
+Q 2250 2553 1709 2553 
+Q 1456 2553 1204 2497 
+Q 953 2441 691 2322 
+L 691 4666 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-18"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_13">
+     <g id="line2d_19">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="75.697422" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_20">
+      <!-- 6 -->
+      <g transform="translate(287.590312 79.525547) scale(0.1 -0.1)">
+       <use xlink:href="#DejaVuSans-19"/>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_14">
+     <g id="line2d_20">
+      <g>
+       <use xlink:href="#m45280ee63c" x="300.952812" y="49.513961" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_21">
+      <!-- 7 -->
+      <g transform="translate(287.590312 53.342086) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-1a" d="M 525 4666 
+L 3525 4666 
+L 3525 4397 
+L 1831 0 
+L 1172 0 
+L 2766 4134 
+L 525 4134 
+L 525 4666 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-1a"/>
+      </g>
+     </g>
+    </g>
+    <g id="text_22">
+     <!-- 用水时长 (s) -->
+     <g transform="translate(281.2075 164.388813) rotate(-90) scale(0.1 -0.1)">
+      <defs>
+       <path id="DroidSansFallback-42c0" d="M 5675 4875 
+L 5675 175 
+Q 5675 -525 5075 -525 
+L 4325 -475 
+L 4225 25 
+L 4975 -25 
+Q 5175 -25 5175 325 
+L 5175 1400 
+L 3550 1400 
+L 3550 -275 
+L 3050 -275 
+L 3050 1400 
+L 1375 1400 
+Q 1250 350 750 -575 
+L 275 -275 
+Q 925 1000 950 2300 
+L 950 4875 
+L 5675 4875 
+z
+M 1450 3375 
+L 3050 3375 
+L 3050 4400 
+L 1450 4400 
+L 1450 3375 
+z
+M 3550 4400 
+L 3550 3375 
+L 5175 3375 
+L 5175 4400 
+L 3550 4400 
+z
+M 1425 1875 
+L 3050 1875 
+L 3050 2900 
+L 1450 2900 
+L 1425 1875 
+z
+M 3550 2900 
+L 3550 1875 
+L 5175 1875 
+L 5175 2900 
+L 3550 2900 
+z
+" transform="scale(0.015625)"/>
+       <path id="DroidSansFallback-39cc" d="M 2975 5175 
+L 3475 5175 
+L 3475 4150 
+L 3975 3075 
+Q 4825 3600 5450 4400 
+L 5875 4075 
+Q 5225 3200 4225 2625 
+Q 5000 1275 6125 525 
+L 5825 -50 
+Q 4375 1000 3475 3075 
+L 3475 -25 
+Q 3450 -575 2775 -575 
+L 1850 -475 
+L 1750 25 
+Q 2225 -100 2700 -100 
+Q 2975 -100 2975 150 
+L 2975 5175 
+z
+M 500 3750 
+L 2500 3750 
+L 2500 3275 
+Q 2500 3075 2037 1975 
+Q 1575 875 650 25 
+L 375 450 
+Q 1625 1600 2025 3275 
+L 500 3275 
+L 500 3750 
+z
+" transform="scale(0.015625)"/>
+       <path id="DroidSansFallback-338e" d="M 2750 3875 
+L 4800 3875 
+L 4800 5175 
+L 5300 5175 
+L 5300 3875 
+L 6050 3875 
+L 6050 3400 
+L 5300 3400 
+L 5300 25 
+Q 5275 -550 4675 -550 
+L 3900 -450 
+L 3800 75 
+Q 4200 -50 4600 -50 
+Q 4800 -50 4800 200 
+L 4800 3400 
+L 2750 3400 
+L 2750 3875 
+z
+M 3475 2975 
+Q 3950 2200 4275 1300 
+L 3775 1075 
+Q 3475 2025 3025 2775 
+L 3475 2975 
+z
+M 2525 4700 
+L 2525 275 
+L 2050 275 
+L 2050 625 
+L 950 625 
+L 950 75 
+L 475 75 
+L 475 4700 
+L 2525 4700 
+z
+M 950 2900 
+L 2050 2900 
+L 2050 4250 
+L 950 4250 
+L 950 2900 
+z
+M 950 1075 
+L 2050 1075 
+L 2050 2450 
+L 950 2450 
+L 950 1075 
+z
+" transform="scale(0.015625)"/>
+       <path id="DroidSansFallback-6317" d="M 350 2875 
+L 1650 2875 
+L 1650 5150 
+L 2150 5150 
+L 2150 2875 
+L 5900 2875 
+L 5900 2400 
+L 3575 2400 
+Q 4200 825 5900 175 
+L 5600 -350 
+Q 3675 450 3025 2400 
+L 2150 2400 
+L 2150 100 
+L 3100 725 
+L 3200 250 
+Q 2650 -175 1875 -550 
+L 1650 -300 
+L 1650 2400 
+L 350 2400 
+L 350 2875 
+z
+M 4725 5125 
+L 5125 4800 
+Q 4250 3725 2975 3100 
+L 2700 3550 
+Q 3825 4100 4725 5125 
+z
+" transform="scale(0.015625)"/>
+       <path id="DroidSansFallback-2" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-b" d="M 1984 4856 
+Q 1566 4138 1362 3434 
+Q 1159 2731 1159 2009 
+Q 1159 1288 1364 580 
+Q 1569 -128 1984 -844 
+L 1484 -844 
+Q 1016 -109 783 600 
+Q 550 1309 550 2009 
+Q 550 2706 781 3412 
+Q 1013 4119 1484 4856 
+L 1984 4856 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-56" d="M 2834 3397 
+L 2834 2853 
+Q 2591 2978 2328 3040 
+Q 2066 3103 1784 3103 
+Q 1356 3103 1142 2972 
+Q 928 2841 928 2578 
+Q 928 2378 1081 2264 
+Q 1234 2150 1697 2047 
+L 1894 2003 
+Q 2506 1872 2764 1633 
+Q 3022 1394 3022 966 
+Q 3022 478 2636 193 
+Q 2250 -91 1575 -91 
+Q 1294 -91 989 -36 
+Q 684 19 347 128 
+L 347 722 
+Q 666 556 975 473 
+Q 1284 391 1588 391 
+Q 1994 391 2212 530 
+Q 2431 669 2431 922 
+Q 2431 1156 2273 1281 
+Q 2116 1406 1581 1522 
+L 1381 1569 
+Q 847 1681 609 1914 
+Q 372 2147 372 2553 
+Q 372 3047 722 3315 
+Q 1072 3584 1716 3584 
+Q 2034 3584 2315 3537 
+Q 2597 3491 2834 3397 
+z
+" transform="scale(0.015625)"/>
+       <path id="DejaVuSans-c" d="M 513 4856 
+L 1013 4856 
+Q 1481 4119 1714 3412 
+Q 1947 2706 1947 2009 
+Q 1947 1309 1714 600 
+Q 1481 -109 1013 -844 
+L 513 -844 
+Q 928 -128 1133 580 
+Q 1338 1288 1338 2009 
+Q 1338 2731 1133 3434 
+Q 928 4138 513 4856 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#DroidSansFallback-42c0"/>
+      <use xlink:href="#DroidSansFallback-39cc" transform="translate(100 0)"/>
+      <use xlink:href="#DroidSansFallback-338e" transform="translate(200 0)"/>
+      <use xlink:href="#DroidSansFallback-6317" transform="translate(300 0)"/>
+      <use xlink:href="#DroidSansFallback-2" transform="translate(400 0)"/>
+      <use xlink:href="#DejaVuSans-b" transform="translate(426.171875 0)"/>
+      <use xlink:href="#DejaVuSans-56" transform="translate(465.1875 0)"/>
+      <use xlink:href="#DejaVuSans-c" transform="translate(517.28125 0)"/>
+     </g>
+    </g>
+   </g>
+   <g id="patch_14">
+    <path d="M 300.952812 232.798187 
+L 300.952812 40.34975 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_15">
+    <path d="M 518.3975 232.798187 
+L 518.3975 40.34975 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_16">
+    <path d="M 300.952812 232.798187 
+L 518.3975 232.798187 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_17">
+    <path d="M 300.952812 40.34975 
+L 518.3975 40.34975 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+  </g>
+  <g id="text_23">
+   <!-- 三种喷射（合成数据） -->
+   <g transform="translate(202.7975 17.04375) scale(0.12 -0.12)">
+    <defs>
+     <path id="DroidSansFallback-1ba1" d="M 800 4700 
+L 5600 4700 
+L 5600 4225 
+L 800 4225 
+L 800 4700 
+z
+M 1075 2550 
+L 5325 2550 
+L 5325 2075 
+L 1075 2075 
+L 1075 2550 
+z
+M 500 350 
+L 5900 350 
+L 5900 -125 
+L 500 -125 
+L 500 350 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-4765" d="M 325 3500 
+L 1300 3500 
+L 1300 4325 
+L 525 4150 
+L 350 4600 
+Q 1475 4800 2400 5200 
+L 2625 4775 
+L 1775 4475 
+L 1775 3500 
+L 2675 3500 
+L 2675 3050 
+L 1775 3050 
+L 1775 2925 
+L 2650 1875 
+L 2325 1425 
+L 1775 2275 
+L 1775 -575 
+L 1300 -575 
+L 1300 1925 
+Q 1000 1175 525 550 
+L 175 975 
+Q 875 1875 1225 3050 
+L 325 3050 
+L 325 3500 
+z
+M 5950 4025 
+L 5950 1125 
+L 5450 1125 
+L 5450 1575 
+L 4625 1575 
+L 4625 -575 
+L 4125 -575 
+L 4125 1575 
+L 3300 1575 
+L 3300 1125 
+L 2800 1125 
+L 2800 4025 
+L 4125 4025 
+L 4125 5175 
+L 4625 5175 
+L 4625 4025 
+L 5950 4025 
+z
+M 3300 2025 
+L 4125 2025 
+L 4125 3550 
+L 3300 3550 
+L 3300 2025 
+z
+M 4625 3550 
+L 4625 2025 
+L 5450 2025 
+L 5450 3550 
+L 4625 3550 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-234f" d="M 3900 5200 
+L 4375 5200 
+L 4375 4725 
+L 5675 4725 
+L 5675 4275 
+L 4375 4275 
+L 4375 3675 
+L 3900 3675 
+L 3900 4275 
+L 2600 4275 
+L 2600 4725 
+L 3900 4725 
+L 3900 5200 
+z
+M 4850 3950 
+L 5300 3950 
+L 5300 3475 
+L 6075 3475 
+L 6075 3025 
+L 5300 3025 
+L 5300 2575 
+L 4850 2575 
+L 4850 3025 
+L 3525 3025 
+L 3525 2575 
+L 3075 2575 
+L 3075 3025 
+L 2300 3025 
+L 2300 3475 
+L 3075 3475 
+L 3075 3925 
+L 3525 3925 
+L 3525 3475 
+L 4850 3475 
+L 4850 3950 
+z
+M 5625 2425 
+L 5625 450 
+L 5150 450 
+L 5150 1975 
+L 3100 1975 
+L 3100 425 
+L 2625 425 
+L 2625 2425 
+L 5625 2425 
+z
+M 3900 1625 
+L 4400 1625 
+Q 4350 -375 2275 -575 
+L 2000 -150 
+Q 3850 -50 3900 1625 
+z
+M 4525 525 
+Q 5325 225 5975 -175 
+L 5625 -550 
+Q 4975 -125 4225 150 
+L 4525 525 
+z
+M 2075 4625 
+L 2075 675 
+L 1575 675 
+L 1575 1075 
+L 1025 1075 
+L 1025 450 
+L 525 450 
+L 525 4625 
+L 2075 4625 
+z
+M 1025 1550 
+L 1575 1550 
+L 1575 4150 
+L 1025 4150 
+L 1025 1550 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-6eaa" d="M 4100 4575 
+L 4700 4575 
+Q 3050 3575 3050 1750 
+Q 3050 -25 4700 -1000 
+L 4100 -1000 
+Q 3375 -675 2912 87 
+Q 2450 850 2450 1750 
+Q 2450 2675 2912 3437 
+Q 3375 4200 4100 4575 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-21a0" d="M 3150 5250 
+L 3675 5100 
+L 3500 4900 
+Q 4750 3900 6125 3350 
+L 5825 2850 
+Q 4500 3425 3200 4575 
+Q 2025 3475 525 2800 
+L 250 3250 
+Q 2275 4200 3150 5250 
+z
+M 1300 3100 
+L 5075 3100 
+L 5075 2600 
+L 1300 2600 
+L 1300 3100 
+z
+M 5300 1925 
+L 5300 -575 
+L 4800 -575 
+L 4800 -175 
+L 1550 -175 
+L 1550 -575 
+L 1050 -575 
+L 1050 1925 
+L 5300 1925 
+z
+M 1550 300 
+L 4800 300 
+L 4800 1450 
+L 1550 1450 
+L 1550 300 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-2fa8" d="M 4850 5175 
+Q 5125 4900 5325 4550 
+L 4875 4350 
+L 4425 4975 
+L 4850 5175 
+z
+M 5750 4225 
+L 5750 3775 
+L 4050 3775 
+Q 4125 2375 4450 1425 
+Q 4800 2150 5050 3200 
+L 5550 3000 
+Q 5250 1675 4700 775 
+Q 5100 -50 5325 -50 
+Q 5525 -50 5625 675 
+L 6075 475 
+Q 5850 -575 5325 -575 
+Q 4850 -575 4350 325 
+Q 3875 -250 3300 -575 
+L 3050 -75 
+Q 3650 275 4100 850 
+Q 3650 2000 3550 3775 
+L 1300 3775 
+L 1300 2725 
+L 3000 2725 
+Q 2975 950 2825 487 
+Q 2675 25 2275 25 
+L 1725 75 
+L 1650 575 
+L 2225 525 
+Q 2350 525 2375 662 
+Q 2400 800 2475 2300 
+L 1300 2300 
+Q 1300 625 700 -500 
+L 250 -225 
+Q 800 900 825 1950 
+L 825 4225 
+L 3525 4225 
+L 3475 5175 
+L 4000 5175 
+L 4025 4225 
+L 5750 4225 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-3308" d="M 4275 4125 
+L 5950 4125 
+L 5950 3650 
+L 5675 3650 
+Q 5525 1900 4975 1000 
+Q 5425 400 6125 -100 
+L 5750 -575 
+Q 5175 -100 4675 550 
+Q 4175 -125 3450 -600 
+L 3100 -150 
+Q 3850 300 4350 1025 
+L 3700 2375 
+L 3500 1950 
+L 3100 2250 
+Q 3725 3575 4000 5175 
+L 4500 5025 
+L 4275 4125 
+z
+M 5175 3650 
+L 4150 3650 
+L 3975 3075 
+Q 4275 2175 4650 1525 
+Q 4975 2225 5125 3225 
+L 5125 3250 
+L 5175 3650 
+z
+M 450 4100 
+L 1750 4100 
+L 1750 5150 
+L 2200 5150 
+L 2200 4100 
+L 3400 4100 
+L 3400 3675 
+L 2200 3675 
+L 2200 2525 
+L 1750 2525 
+L 1750 3300 
+Q 1325 2700 750 2325 
+L 425 2725 
+Q 1050 3050 1525 3675 
+L 450 3675 
+L 450 4100 
+z
+M 1050 5050 
+L 1375 4375 
+L 975 4175 
+L 675 4875 
+L 1050 5050 
+z
+M 2900 5050 
+L 3275 4875 
+Q 3050 4450 2800 4225 
+L 2475 4525 
+Q 2725 4750 2900 5050 
+z
+M 2725 3450 
+L 3175 2825 
+L 2800 2600 
+Q 2650 2950 2375 3250 
+L 2725 3450 
+z
+M 425 2000 
+L 1400 2000 
+L 1575 2400 
+L 2050 2350 
+L 1900 2000 
+L 3025 2000 
+L 3025 1575 
+Q 2725 925 2300 475 
+L 3075 0 
+L 2775 -450 
+L 1925 125 
+Q 1400 -325 525 -600 
+L 375 -175 
+Q 1025 25 1500 350 
+L 625 800 
+L 1150 1575 
+L 425 1575 
+L 425 2000 
+z
+M 1675 1575 
+L 1300 1000 
+L 1900 700 
+Q 2275 1100 2500 1575 
+L 1675 1575 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-3106" d="M 350 4125 
+L 1125 4125 
+L 1125 5175 
+L 1625 5175 
+L 1625 4125 
+L 2125 4125 
+L 2125 3650 
+L 1625 3650 
+L 1625 2425 
+L 2200 2700 
+L 2300 2250 
+L 1625 1875 
+L 1625 0 
+Q 1600 -575 1000 -575 
+Q 700 -575 450 -475 
+L 350 25 
+Q 625 -75 925 -75 
+Q 1125 -75 1125 175 
+L 1125 1650 
+L 500 1400 
+L 300 1925 
+L 1125 2225 
+L 1125 3650 
+L 350 3650 
+L 350 4125 
+z
+M 4225 2250 
+L 3000 2250 
+Q 2950 675 2475 -525 
+L 2025 -250 
+Q 2525 1075 2525 2600 
+L 2525 4925 
+L 5800 4925 
+L 5800 3400 
+L 4700 3400 
+L 4700 2700 
+L 6025 2700 
+L 6025 2250 
+L 4700 2250 
+L 4700 1525 
+L 5775 1525 
+L 5775 -575 
+L 5300 -575 
+L 5300 -200 
+L 3650 -200 
+L 3650 -575 
+L 3175 -575 
+L 3175 1525 
+L 4225 1525 
+L 4225 2250 
+z
+M 5325 4475 
+L 3000 4475 
+L 3000 3850 
+L 5325 3850 
+L 5325 4475 
+z
+M 3000 3400 
+L 3000 2700 
+L 4225 2700 
+L 4225 3400 
+L 3000 3400 
+z
+M 3650 250 
+L 5300 250 
+L 5300 1075 
+L 3650 1075 
+L 3650 250 
+z
+" transform="scale(0.015625)"/>
+     <path id="DroidSansFallback-6eab" d="M 2300 -1000 
+L 1700 -1000 
+Q 3350 -25 3350 1750 
+Q 3350 3575 1700 4575 
+L 2300 4575 
+Q 3025 4200 3487 3437 
+Q 3950 2675 3950 1750 
+Q 3950 850 3487 87 
+Q 3025 -675 2300 -1000 
+z
+" transform="scale(0.015625)"/>
+    </defs>
+    <use xlink:href="#DroidSansFallback-1ba1"/>
+    <use xlink:href="#DroidSansFallback-4765" transform="translate(100 0)"/>
+    <use xlink:href="#DroidSansFallback-234f" transform="translate(200 0)"/>
+    <use xlink:href="#DroidSansFallback-299c" transform="translate(300 0)"/>
+    <use xlink:href="#DroidSansFallback-6eaa" transform="translate(400 0)"/>
+    <use xlink:href="#DroidSansFallback-21a0" transform="translate(500 0)"/>
+    <use xlink:href="#DroidSansFallback-2fa8" transform="translate(600 0)"/>
+    <use xlink:href="#DroidSansFallback-3308" transform="translate(700 0)"/>
+    <use xlink:href="#DroidSansFallback-3106" transform="translate(800 0)"/>
+    <use xlink:href="#DroidSansFallback-6eab" transform="translate(900 0)"/>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pd2962dfe81">
+   <rect x="44.689063" y="40.34975" width="217.444688" height="192.448437"/>
+  </clipPath>
+  <clipPath id="p756b7f441a">
+   <rect x="300.952812" y="40.34975" width="217.444688" height="192.448437"/>
+  </clipPath>
+ </defs>
+</svg>
