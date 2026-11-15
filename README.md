@@ -12,44 +12,37 @@
 
 模型权重不在 Git 仓库里。把微调权重放到 `models/yolo26s-ft-2026-11-04/best.pt`。`config.example.json` 的 `model.path` 指向这个文件。火焰阈值 0.30，烟雾阈值 0.35。低于对应阈值的框不进入时序，也不作为该类别的定位观测。
 
-## Windows 启动
+## 快速开始
 
-需要 Python 3.11、Node.js、FFmpeg、MediaMTX 的 Windows 程序和 Docker Desktop。`ffmpeg` 与 `mediamtx` 要在 PATH 里，或者把绝对路径写进 `config.json`。
+Windows 10/11 在仓库根目录执行：
 
-```powershell
-copy config.example.json config.json
+```text
+scripts\windows\install-and-start.bat
 ```
 
-按本机修改 `config.json`。这个文件含密钥，不要提交。
+脚本检查并安装 Python 3.12、Node.js、FFmpeg 和 MediaMTX 1.15.3，创建 `.venv`，安装依赖，构建前端。没有 `config.json` 时从 `config.example.json` 复制，不写入密钥，也不覆盖已有配置。示例里的占位口令只与 `compose.yaml` 的本机默认值一致。然后启动 MySQL、MinIO、后端和 MediaMTX，并打开浏览器。
 
-```powershell
-docker compose up -d
-powershell -ExecutionPolicy Bypass -File scripts\windows\bootstrap.ps1
-powershell -ExecutionPolicy Bypass -File scripts\windows\start-server.ps1
-powershell -ExecutionPolicy Bypass -File scripts\windows\start-web.ps1
+`apps/web/dist` 已存在且没有 Node 时，安装脚本直接使用这份静态文件。启动时设置 `FIRE_WEB_DIST`，页面和接口都在后端地址上，默认 `http://127.0.0.1:8080`。
+
+没有摄像头和 ESP32 时：
+
+```text
+scripts\windows\start-demo.bat
 ```
 
-`docker compose` 只启动 MySQL 和 MinIO。浏览器打开 `http://127.0.0.1:5173`，用 `config.json` 里的账号登录。先建教室和摄像头，再启动推流：
+演示模式仍要 MySQL 和 MinIO。它写出 `runtime/demo.config.json`，打开合成回放，关闭串口，不启动 MediaMTX。材料在 `data/demo/synthetic-classroom`，是程序生成的画面，不是现场录像。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\windows\start-streams.ps1
-```
+数据库里还没有摄像头时，监控页打得开，但没有四路实况。管理员建好教室和摄像头后，重新运行 `scripts\windows\start-streams.ps1`。
 
-这个脚本按数据库里的摄像头写出 `runtime/mediamtx.yml`，启动 MediaMTX，并对每路 USB 摄像头启动 FFmpeg，推到 `rtsp_base/{stream_key}`。改了摄像头之后重新运行它。
+分步命令仍然可用：`bootstrap.ps1`、`start-server.ps1`、`start-web.ps1`、`start-streams.ps1`、`stop.ps1`。`stop.ps1` 不停止 Docker。数据库和对象存储用 `docker compose stop`。
 
-停止脚本拉起的进程：
+开发时在仓库根目录执行 `python -m fire_monitoring`。可选配置路径作为第一个参数。前端在 `apps/web` 执行 `npm run dev`，地址是 `http://127.0.0.1:5173`。`npm run build` 先做类型检查再打包，Vite 从仓库根的 `config.json` 读取服务地址。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\windows\stop.ps1
-```
-
-它不停止 Docker。数据库和对象存储用 `docker compose stop`。
-
-开发时可以在仓库根目录执行 `python -m fire_monitoring`。前端在 `apps/web` 执行 `npm run dev`。`npm run build` 会先做类型检查再打包，Vite 从仓库根的 `config.json` 读取服务地址。
+步骤、失败时的提示和回滚见 [部署手册](docs/manuals/部署手册.md)。
 
 ## 页面
 
-登录。教室管理，含最多 4 路摄像头绑定、标定和平面图。未标定的绑定在教室详情里标红。摄像头管理。实时监控，选定教室后四宫格，显示检测框和状态。告警研判，含关键帧、大模型分析、燃烧物、是否有人、平面图火点、处置记录和手动重跑分析。任意页面都会通过 WebSocket 弹出告警并播放提示音。系统配置只读，密钥打码。角色只有管理员和值班员。
+登录。教室管理，含最多 4 路摄像头绑定、标定、平面图和可燃物区域。未完成标定的绑定在教室详情里标出。摄像头管理。实时监控选定教室后四宫格，显示检测框和状态；演示模式改为四路回放。告警研判含关键帧、片段、大模型分析、燃烧物、是否有人、平面图火点、处置记录和手动重跑分析。灭火控制显示状态机、急停、解锁和手动瞄准。演示模式另有数据大屏和数字孪生。任意页面都会通过 WebSocket 弹出告警并播放提示音。管理员可以改非密钥配置，密钥不返回到页面。角色只有管理员和值班员。操作说明见 [用户手册](docs/manuals/用户手册.md)。
 
 ## 现场需要做的事
 
@@ -135,9 +128,9 @@ MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一�
 
 ### pump
 
-`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是覆盖的教室 id，不是摄像头 id。确认告警后向执行节点发送 `FIRE_ACTUATOR_V2` 的 `RUN` 指令，持续 `duration_ms` 毫秒。BOOT 强制喷水已删除。接线见 `docs/hardware/wiring.md`。
+`enabled` 为 true 时必须填写 `serial_port` 和 `zone_id`。`zone_id` 是覆盖的教室 id，不是摄像头 id。灭火状态机进入喷射后发送 `FIRE_ACTUATOR_V2` 的 `RUN`，持续 `duration_ms` 毫秒。BOOT 强制喷水已删除。接线见 `docs/hardware/wiring.md`。
 
-`require_vlm` 为 false 时，用本地火焰确认：分数不低于 `local_min_confidence`，有效帧数不少于 `local_min_frames`。为 true 时还要求千问证据校验通过，并且看见火或烟；规则表禁止用水时不发 `RUN`。`max_evidence_age_seconds` 是从取证到发指令允许的最大延迟，超出则不启动。`cooldown_seconds` 是两次启动的最短间隔。`journal_path` 是命令记录的 SQLite 文件。监控页可以紧急停泵。
+喷水由灭火状态机在联锁通过、待喷结束后发送 `RUN`，不是告警一确认就发。`require_vlm` 为 false 时，用本地火焰确认：分数不低于 `local_min_confidence`，有效帧数不少于 `local_min_frames`。为 true 时还要求千问证据校验通过，并且看见火或烟；规则表禁止用水时不发 `RUN`。`max_evidence_age_seconds` 是从取证到发指令允许的最大延迟，超出则不启动。`cooldown_seconds` 是两次启动的最短间隔。`journal_path` 是命令记录的 SQLite 文件。监控页可以紧急停泵。
 
 ### auth
 
@@ -157,9 +150,50 @@ MySQL 连接。`name`、`user`、`password` 要和 `compose.yaml` 里的库一�
 
 `freeze_seconds` 是连续帧差为零持续多久后记一条画面冻结故障。`offline_seconds` 是没有画面持续多久后记一条离线故障。模糊仍由标定里的拉普拉斯方差阈值判断，不在这里再设一份。监控页和摄像头页显示当前状态。
 
+### suppression
+
+灭火状态机的待喷、复核、清除时间，修正次数，覆盖半径和阈值，单次告警允许的总喷水时间 `max_water_s`，人员距离，弹道初速和阻力，教室尺寸，云台初值，以及 `gimbal_path`。覆盖概率不够时，扫射从估计点出发，沿落点平面主轴按喷射半径加点，并在点数上限里取并集覆盖概率最大的前缀；低于阈值就不喷。演示包按待喷 3 秒、喷射 5 秒、清除 3 秒制作，改了这三项之后示例剧本会拒绝播放。
+
+### demo
+
+`enabled` 为 true 时不启动实况检测线程，改为播放 `pack`。`hardware` 为 `sim` 时用进程内模拟设备，为 `serial` 时使用已启用的串口。`detector` 为 `replay` 时用包内检测框，不加载 YOLO。`pump_run` 为 false 时状态机仍推进，但不把喷水交给模拟泵。
+
 ### timezone
 
 短信使用的时区，例如 `Asia/Shanghai`。
+
+## 目录
+
+| 路径 | 内容 |
+|---|---|
+| `apps/server` | FastAPI 后端 |
+| `apps/inference` | 时序、定位、规则、灭火状态机和串口协议 |
+| `apps/web` | Vue 3 页面 |
+| `firmware` | ESP32 执行节点和报警节点 |
+| `contracts` | 串口协议 |
+| `config` | 火灾类别规则 |
+| `ml` | 训练和数据脚本，在线服务不调用 |
+| `data/demo` | 合成演示包 |
+| `scripts/windows` | 安装、启动、演示和停止 |
+| `docs/manuals` | 部署手册、用户手册、测试报告、系统设计说明及 PDF |
+| `docs/copyright` | 软著填表草稿、说明书和源程序节选 |
+| `docs/experiments` | 已生成的实验图和 JSON |
+| `docs/releases` | 版本说明草稿 |
+
+`config.json`、`.venv`、`runtime/` 和 `models/` 不提交。
+
+## 文档
+
+- [部署手册](docs/manuals/部署手册.md)、[用户手册](docs/manuals/用户手册.md)、[测试报告](docs/manuals/测试报告.md)、[系统设计说明](docs/manuals/系统设计说明.md)
+- [v2.0 发布说明草稿](docs/releases/v2.0.md)
+- [实验说明](docs/experiments/README.md)、[训练交接](docs/training/yolo26s-handoff-2026-11-08.md)
+- [执行节点协议](contracts/actuator-serial-v2.md)、[报警节点协议](contracts/panel-serial-v2.md)
+
+PDF 由 `python scripts/docs/build_materials.py` 生成。中文优先用本机的 Droid Sans Fallback，没有则用仓库里的文泉驿微米黑。
+
+## 回滚
+
+P9 之前的 main 是 `1a80bbc`，标签 `p8-done` 和 `before-p9` 指向它。合并之后撤回本次改动用 `git revert -m 1 <合并提交>` 另开 PR，不要强推 `main`。只查看旧代码可以 `git checkout before-p9`。
 
 ## 测试
 
