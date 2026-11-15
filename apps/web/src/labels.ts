@@ -73,6 +73,30 @@ export const alertStatusLabels: Record<string, string> = {
   CLOSED: "已结案",
 }
 
+export const eventLabels: Record<string, string> = {
+  CONFIRMED: "告警生成",
+  LOCALIZED: "完成定位",
+  UNOBSERVABLE: "无法定位",
+  ANALYSIS: "完成研判",
+  SMS: "发送短信",
+  PUMP: "联动水泵",
+  CLIP: "保存视频",
+  ACKNOWLEDGED: "值班确认",
+  FALSE_ALARM: "标记误报",
+  CLOSED: "结案",
+  SUP_MONITOR: "回到监视",
+  SUP_SUSPECTED: "疑似",
+  SUP_CONFIRMED: "火情确认",
+  SUP_AIM: "瞄准",
+  SUP_PENDING: "待喷",
+  SUP_SPRAY: "喷射",
+  SUP_REVIEW: "复核",
+  SUP_OUT: "已扑灭",
+  SUP_MANUAL: "需人工处置",
+  SUP_LOCKED: "急停锁定",
+  SUP_BLOCK: "喷水联锁",
+}
+
 export const dispositionLabels: Record<string, string> = {
   acknowledge: "确认",
   false_alarm: "标记误报",

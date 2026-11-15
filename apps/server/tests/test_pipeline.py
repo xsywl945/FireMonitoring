@@ -17,6 +17,7 @@ from fire_monitoring.detection.capture import CapturedFrame, FrameBuffer
 from fire_monitoring.detection.ingest import FrameShot
 from fire_monitoring.detection.worker import Assignment, due_cameras
 from fire_monitoring.events.hub import EventHub
+from fire_monitoring.localization.observe import source_from_box
 from fire_monitoring.evidence.store import MemoryStore
 from fire_monitoring.main import create_app
 from fire_monitoring.models import Alert, AlertEvent, Camera, Room, RoomCamera
@@ -100,8 +101,16 @@ class FakeTransport:
             trace = command.split()[1]
             return f"ACK {trace} ON"
         if command == "STATUS":
-            return "STATE OFF NONE"
-        return "STOPPED"
+            return "STATE OFF OFF CLEAR 0 0"
+        if command == "PING":
+            return "PONG"
+        if command == "HELLO":
+            return "READY FIRE_ACTUATOR_V2"
+        if command.startswith(("AIM ", "LASER ", "MODE ")):
+            return command
+        if command in {"STOP", "UNLOCK"}:
+            return "STOPPED" if command == "STOP" else "UNLOCKED"
+        return "ERR COMMAND"
 
     def close(self) -> None:
         return None
@@ -188,6 +197,7 @@ def test_due_cameras_follow_target_fps() -> None:
 def test_require_vlm_holds_the_pump_until_analysis(tmp_path: Path) -> None:
     config = _config()
     config.pump.require_vlm = True
+    config.suppression.pending_seconds = 0
     engine = make_engine(f"sqlite:///{tmp_path / 'hold.db'}")
     Base.metadata.create_all(engine)
     factory = make_session_factory(engine)
@@ -220,7 +230,13 @@ def test_require_vlm_holds_the_pump_until_analysis(tmp_path: Path) -> None:
         SmsService(config, sender),
         pump,
         EventHub(),
-        localizer=lambda _manifest: {"status": "UNOBSERVABLE", "support_camera_ids": []},
+        localizer=lambda _manifest: {
+            "status": "ESTIMATED",
+            "xyz": [1.5, 2.5, 0.2],
+            "covariance": [[0.0025, 0, 0], [0, 0.0025, 0], [0, 0, 0.0025]],
+            "condition_number": 1.0,
+            "support_camera_ids": [1, 2],
+        },
         on_fatal=lambda: None,
     )
     pipeline.start()
@@ -234,8 +250,31 @@ def test_require_vlm_holds_the_pump_until_analysis(tmp_path: Path) -> None:
             room_id=room.id,
             alert_type="FIRE",
             started_at=now,
-            sources=[],
-            calibrations={},
+            sources=[
+                source_from_box(
+                    camera_id=camera_id,
+                    class_name="fire",
+                    bbox_xyxy=(1, 1, 4, 4),
+                    confidence=0.9,
+                    image_width=8,
+                    image_height=8,
+                    captured_at=now,
+                )
+                for camera_id in (1, 2)
+            ],
+            calibrations={
+                camera_id: {
+                    "intrinsics": [[8, 0, 4], [0, 8, 4], [0, 0, 1]],
+                    "distortion": [0, 0, 0, 0, 0],
+                    "landmarks": [
+                        {"world_m": [0, 0, 0], "pixel": [1, 1]},
+                        {"world_m": [1, 0, 0], "pixel": [2, 1]},
+                        {"world_m": [1, 1, 0], "pixel": [2, 2]},
+                        {"world_m": [0, 1, 0], "pixel": [1, 2]},
+                    ],
+                }
+                for camera_id in (1, 2)
+            },
             frames=frames,
             pump_observations=[
                 {
@@ -256,13 +295,14 @@ def test_require_vlm_holds_the_pump_until_analysis(tmp_path: Path) -> None:
     analyzer.release.set()
     pipeline.wait()
     assert sender.sent
-    assert transport.commands[0].startswith("RUN ")
+    assert any(item.startswith("RUN ") for item in transport.commands)
     pipeline.stop()
     pump.close()
 
 
 def test_synthetic_frames_publish_events_while_qwen_is_delayed(tmp_path: Path, caplog) -> None:
     config = _config()
+    config.suppression.pending_seconds = 0
     engine = make_engine(f"sqlite:///{tmp_path / 'live.db'}")
     Base.metadata.create_all(engine)
     import fire_monitoring.models  # noqa: F401
@@ -371,7 +411,7 @@ def test_synthetic_frames_publish_events_while_qwen_is_delayed(tmp_path: Path, c
     kinds = [row.kind for row in fresh.query(AlertEvent).order_by(AlertEvent.id)]
     assert kinds[0] == "CONFIRMED"
     assert kinds.index("ANALYSIS") < kinds.index("SMS")
-    assert kinds.index("PUMP") < kinds.index("ANALYSIS")
+    assert kinds.index("SUP_SPRAY") < kinds.index("ANALYSIS")
     assert "LOCALIZED" in kinds
     assert any("popup" in record.message and "after confirmation" in record.message for record in caplog.records)
     pump.close()

@@ -9,24 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from .actuator_v2 import READY, run_line
-from .contracts import (
-    EventEnvelope,
-    EventType,
-    IncidentConfirmedPayload,
-    VlmAnalysisPayload,
-    utc_now,
-)
-
-
-def _vlm_confirms(judgement: VlmAnalysisPayload | None) -> bool:
-    return (
-        judgement is not None
-        and judgement.status == "SUCCEEDED"
-        and bool(judgement.has_visible_fire or judgement.has_visible_smoke)
-    )
+from .contracts import utc_now
 
 
 class PumpConfig(BaseModel):
@@ -161,52 +147,46 @@ class PumpController:
             return "STALE_EVIDENCE"
         return None
 
-    def trigger(
+    def command(self, line: str) -> str:
+        with self._lock:
+            reply = self.transport.request(line)
+            self._connected = True
+            return reply
+
+    def release_inhibit(self) -> None:
+        self._inhibited = False
+
+    def dispatch_run(
         self,
-        event: EventEnvelope,
-        judgement: VlmAnalysisPayload | None,
+        trace_id: str,
+        duration_ms: int,
         *,
         captured_at: datetime,
         cancelled: threading.Event | None = None,
-    ) -> None:
+        zone_id: int | None = None,
+        camera_id: int | None = None,
+    ) -> dict:
         with self._lock:
-            if self._db.execute(
-                "SELECT 1 FROM commands WHERE trace = ?", (str(event.trace_id),)
-            ).fetchone():
-                return
+            if self._db.execute("SELECT 1 FROM commands WHERE trace = ?", (trace_id,)).fetchone():
+                return json.loads(
+                    self._db.execute("SELECT data FROM commands WHERE trace = ?", (trace_id,)).fetchone()[0]
+                )
             now = self.clock()
             reason = self._live_rejection(captured_at, cancelled)
-            if reason is not None:
-                pass
-            elif not self.config.enabled:
+            if reason is None and not self.config.enabled:
                 reason = "PUMP_DISABLED"
-            elif event.zone_id != self.config.zone_id:
-                reason = "ZONE_NOT_COVERED"
-            elif judgement is not None and judgement.water_prohibited:
-                reason = "WATER_PROHIBITED"
-            elif self.config.require_vlm and not _vlm_confirms(judgement):
-                reason = "VLM_NOT_CONFIRMED"
-            elif not self.config.require_vlm and not self._local_fire_confirmed(event):
-                reason = "LOCAL_FIRE_NOT_CONFIRMED"
-            elif any(
-                record.get("attemptedAt")
-                and (now - datetime.fromisoformat(record["attemptedAt"])).total_seconds()
-                < self.config.cooldown_seconds
-                for record in self._records()
-            ):
-                reason = "COOLDOWN"
             record = dict(
-                traceId=str(event.trace_id),
-                zoneId=event.zone_id,
-                cameraId=event.camera_id,
+                traceId=trace_id,
+                zoneId=zone_id if zone_id is not None else self.config.zone_id,
+                cameraId=camera_id,
                 createdAt=now.isoformat(),
-                durationMs=self.config.duration_ms,
+                durationMs=duration_ms,
                 status="SKIPPED" if reason else "ATTEMPTING",
                 reason=reason,
             )
             if reason:
                 self._save(record)
-                return
+                return record
             # Commit before writing: an ambiguous timeout must never cause another RUN.
             record["attemptedAt"] = now.isoformat()
             self._save(record)
@@ -217,10 +197,8 @@ class PumpController:
                     record.update(status="SKIPPED", reason=reason)
                     record.pop("attemptedAt", None)
                     self._save(record)
-                    return
-                reply = self.transport.request(
-                    run_line(event.trace_id.hex, self.config.duration_ms)
-                )
+                    return record
+                reply = self.transport.request(run_line(trace_id, duration_ms))
                 if reply.startswith("ERR "):
                     record.update(status="SKIPPED", reason=reply.split()[1])
                     record.pop("attemptedAt", None)
@@ -228,8 +206,8 @@ class PumpController:
                     self._device_state = "OFF"
                     self._error = reply.split()[1]
                     self._save(record)
-                    return
-                if reply != f"ACK {event.trace_id.hex} ON":
+                    return record
+                if reply != f"ACK {trace_id} ON":
                     raise OSError("pump did not acknowledge this command")
                 record.update(status="RUNNING", reason=None)
                 self._connected = True
@@ -242,20 +220,17 @@ class PumpController:
                 self._device_state = "UNKNOWN"
                 self._error = "DEVICE_ACK_UNAVAILABLE"
             self._save(record)
+            return record
 
-    def _local_fire_confirmed(self, event: EventEnvelope) -> bool:
-        if event.event_type != EventType.INCIDENT_CONFIRMED:
-            return False
-        try:
-            payload = IncidentConfirmedPayload.model_validate(event.payload)
-        except ValidationError:
-            return False
-        return payload.primary_type in {"FIRE", "FIRE_AND_SMOKE"} and any(
-            observation.class_name == "fire"
-            and observation.score >= self.config.local_min_confidence
-            and observation.effective_frames >= self.config.local_min_frames
-            for observation in payload.observations
-        )
+    def cutoff(self) -> None:
+        with self._lock:
+            if not self.config.enabled:
+                return
+            if self.transport.request("STOP") != "STOPPED":
+                raise OSError("stop not acknowledged")
+            self._device_state = "OFF"
+            self._activation_source = None
+            self._connected = True
 
     def refresh(self) -> None:
         if not self.config.enabled:

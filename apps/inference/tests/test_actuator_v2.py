@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fire_monitoring_inference.actuator_v2 import READY, ActuatorDevice, run_line
-from fire_monitoring_inference.contracts import EventEnvelope, EventType, utc_now
+from fire_monitoring_inference.contracts import utc_now
 from fire_monitoring_inference.pump import PumpConfig, PumpController
 
 
@@ -52,31 +52,6 @@ def test_heartbeat_timeout_stops_pump_and_laser() -> None:
 def test_controller_run_uses_the_same_device(tmp_path: Path) -> None:
     device = ActuatorDevice()
     now = utc_now()
-    event = EventEnvelope.create(
-        event_type=EventType.INCIDENT_CONFIRMED,
-        source="server",
-        zone_id=2,
-        camera_id=1,
-        payload={
-            "dedupKey": "p3",
-            "primaryType": "FIRE",
-            "severity": "HIGH",
-            "fusionMode": "SINGLE_CAMERA",
-            "fusionScore": 0.9,
-            "startedAt": now.isoformat(),
-            "confirmedAt": now.isoformat(),
-            "observations": [
-                {
-                    "cameraId": 1,
-                    "viewRole": "SINGLE",
-                    "className": "fire",
-                    "score": 0.9,
-                    "effectiveFrames": 3,
-                    "durationMs": 400,
-                }
-            ],
-        },
-    )
     pump = PumpController(
         config=PumpConfig(
             enabled=True,
@@ -92,23 +67,15 @@ def test_controller_run_uses_the_same_device(tmp_path: Path) -> None:
         transport=SimTransport(device),
     )
     device.latch_estop()
-    pump.trigger(event, None, captured_at=now)
+    first = "0123456789abcdef0123456789abcdef"
+    pump.dispatch_run(first, 5000, captured_at=now)
     assert pump.snapshot()["records"][0]["reason"] == "ESTOP"
     assert device.running is False
     device.release_estop()
     device.press_reset()
     assert device.exchange("UNLOCK") == "UNLOCKED"
-    pump.trigger(
-        EventEnvelope.create(
-            event_type=EventType.INCIDENT_CONFIRMED,
-            source="server",
-            zone_id=2,
-            camera_id=1,
-            payload=event.payload,
-        ),
-        None,
-        captured_at=now,
-    )
+    second = "abcdef0123456789abcdef0123456789"
+    pump.dispatch_run(second, 5000, captured_at=now)
     assert device.running is True
     assert pump.snapshot()["records"][0]["status"] == "RUNNING"
     pump.close()

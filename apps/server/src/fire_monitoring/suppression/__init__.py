@@ -1,0 +1,1 @@
+"""Per-room suppression wiring."""

@@ -15,7 +15,7 @@ from fire_monitoring.detection.ingest import FrameShot
 from fire_monitoring.events.hub import EventHub
 from fire_monitoring.evidence.store import MemoryStore
 from fire_monitoring.localization.observe import source_from_box
-from fire_monitoring.models import Alert, AlertFrame, Room, SmsDispatch
+from fire_monitoring.models import Alert, AlertEvent, AlertFrame, Room, SmsDispatch
 from fire_monitoring.sms.aliyun import AliyunSmsSender
 from fire_monitoring.sms.service import SmsService
 from fire_monitoring.config.model import SmsSettings
@@ -73,8 +73,16 @@ class FakeTransport:
             trace = command.split()[1]
             return f"ACK {trace} ON"
         if command == "STATUS":
-            return "STATE OFF NONE"
-        return "STOPPED"
+            return "STATE OFF OFF CLEAR 0 0"
+        if command == "PING":
+            return "PONG"
+        if command == "HELLO":
+            return "READY FIRE_ACTUATOR_V2"
+        if command.startswith(("AIM ", "LASER ", "MODE ")):
+            return command
+        if command in {"STOP", "UNLOCK"}:
+            return "STOPPED" if command == "STOP" else "UNLOCKED"
+        return "ERR COMMAND"
 
     def close(self) -> None:
         return None
@@ -188,6 +196,7 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
         }
 
     config = _config()
+    config.suppression.pending_seconds = 0
     pipeline = AlertPipeline(
         config,
         factory,
@@ -246,7 +255,7 @@ def test_confirm_alert_saves_position_frames_analysis_sms_and_pump(tmp_path: Pat
             },
         )
     ]
-    assert transport.commands[0].startswith("RUN ")
+    assert any(item.startswith("RUN ") for item in transport.commands)
 
     later = now + timedelta(seconds=10)
     _submit(
@@ -336,8 +345,11 @@ def test_qwen_class_e_makes_the_pump_refuse_water(tmp_path: Path) -> None:
     analysis = json.loads(session.query(Alert).one().analysis_json)
     assert "E" in analysis["rules"]["classes"]
     assert analysis["rules"]["water_prohibited"] is True
-    assert pump.snapshot()["records"][0]["reason"] == "WATER_PROHIBITED"
-    assert transport.commands == []
+    kinds = [row.kind for row in session.query(AlertEvent).order_by(AlertEvent.id)]
+    assert "SUP_BLOCK" in kinds
+    detail = json.loads(session.query(AlertEvent).filter_by(kind="SUP_BLOCK").one().detail_json)
+    assert detail["reason"] == "WATER_PROHIBITED"
+    assert not any(item.startswith("RUN ") for item in transport.commands)
     pipeline.stop()
     pump.close()
 

@@ -105,6 +105,27 @@
   "cameras": {
     "default_fps": 15
   },
+  "suppression": {
+    "pending_seconds": 3,
+    "review_seconds": 5,
+    "clear_seconds": 3,
+    "max_corrections": 2,
+    "max_std_m": 0.5,
+    "cover_radius_m": 1,
+    "cover_threshold": 0.5,
+    "person_distance_m": 1.5,
+    "speed": 10,
+    "drag": 0.05,
+    "room_width_m": 9,
+    "room_depth_m": 12,
+    "gimbal_x": 0,
+    "gimbal_y": 0,
+    "gimbal_z": 2.2,
+    "gimbal_yaw_deg": 0,
+    "gimbal_tilt_zero": 4000,
+    "gimbal_path": "runtime/gimbal.json",
+    "person_weights": ""
+  },
   "health": {
     "freeze_seconds": 5,
     "offline_seconds": 3
